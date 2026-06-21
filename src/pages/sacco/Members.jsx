@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { formatDate } from '@/lib/format';
 import { Users, UserPlus, Check, X } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
+import { formatPhoneDisplay } from '@/lib/phone';
 
 export default function SaccoMembers() {
   const { user } = useAuth();
@@ -49,7 +50,7 @@ export default function SaccoMembers() {
             {members.map(m => (
               <tr key={m.id} className="border-t border-border hover:bg-accent/50">
                 <td className="px-4 py-3 font-medium">{m.full_name || 'Unknown'}</td>
-                <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{m.phone || '—'}</td>
+                <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{m.phone ? formatPhoneDisplay(m.phone) : '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(m.created_date)}</td>
                 <td className="px-4 py-3 text-right">
                   <button className="text-xs text-blue-600 font-semibold hover:underline">View</button>

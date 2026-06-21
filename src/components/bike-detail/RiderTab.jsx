@@ -1,4 +1,5 @@
 import { User, Phone, Shield, Crown } from 'lucide-react';
+import { formatPhoneDisplay } from '@/lib/phone';
 
 function PersonCard({ person, label, role }) {
   if (!person) {
@@ -19,7 +20,7 @@ function PersonCard({ person, label, role }) {
       {person.email && <p className="text-xs text-muted-foreground mt-0.5">{person.email}</p>}
       {person.phone && (
         <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-          <Phone className="w-3 h-3" /> {person.phone}
+          <Phone className="w-3 h-3" /> {formatPhoneDisplay(person.phone)}
         </p>
       )}
       {person.kyc_status && (

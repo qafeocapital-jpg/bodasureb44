@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { ChevronLeft, ChevronRight, Check, MapPin } from 'lucide-react';
+import PhoneInput from '@/components/ui/PhoneInput';
+import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -13,6 +15,8 @@ export default function Profile() {
   const [stages, setStages] = useState([]);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+  const [nationalIdError, setNationalIdError] = useState('');
   const [form, setForm] = useState({
     full_name: '',
     phone: '',
@@ -29,7 +33,7 @@ export default function Profile() {
       try {
         setForm({
           full_name: user.full_name || '',
-          phone: user.phone || '',
+          phone: normalizePhone(user.phone) || user.phone || '',
           national_id: user.national_id || '',
           county_id: user.county_id || '',
           sub_county_id: user.sub_county_id || '',
@@ -108,19 +112,61 @@ export default function Profile() {
     },
   ];
 
+  const isNationalIdValid = (id) => /^\d{7,8}$/.test((id || '').trim());
+
   const canProceed = () => {
     const current = steps[step];
+    if (current.fields.includes('phone') && !isValidKenyanPhone(form.phone)) return false;
+    if (current.fields.includes('national_id') && !isNationalIdValid(form.national_id)) return false;
     return current.fields.every(f => form[f] && form[f].trim() !== '');
   };
+
+  async function checkPhoneUniqueness() {
+    if (!form.phone || !isValidKenyanPhone(form.phone)) { setPhoneError(''); return false; }
+    if (form.phone === normalizePhone(user?.phone)) { setPhoneError(''); return false; }
+    try {
+      const existing = await base44.entities.User.filter({ phone: form.phone });
+      if (existing.length > 0 && existing[0].id !== user?.id) {
+        setPhoneError('This phone number is already registered to another account.');
+        return true;
+      }
+      setPhoneError('');
+      return false;
+    } catch (e) {
+      setPhoneError('');
+      return false;
+    }
+  }
+
+  async function checkNationalIdUniqueness() {
+    const id = (form.national_id || '').trim();
+    if (!id || !isNationalIdValid(id)) { setNationalIdError(''); return false; }
+    if (id === user?.national_id) { setNationalIdError(''); return false; }
+    try {
+      const existing = await base44.entities.User.filter({ national_id: id });
+      if (existing.length > 0 && existing[0].id !== user?.id) {
+        setNationalIdError('This ID is already registered.');
+        return true;
+      }
+      setNationalIdError('');
+      return false;
+    } catch (e) {
+      setNationalIdError('');
+      return false;
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
     try {
+      const phoneTaken = await checkPhoneUniqueness();
+      const idTaken = await checkNationalIdUniqueness();
+      if (phoneTaken || idTaken) { setSaving(false); return; }
       const isComplete = form.full_name && form.county_id && form.sub_county_id && form.ward_id;
       await base44.auth.updateMe({
         full_name: form.full_name,
         phone: form.phone,
-        national_id: form.national_id,
+        national_id: (form.national_id || '').trim(),
         county_id: form.county_id,
         sub_county_id: form.sub_county_id,
         ward_id: form.ward_id,
@@ -150,27 +196,29 @@ export default function Profile() {
       case 'phone':
         return (
           <div key={field}>
-            <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
-            <input
-              type="tel"
+            <PhoneInput
               value={form.phone}
-              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              placeholder="07XX XXX XXX"
-              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              onChange={(e164) => setForm(f => ({ ...f, phone: e164 }))}
+              onBlur={checkPhoneUniqueness}
+              error={phoneError}
             />
           </div>
         );
       case 'national_id':
         return (
           <div key={field}>
-            <label className="text-xs font-medium text-muted-foreground">National ID (Optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">National ID Number *</label>
             <input
               type="text"
+              inputMode="numeric"
               value={form.national_id}
-              onChange={e => setForm(f => ({ ...f, national_id: e.target.value }))}
+              onChange={e => setForm(f => ({ ...f, national_id: e.target.value.replace(/[^\d]/g, '') }))}
+              onBlur={checkNationalIdUniqueness}
               placeholder="00000000"
+              maxLength={8}
               className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
+            {nationalIdError && <p className="text-xs text-destructive mt-1">{nationalIdError}</p>}
           </div>
         );
       case 'county_id':

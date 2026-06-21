@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { Users, Bike, BadgeCheck, FileText, MapPin, ArrowLeftRight } from 'lucide-react';
 import BikeDetailSheet from '@/components/BikeDetailSheet';
+import { formatPhoneDisplay } from '@/lib/phone';
 
 export default function CountyRegistrations() {
   const [tab, setTab] = useState('riders');
@@ -82,7 +83,7 @@ export default function CountyRegistrations() {
               {riders.map(r => (
                 <tr key={r.id} className="border-t border-border hover:bg-accent/50">
                   <td className="px-4 py-3 font-medium">{r.full_name || 'Unknown'}</td>
-                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{r.phone || r.email || '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{r.phone ? formatPhoneDisplay(r.phone) : r.email || '—'}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${r.kyc_status === 'approved' ? 'bg-success/10 text-success' : r.kyc_status === 'pending' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground'}`}>{r.kyc_status || 'none'}</span>
                   </td>

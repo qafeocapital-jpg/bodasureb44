@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { UserPlus, Loader2, CheckCircle2 } from 'lucide-react';
+import PhoneInput from '@/components/ui/PhoneInput';
+import { isValidKenyanPhone } from '@/lib/phone';
 
 export default function AgentInvite() {
   const [phone, setPhone] = useState('');
@@ -9,7 +11,7 @@ export default function AgentInvite() {
   const [result, setResult] = useState(null);
 
   async function handleInvite() {
-    if (!phone) return;
+    if (!isValidKenyanPhone(phone)) return;
     setInviting(true);
     try {
       await base44.entities.Announcement.create({
@@ -44,10 +46,9 @@ export default function AgentInvite() {
           <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="John Mwangi" className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
-          <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="07XX XXX XXX" className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          <PhoneInput value={phone} onChange={setPhone} label="Phone Number" />
         </div>
-        <button onClick={handleInvite} disabled={inviting || !phone} className="w-full flex items-center justify-center gap-2 bg-orange-500 text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
+        <button onClick={handleInvite} disabled={inviting || !isValidKenyanPhone(phone)} className="w-full flex items-center justify-center gap-2 bg-orange-500 text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
           {inviting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><UserPlus className="w-5 h-5" /> Send Invite</>}
         </button>
       </div>

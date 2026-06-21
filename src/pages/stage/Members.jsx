@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { formatDate } from '@/lib/format';
 import { Users } from 'lucide-react';
 import BikeDetailSheet from '@/components/BikeDetailSheet';
+import { formatPhoneDisplay } from '@/lib/phone';
 
 export default function StageMembers() {
   const [members, setMembers] = useState([]);
@@ -59,7 +60,7 @@ export default function StageMembers() {
               {members.map(m => (
                 <tr key={m.id} className="border-t border-border hover:bg-accent/50">
                   <td className="px-4 py-3 font-medium">{m.full_name || 'Unknown'}</td>
-                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{m.phone || '—'}</td>
+                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{m.phone ? formatPhoneDisplay(m.phone) : '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(m.created_date)}</td>
                   <td className="px-4 py-3">
                     {bikeByRider[m.id] ? (

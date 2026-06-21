@@ -6,6 +6,8 @@ import { formatKES, formatDateTime } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, HandCoins, Loader2, CheckCircle2, XCircle, Receipt } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
+import PhoneInput from '@/components/ui/PhoneInput';
+import { isValidKenyanPhone, formatPhoneDisplay } from '@/lib/phone';
 
 export default function Lipisha() {
   const navigate = useNavigate();
@@ -35,7 +37,7 @@ export default function Lipisha() {
 
   async function handleCollect() {
     const cents = Math.round(parseFloat(amount) * 100);
-    if (!phone || !cents || cents <= 0) return;
+    if (!isValidKenyanPhone(phone) || !cents || cents <= 0) return;
     setLoading(true);
     setResult(null);
     try {
@@ -80,7 +82,7 @@ export default function Lipisha() {
           <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
           <div>
             <p className="text-sm font-bold text-success">Fare Collected!</p>
-            <p className="text-xs text-muted-foreground">{formatKES(result.amount)} from {result.phone}</p>
+            <p className="text-xs text-muted-foreground">{formatKES(result.amount)} from {formatPhoneDisplay(result.phone)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Ref: {result.reference} · No fees applied</p>
           </div>
         </div>
@@ -95,13 +97,10 @@ export default function Lipisha() {
 
       <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Customer Phone Number</label>
-          <input
-            type="tel"
+          <PhoneInput
             value={phone}
-            onChange={e => setPhone(e.target.value)}
-            placeholder="07XX XXX XXX"
-            className="w-full mt-1 px-3 py-3 rounded-xl border border-input bg-background text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
+            onChange={setPhone}
+            label="Customer Phone Number"
           />
         </div>
         <div>
@@ -123,7 +122,7 @@ export default function Lipisha() {
         </div>
         <button
           onClick={handleCollect}
-          disabled={loading || !phone || !amount}
+          disabled={loading || !isValidKenyanPhone(phone) || !amount}
           className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold text-sm disabled:opacity-50"
         >
           {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Sending STK Push...</> : <><HandCoins className="w-5 h-5" /> Collect Fare</>}
@@ -150,7 +149,7 @@ export default function Lipisha() {
             {history.map(tx => (
               <div key={tx.id} className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium">From {tx.counterparty_phone || 'Customer'}</p>
+                  <p className="text-sm font-medium">From {tx.counterparty_phone ? formatPhoneDisplay(tx.counterparty_phone) : 'Customer'}</p>
                   <p className="text-xs text-muted-foreground">{formatDateTime(tx.created_date)}</p>
                 </div>
                 <p className="text-sm font-bold text-success">+{formatKES(tx.amount_cents)}</p>

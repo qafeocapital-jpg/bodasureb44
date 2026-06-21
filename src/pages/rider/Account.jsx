@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { getAccessiblePortals } from '@/lib/portals';
 import { User, FileCheck, Bell, Lock, Headphones, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
+import { formatPhoneDisplay } from '@/lib/phone';
 
 export default function Account() {
   const { user } = useAuth();
@@ -35,7 +36,7 @@ export default function Account() {
                 </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">{user?.phone || user?.email || 'Not set'}</p>
+            <p className="text-sm text-muted-foreground">{user?.phone ? formatPhoneDisplay(user.phone) : user?.email || 'Not set'}</p>
             <span className="inline-block mt-1 text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">
               Tier {user?.wallet_tier || 0}
             </span>

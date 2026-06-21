@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, FileCheck, Loader2 } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
+import { formatPhoneDisplay } from '@/lib/phone';
 
 export default function WalletActivate() {
   const navigate = useNavigate();
@@ -109,7 +110,7 @@ export default function WalletActivate() {
             <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
             <input
               type="tel"
-              value={user.phone || ''}
+              value={formatPhoneDisplay(user.phone) || user.phone || ''}
               disabled
               className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-muted text-sm"
             />
@@ -202,14 +203,19 @@ export default function WalletActivate() {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">National ID</label>
+            <label className="text-xs font-medium text-muted-foreground">National ID Number *</label>
             <input
               type="text"
+              inputMode="numeric"
+              maxLength={8}
               value={identity.national_id}
-              onChange={e => setIdentity(i => ({ ...i, national_id: e.target.value }))}
+              onChange={e => setIdentity(i => ({ ...i, national_id: e.target.value.replace(/[^\d]/g, '') }))}
               placeholder="00000000"
               className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
+            {identity.national_id && !/^\d{7,8}$/.test(identity.national_id) && (
+              <p className="text-xs text-destructive mt-1">National ID must be 7–8 digits</p>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Date of Birth</label>
@@ -233,7 +239,7 @@ export default function WalletActivate() {
                 });
                 handleActivate();
               }}
-              disabled={saving || !identity.full_name || !identity.national_id}
+              disabled={saving || !identity.full_name || !identity.national_id || !/^\d{7,8}$/.test(identity.national_id)}
               className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
             >
               {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Activating...</> : <><Shield className="w-4 h-4" /> Activate Wallet</>}
