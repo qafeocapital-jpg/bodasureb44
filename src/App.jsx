@@ -34,6 +34,26 @@ import MerchantDashboard from './pages/merchant/Dashboard';
 import AgentDashboard from './pages/agent/Dashboard';
 import StageDashboard from './pages/stage/Dashboard';
 import AdminOverview from './pages/admin/Overview';
+import CountyRegistrations from './pages/county/Registrations';
+import CountyPermits from './pages/county/Permits';
+import CountyEnforcement from './pages/county/Enforcement';
+import CountyRevenue from './pages/county/Revenue';
+import { CountyPeople, CountyReports, CountySettings } from './pages/county/OtherPages';
+import SaccoMembers from './pages/sacco/Members';
+import SaccoBikes from './pages/sacco/Bikes';
+import SaccoSettlements from './pages/sacco/Settlements';
+import MerchantProducts from './pages/merchant/Products';
+import MerchantPolicies from './pages/merchant/Policies';
+import AgentInvite from './pages/agent/Invite';
+import AgentHistory from './pages/agent/History';
+import StageMembers from './pages/stage/Members';
+import StageCompliance from './pages/stage/Compliance';
+import AdminCounties from './pages/admin/Counties';
+import AdminSasaPay from './pages/admin/SasaPay';
+import AdminUsers from './pages/admin/Users';
+import AdminKyc from './pages/admin/Kyc';
+import AdminMoney from './pages/admin/Money';
+import AdminReports from './pages/admin/Reports';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -88,31 +108,53 @@ const AuthenticatedApp = () => {
       {/* County Portal (emerald) */}
       <Route element={<StaffLayout accent="emerald" portalName="County" navItems={countyNav} />}>
         <Route path="/county/dashboard" element={<CountyDashboard />} />
+        <Route path="/county/registrations" element={<CountyRegistrations />} />
+        <Route path="/county/permits" element={<CountyPermits />} />
+        <Route path="/county/enforcement" element={<CountyEnforcement />} />
+        <Route path="/county/revenue" element={<CountyRevenue />} />
+        <Route path="/county/people" element={<CountyPeople />} />
+        <Route path="/county/reports" element={<CountyReports />} />
+        <Route path="/county/settings" element={<CountySettings />} />
       </Route>
 
       {/* SACCO Portal (blue) */}
       <Route element={<StaffLayout accent="blue" portalName="SACCO" navItems={saccoNav} />}>
         <Route path="/sacco/dashboard" element={<SaccoDashboard />} />
+        <Route path="/sacco/members" element={<SaccoMembers />} />
+        <Route path="/sacco/bikes" element={<SaccoBikes />} />
+        <Route path="/sacco/settlements" element={<SaccoSettlements />} />
       </Route>
 
       {/* Merchant Portal (emerald) */}
       <Route element={<StaffLayout accent="emerald" portalName="Merchant" navItems={merchantNav} />}>
         <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
+        <Route path="/merchant/products" element={<MerchantProducts />} />
+        <Route path="/merchant/policies" element={<MerchantPolicies />} />
       </Route>
 
       {/* Field Agent Portal (orange) */}
       <Route element={<StaffLayout accent="orange" portalName="Field Agent" navItems={agentNav} />}>
         <Route path="/agent/dashboard" element={<AgentDashboard />} />
+        <Route path="/agent/invite" element={<AgentInvite />} />
+        <Route path="/agent/history" element={<AgentHistory />} />
       </Route>
 
       {/* Stage Portal (blue) */}
       <Route element={<StaffLayout accent="blue" portalName="Stage" navItems={stageNav} />}>
         <Route path="/stage/dashboard" element={<StageDashboard />} />
+        <Route path="/stage/members" element={<StageMembers />} />
+        <Route path="/stage/compliance" element={<StageCompliance />} />
       </Route>
 
       {/* Super Admin Portal (orange) */}
       <Route element={<StaffLayout accent="orange" portalName="Super Admin" navItems={adminNav} />}>
         <Route path="/admin/overview" element={<AdminOverview />} />
+        <Route path="/admin/counties" element={<AdminCounties />} />
+        <Route path="/admin/sasapay" element={<AdminSasaPay />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/kyc" element={<AdminKyc />} />
+        <Route path="/admin/money" element={<AdminMoney />} />
+        <Route path="/admin/reports" element={<AdminReports />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />
