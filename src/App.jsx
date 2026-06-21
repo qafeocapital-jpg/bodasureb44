@@ -23,6 +23,11 @@ import BikeCertificate from './pages/rider/BikeCertificate';
 import Lipisha from './pages/rider/Lipisha';
 import LipaCounty from './pages/rider/LipaCounty';
 import LipaOwner from './pages/rider/LipaOwner';
+import Groups from './pages/rider/Groups';
+import Chama from './pages/rider/Chama';
+import Stage from './pages/rider/Stage';
+import Insurance from './pages/rider/Insurance';
+import Services from './pages/rider/Services';
 import CountyDashboard from './pages/county/Dashboard';
 import SaccoDashboard from './pages/sacco/Dashboard';
 import MerchantDashboard from './pages/merchant/Dashboard';
@@ -73,6 +78,11 @@ const AuthenticatedApp = () => {
         <Route path="/app/lipisha" element={<Lipisha />} />
         <Route path="/app/lipa-county" element={<LipaCounty />} />
         <Route path="/app/lipa-owner" element={<LipaOwner />} />
+        <Route path="/app/groups" element={<Groups />} />
+        <Route path="/app/chama" element={<Chama />} />
+        <Route path="/app/stage" element={<Stage />} />
+        <Route path="/app/insurance" element={<Insurance />} />
+        <Route path="/app/services" element={<Services />} />
       </Route>
 
       {/* County Portal (emerald) */}
