@@ -5,11 +5,13 @@ export const PORTAL_ROUTES = {
   field_agent: { path: '/agent/dashboard', name: 'Field Agent Portal', accent: 'orange', color: 'bg-orange-500' },
   stage_admin: { path: '/stage/dashboard', name: 'Stage Portal', accent: 'blue', color: 'bg-blue-500' },
   super_admin: { path: '/admin/overview', name: 'Super Admin Portal', accent: 'orange', color: 'bg-orange-500' },
+  rider: { path: '/app', name: 'Rider / Owner Portal', accent: 'orange', color: 'bg-orange-500' },
 };
 
 export function getAccessiblePortals(role) {
   if (role === 'super_admin') {
     return [
+      PORTAL_ROUTES.rider,
       PORTAL_ROUTES.county_admin,
       PORTAL_ROUTES.sacco_admin,
       PORTAL_ROUTES.merchant_admin,
