@@ -26,6 +26,12 @@
     "county_id": {
       "type": "string"
     },
+    "sub_county_id": {
+      "type": "string"
+    },
+    "ward_id": {
+      "type": "string"
+    },
     "stage_id": {
       "type": "string"
     },

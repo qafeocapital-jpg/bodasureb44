@@ -1,0 +1,39 @@
+{
+  "name": "GroupMember",
+  "type": "object",
+  "properties": {
+    "group_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "member",
+        "treasurer",
+        "chairperson",
+        "secretary"
+      ],
+      "default": "member"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending"
+    },
+    "joined_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "group_id",
+    "user_id"
+  ]
+}

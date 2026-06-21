@@ -1,22 +1,22 @@
 {
-  "name": "Ward",
+  "name": "Constituency",
   "type": "object",
   "properties": {
     "name": {
       "type": "string"
     },
+    "county_id": {
+      "type": "string"
+    },
     "sub_county_id": {
       "type": "string"
     },
-    "constituency_id": {
-      "type": "string"
-    },
-    "county_id": {
+    "code": {
       "type": "string"
     }
   },
   "required": [
     "name",
-    "sub_county_id"
+    "county_id"
   ]
 }
