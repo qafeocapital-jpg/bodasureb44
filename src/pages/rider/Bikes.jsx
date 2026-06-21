@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Plus, Bike as BikeIcon, BadgeCheck, Clock } from 'lucide-react';
+import { Plus, Bike as BikeIcon, BadgeCheck, Clock, ChevronRight, QrCode } from 'lucide-react';
 
 export default function Bikes() {
   const [bikes, setBikes] = useState([]);
@@ -45,11 +45,16 @@ export default function Bikes() {
       ) : (
         <div className="space-y-3">
           {bikes.map(bike => (
-            <div key={bike.id} className="bg-card border border-border rounded-2xl p-4">
+            <Link key={bike.id} to={`/app/bikes/${bike.id}/certificate`} className="block bg-card border border-border rounded-2xl p-4 hover:bg-accent transition-colors">
               <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-heading font-bold text-lg">{bike.plate_number}</p>
-                  <p className="text-xs text-muted-foreground">{bike.make} {bike.model} · {bike.color}</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center">
+                    <BikeIcon className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-heading font-bold text-base">{bike.plate_number}</p>
+                    <p className="text-xs text-muted-foreground">{bike.make} · {bike.color}</p>
+                  </div>
                 </div>
                 {bike.status === 'approved' ? (
                   <span className="flex items-center gap-1 text-xs font-semibold text-success bg-success/10 rounded-full px-2.5 py-1">
@@ -63,7 +68,12 @@ export default function Bikes() {
                   <span className="text-xs font-semibold text-destructive bg-destructive/10 rounded-full px-2.5 py-1">Rejected</span>
                 )}
               </div>
-            </div>
+              {bike.status === 'approved' && (
+                <div className="flex items-center gap-1 mt-3 text-xs text-primary font-medium">
+                  <QrCode className="w-3.5 h-3.5" /> View Certificate <ChevronRight className="w-3 h-3" />
+                </div>
+              )}
+            </Link>
           ))}
         </div>
       )}

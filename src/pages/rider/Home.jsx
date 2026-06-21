@@ -3,12 +3,15 @@ import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
-import { ShieldCheck, AlertCircle, ChevronRight } from 'lucide-react';
+import { ShieldCheck, AlertCircle } from 'lucide-react';
+import OnboardingTiles from '@/components/rider/OnboardingTiles';
 
 export default function Home() {
   const [user, setUser] = useState(null);
   const [balance, setBalance] = useState(0);
   const [walletActive, setWalletActive] = useState(false);
+  const [bikes, setBikes] = useState([]);
+  const [kycDocs, setKycDocs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +27,14 @@ export default function Home() {
             const snapshots = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
             if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
           }
+          const [owned, ridden, kyc] = await Promise.all([
+            base44.entities.Vehicle.filter({ owner_id: u.id }),
+            base44.entities.Vehicle.filter({ rider_id: u.id }),
+            base44.entities.KycDocument.filter({ user_id: u.id }),
+          ]);
+          const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
+          setBikes(merged);
+          setKycDocs(kyc);
         }
       } catch (e) {
         // Not logged in — show placeholder
@@ -60,6 +71,28 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Onboarding Progress Tiles */}
+      <div className="px-4 pt-5">
+        {!loading && user && (
+          <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} />
+        )}
+      </div>
+
+      {/* Notifications Banner */}
+      {!user?.profile_complete && !loading && (
+        <div className="px-4 pt-5">
+          <Link to="/app/profile" className="block bg-warning/10 border border-warning/20 rounded-xl p-4">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-warning">Complete your profile</p>
+                <p className="text-xs text-muted-foreground">Add your name and county to unlock wallet features</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Icon Grid Sections */}
       <div className="px-4 py-5 space-y-7">

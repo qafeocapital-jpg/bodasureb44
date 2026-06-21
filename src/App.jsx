@@ -15,6 +15,14 @@ import Wallet from './pages/rider/Wallet';
 import Bikes from './pages/rider/Bikes';
 import Compliance from './pages/rider/Compliance';
 import Account from './pages/rider/Account';
+import Profile from './pages/rider/Profile';
+import Kyc from './pages/rider/Kyc';
+import WalletActivate from './pages/rider/WalletActivate';
+import BikeRegister from './pages/rider/BikeRegister';
+import BikeCertificate from './pages/rider/BikeCertificate';
+import Lipisha from './pages/rider/Lipisha';
+import LipaCounty from './pages/rider/LipaCounty';
+import LipaOwner from './pages/rider/LipaOwner';
 import CountyDashboard from './pages/county/Dashboard';
 import SaccoDashboard from './pages/sacco/Dashboard';
 import MerchantDashboard from './pages/merchant/Dashboard';
@@ -57,6 +65,14 @@ const AuthenticatedApp = () => {
         <Route path="/app/bikes" element={<Bikes />} />
         <Route path="/app/compliance" element={<Compliance />} />
         <Route path="/app/account" element={<Account />} />
+        <Route path="/app/profile" element={<Profile />} />
+        <Route path="/app/kyc" element={<Kyc />} />
+        <Route path="/app/wallet/activate" element={<WalletActivate />} />
+        <Route path="/app/bikes/register" element={<BikeRegister />} />
+        <Route path="/app/bikes/:id/certificate" element={<BikeCertificate />} />
+        <Route path="/app/lipisha" element={<Lipisha />} />
+        <Route path="/app/lipa-county" element={<LipaCounty />} />
+        <Route path="/app/lipa-owner" element={<LipaOwner />} />
       </Route>
 
       {/* County Portal (emerald) */}
