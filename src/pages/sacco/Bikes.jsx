@@ -3,12 +3,14 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatDate } from '@/lib/format';
 import { Bike, BadgeCheck, Clock, XCircle } from 'lucide-react';
+import BikeDetailSheet from '@/components/BikeDetailSheet';
 
 export default function SaccoBikes() {
   const { user } = useAuth();
   const [bikes, setBikes] = useState([]);
   const [riders, setRiders] = useState({});
   const [loading, setLoading] = useState(true);
+  const [detailVehicleId, setDetailVehicleId] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -50,7 +52,7 @@ export default function SaccoBikes() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {bikes.map(b => (
-            <div key={b.id} className="bg-card border border-border rounded-xl p-4">
+            <div key={b.id} onClick={() => setDetailVehicleId(b.id)} className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:bg-accent transition-colors">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center"><Bike className="w-5 h-5 text-orange-600" /></div>
@@ -78,6 +80,10 @@ export default function SaccoBikes() {
             </div>
           ))}
         </div>
+      )}
+
+      {detailVehicleId && (
+        <BikeDetailSheet vehicleId={detailVehicleId} onClose={() => setDetailVehicleId(null)} isStaff accent="blue" />
       )}
     </div>
   );

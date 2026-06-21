@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { Users, Bike, BadgeCheck, FileText, MapPin, ArrowLeftRight } from 'lucide-react';
+import BikeDetailSheet from '@/components/BikeDetailSheet';
 
 export default function CountyRegistrations() {
   const [tab, setTab] = useState('riders');
@@ -10,6 +11,7 @@ export default function CountyRegistrations() {
   const [pendingBikes, setPendingBikes] = useState([]);
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [detailVehicleId, setDetailVehicleId] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -107,7 +109,7 @@ export default function CountyRegistrations() {
             </thead>
             <tbody>
               {vehicles.map(v => (
-                <tr key={v.id} className="border-t border-border hover:bg-accent/50">
+                <tr key={v.id} onClick={() => setDetailVehicleId(v.id)} className="border-t border-border hover:bg-accent/50 cursor-pointer">
                   <td className="px-4 py-3 font-semibold">{v.plate_number}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{v.make} {v.color}</td>
                   <td className="px-4 py-3">
@@ -140,6 +142,7 @@ export default function CountyRegistrations() {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    <button onClick={() => setDetailVehicleId(b.id)} className="bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg px-4 py-2 text-xs font-semibold hover:bg-emerald-100">View</button>
                     <button onClick={() => approveBike(b.id)} className="bg-success text-success-foreground rounded-lg px-4 py-2 text-xs font-semibold hover:bg-success/90">Approve</button>
                     <button onClick={() => rejectBike(b.id)} className="bg-destructive/10 text-destructive border border-destructive/20 rounded-lg px-4 py-2 text-xs font-semibold hover:bg-destructive/20">Reject</button>
                   </div>
@@ -162,6 +165,10 @@ export default function CountyRegistrations() {
           ))}
           {stages.length === 0 && <p className="text-sm text-muted-foreground col-span-full text-center py-8">No stages registered</p>}
         </div>
+      )}
+
+      {detailVehicleId && (
+        <BikeDetailSheet vehicleId={detailVehicleId} onClose={() => setDetailVehicleId(null)} isStaff accent="emerald" />
       )}
     </div>
   );

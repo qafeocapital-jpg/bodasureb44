@@ -4,8 +4,9 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, timeAgo } from '@/lib/format';
 import { getOrCreateWallet } from '@/lib/mockPayments';
-import { Plus, Bike as BikeIcon, BadgeCheck, Clock, ChevronRight, QrCode, UserCheck, TrendingUp } from 'lucide-react';
+import { Plus, Bike as BikeIcon, BadgeCheck, Clock, UserCheck, TrendingUp } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
+import BikeDetailSheet from '@/components/BikeDetailSheet';
 
 export default function Bikes() {
   const { user } = useAuth();
@@ -14,6 +15,7 @@ export default function Bikes() {
   const [ownerTxns, setOwnerTxns] = useState([]);
   const [activeTab, setActiveTab] = useState('my');
   const [loading, setLoading] = useState(true);
+  const [detailVehicleId, setDetailVehicleId] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -81,7 +83,7 @@ export default function Bikes() {
         ) : (
           <div className="space-y-3">
             {bikes.map(bike => (
-              <Link key={bike.id} to={`/app/bikes/${bike.id}/certificate`} className="block bg-card border border-border rounded-2xl p-4 hover:bg-accent transition-colors">
+              <div key={bike.id} onClick={() => setDetailVehicleId(bike.id)} className="block bg-card border border-border rounded-2xl p-4 hover:bg-accent transition-colors cursor-pointer">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center">
@@ -104,12 +106,7 @@ export default function Bikes() {
                     <span className="text-xs font-semibold text-destructive bg-destructive/10 rounded-full px-2.5 py-1">Rejected</span>
                   )}
                 </div>
-                {bike.status === 'approved' && (
-                  <div className="flex items-center gap-1 mt-3 text-xs text-primary font-medium">
-                    <QrCode className="w-3.5 h-3.5" /> View Certificate <ChevronRight className="w-3 h-3" />
-                  </div>
-                )}
-              </Link>
+              </div>
             ))}
           </div>
         )
@@ -134,7 +131,7 @@ export default function Bikes() {
             ) : (
               <div className="space-y-2">
                 {ownedBikes.map(bike => (
-                  <Link key={bike.id} to={`/app/bikes/${bike.id}/certificate`} className="block bg-card border border-border rounded-xl p-3 hover:bg-accent transition-colors">
+                  <div key={bike.id} onClick={() => setDetailVehicleId(bike.id)} className="block bg-card border border-border rounded-xl p-3 hover:bg-accent transition-colors cursor-pointer">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
@@ -153,7 +150,7 @@ export default function Bikes() {
                         <span className="text-xs font-semibold text-muted-foreground bg-muted rounded-full px-2 py-0.5 capitalize">{bike.status}</span>
                       )}
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
@@ -185,6 +182,10 @@ export default function Bikes() {
             )}
           </div>
         </div>
+      )}
+
+      {detailVehicleId && (
+        <BikeDetailSheet vehicleId={detailVehicleId} onClose={() => setDetailVehicleId(null)} />
       )}
     </div>
   );
