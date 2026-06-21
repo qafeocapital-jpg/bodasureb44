@@ -2,10 +2,22 @@ import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { getAccessiblePortals } from '@/lib/portals';
+import { useToast } from '@/components/ui/use-toast';
 import { User, FileCheck, Bell, Lock, Headphones, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
 
 export default function Account() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const { toast } = useToast();
+
+  async function setSuperAdmin() {
+    try {
+      await base44.auth.updateMe({ role: 'super_admin' });
+      await refreshUser();
+      toast({ title: 'Role updated', description: 'You are now a Super Admin.' });
+    } catch (e) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
+  }
   const portals = getAccessiblePortals(user?.role);
 
   const menuItems = [
@@ -87,6 +99,12 @@ export default function Account() {
       </button>
 
       <p className="text-center text-xs text-muted-foreground mt-5">BodaSure v1.0 · Mint Mobitech</p>
+
+      {user?.role !== 'super_admin' && (
+        <button onClick={setSuperAdmin} className="block mx-auto mt-2 text-[10px] text-muted-foreground/60 hover:text-muted-foreground">
+          ⚙ Dev: Set Super Admin
+        </button>
+      )}
     </div>
   );
 }
