@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, Navigate, useLocation, Link } from 'react-router-dom';
 import { Menu, X, LogOut } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { hasPortalAccess } from '@/lib/portals';
+import { hasPortalAccess, getAccessiblePortals } from '@/lib/portals';
 import { useToast } from '@/components/ui/use-toast';
 
 const accentMap = {
@@ -18,6 +18,8 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
   const { user } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
+  const portals = getAccessiblePortals(user?.role);
+  const showSwitcher = portals.length > 1;
 
   useEffect(() => {
     if (user && !hasPortalAccess(user.role, requiredRole)) {
@@ -61,6 +63,29 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
           ))}
         </nav>
         <div className="p-3 border-t border-sidebar-border">
+          {showSwitcher && (
+            <div className="mb-3">
+              <p className="text-xs text-muted-foreground px-3 mb-1">Portals</p>
+              <div className="space-y-0.5">
+                {portals.map((portal) => {
+                  const isActivePortal = portal.name.startsWith(portalName);
+                  return (
+                    <Link
+                      key={portal.path}
+                      to={portal.path}
+                      className={`flex items-center gap-2 py-2 px-3 rounded-lg text-sm transition-colors ${
+                        isActivePortal ? `${accentCls.light} ${accentCls.text} font-medium` : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${portal.color}`} />
+                      {portal.name}
+                    </Link>
+                  );
+                })}
+              </div>
+              <div className="border-t border-sidebar-border mt-2" />
+            </div>
+          )}
           <button
             onClick={() => base44.auth.logout('/')}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
@@ -100,6 +125,38 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
                 </NavLink>
               ))}
             </nav>
+            <div className="p-3 border-t border-sidebar-border">
+              {showSwitcher && (
+                <div className="mb-3">
+                  <p className="text-xs text-muted-foreground px-3 mb-1">Portals</p>
+                  <div className="space-y-0.5">
+                    {portals.map((portal) => {
+                      const isActivePortal = portal.name.startsWith(portalName);
+                      return (
+                        <Link
+                          key={portal.path}
+                          to={portal.path}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`flex items-center gap-2 py-2 px-3 rounded-lg text-sm transition-colors ${
+                            isActivePortal ? `${accentCls.light} ${accentCls.text} font-medium` : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                          }`}
+                        >
+                          <span className={`w-2.5 h-2.5 rounded-full ${portal.color}`} />
+                          {portal.name}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                  <div className="border-t border-sidebar-border mt-2" />
+                </div>
+              )}
+              <button
+                onClick={() => base44.auth.logout('/')}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
+              >
+                <LogOut className="w-4 h-4" /> Log Out
+              </button>
+            </div>
           </aside>
         </div>
       )}
