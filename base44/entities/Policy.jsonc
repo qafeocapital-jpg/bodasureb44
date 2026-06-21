@@ -1,0 +1,47 @@
+{
+  "name": "Policy",
+  "type": "object",
+  "properties": {
+    "vehicle_id": {
+      "type": "string"
+    },
+    "rider_id": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "merchant_id": {
+      "type": "string"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "premium_cents": {
+      "type": "integer"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "expired",
+        "cancelled"
+      ],
+      "default": "active"
+    },
+    "transaction_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "vehicle_id",
+    "rider_id",
+    "product_id",
+    "premium_cents"
+  ]
+}

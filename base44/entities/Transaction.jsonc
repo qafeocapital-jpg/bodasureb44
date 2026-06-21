@@ -1,0 +1,77 @@
+{
+  "name": "Transaction",
+  "type": "object",
+  "properties": {
+    "wallet_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "deposit",
+        "withdraw",
+        "send",
+        "lipisha",
+        "lipa_county",
+        "lipa_owner",
+        "chama",
+        "insurance",
+        "utility",
+        "penalty"
+      ]
+    },
+    "amount_cents": {
+      "type": "integer"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "initiated",
+        "pending",
+        "completed",
+        "failed",
+        "reversed"
+      ],
+      "default": "initiated"
+    },
+    "reference": {
+      "type": "string"
+    },
+    "product_type": {
+      "type": "string"
+    },
+    "fee_rule_id": {
+      "type": "string"
+    },
+    "fee_rule_version": {
+      "type": "integer"
+    },
+    "counterparty_wallet_id": {
+      "type": "string"
+    },
+    "counterparty_phone": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "vehicle_id": {
+      "type": "string"
+    },
+    "permit_id": {
+      "type": "string"
+    },
+    "failure_reason": {
+      "type": "string"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "wallet_id",
+    "type",
+    "amount_cents"
+  ]
+}

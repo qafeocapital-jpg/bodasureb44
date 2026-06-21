@@ -1,0 +1,39 @@
+{
+  "name": "Announcement",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "body": {
+      "type": "string"
+    },
+    "county_id": {
+      "type": "string"
+    },
+    "audience": {
+      "type": "string",
+      "enum": [
+        "all",
+        "riders",
+        "county_staff",
+        "sacco_staff"
+      ],
+      "default": "all"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published",
+        "archived"
+      ],
+      "default": "draft"
+    }
+  },
+  "required": [
+    "title",
+    "body",
+    "audience"
+  ]
+}

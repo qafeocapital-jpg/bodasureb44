@@ -1,0 +1,47 @@
+{
+  "name": "Group",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "sacco",
+        "chama",
+        "welfare",
+        "self_help",
+        "other"
+      ],
+      "default": "sacco"
+    },
+    "county_id": {
+      "type": "string"
+    },
+    "sasapay_account_number": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "pending"
+      ],
+      "default": "active"
+    },
+    "member_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "description": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "type",
+    "county_id"
+  ]
+}

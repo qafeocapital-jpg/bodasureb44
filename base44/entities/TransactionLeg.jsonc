@@ -1,0 +1,40 @@
+{
+  "name": "TransactionLeg",
+  "type": "object",
+  "properties": {
+    "transaction_id": {
+      "type": "string"
+    },
+    "leg_type": {
+      "type": "string",
+      "enum": [
+        "county",
+        "sacco",
+        "platform",
+        "rider",
+        "owner",
+        "merchant"
+      ]
+    },
+    "amount_cents": {
+      "type": "integer"
+    },
+    "recipient_account": {
+      "type": "string"
+    },
+    "recipient_wallet_id": {
+      "type": "string"
+    },
+    "percentage": {
+      "type": "number"
+    },
+    "description": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "transaction_id",
+    "leg_type",
+    "amount_cents"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "PaymentEvent",
+  "type": "object",
+  "properties": {
+    "transaction_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "reference": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "processed": {
+      "type": "boolean",
+      "default": false
+    },
+    "processed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "event_type"
+  ]
+}

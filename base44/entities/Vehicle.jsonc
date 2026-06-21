@@ -1,0 +1,72 @@
+{
+  "name": "Vehicle",
+  "type": "object",
+  "properties": {
+    "plate_number": {
+      "type": "string"
+    },
+    "make": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    },
+    "year": {
+      "type": "integer"
+    },
+    "owner_id": {
+      "type": "string"
+    },
+    "rider_id": {
+      "type": "string"
+    },
+    "county_id": {
+      "type": "string"
+    },
+    "stage_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "bike_photo_url": {
+      "type": "string"
+    },
+    "rider_photo_url": {
+      "type": "string"
+    },
+    "logbook_url": {
+      "type": "string"
+    },
+    "owner_id_doc_url": {
+      "type": "string"
+    },
+    "is_owner_rider": {
+      "type": "boolean",
+      "default": true
+    },
+    "approved_by_id": {
+      "type": "string"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "plate_number",
+    "county_id"
+  ]
+}

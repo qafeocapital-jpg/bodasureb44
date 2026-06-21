@@ -1,0 +1,45 @@
+{
+  "name": "Wallet",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "group_id": {
+      "type": "string"
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": [
+        "personal",
+        "business"
+      ],
+      "default": "personal"
+    },
+    "account_number": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "integer",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "inactive",
+        "active",
+        "pending_kyc"
+      ],
+      "default": "inactive"
+    },
+    "pin_hash": {
+      "type": "string"
+    },
+    "sasapay_customer_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "entity_type"
+  ]
+}

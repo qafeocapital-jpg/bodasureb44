@@ -1,0 +1,48 @@
+{
+  "name": "EnforcementLog",
+  "type": "object",
+  "properties": {
+    "officer_id": {
+      "type": "string"
+    },
+    "county_id": {
+      "type": "string"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "field_check",
+        "flag_rider",
+        "issue_penalty",
+        "inspection",
+        "conflict_resolve"
+      ]
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "rider",
+        "vehicle",
+        "stage"
+      ]
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "location_lat": {
+      "type": "number"
+    },
+    "location_lng": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "officer_id",
+    "action_type",
+    "target_type",
+    "target_id"
+  ]
+}

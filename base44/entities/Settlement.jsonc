@@ -1,0 +1,59 @@
+{
+  "name": "Settlement",
+  "type": "object",
+  "properties": {
+    "entity_type": {
+      "type": "string",
+      "enum": [
+        "county",
+        "sacco",
+        "merchant",
+        "platform"
+      ]
+    },
+    "entity_id": {
+      "type": "string"
+    },
+    "amount_cents": {
+      "type": "integer"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processed",
+        "failed"
+      ],
+      "default": "pending"
+    },
+    "bank_reference": {
+      "type": "string"
+    },
+    "transaction_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "settled_by_id": {
+      "type": "string"
+    },
+    "settled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "period_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "period_end": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "entity_type",
+    "entity_id",
+    "amount_cents"
+  ]
+}

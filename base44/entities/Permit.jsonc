@@ -1,0 +1,62 @@
+{
+  "name": "Permit",
+  "type": "object",
+  "properties": {
+    "vehicle_id": {
+      "type": "string"
+    },
+    "rider_id": {
+      "type": "string"
+    },
+    "county_id": {
+      "type": "string"
+    },
+    "billing_cycle": {
+      "type": "string",
+      "enum": [
+        "weekly",
+        "monthly",
+        "quarterly",
+        "yearly"
+      ]
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "expired",
+        "cancelled"
+      ],
+      "default": "active"
+    },
+    "amount_paid_cents": {
+      "type": "integer"
+    },
+    "transaction_id": {
+      "type": "string"
+    },
+    "fee_schedule_id": {
+      "type": "string"
+    },
+    "qr_code_data": {
+      "type": "string"
+    },
+    "issued_manually": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "vehicle_id",
+    "county_id",
+    "billing_cycle"
+  ]
+}

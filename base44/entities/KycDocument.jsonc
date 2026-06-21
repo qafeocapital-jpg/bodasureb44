@@ -1,0 +1,46 @@
+{
+  "name": "KycDocument",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "id_front",
+        "id_back",
+        "selfie",
+        "logbook",
+        "owner_id"
+      ]
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "reviewed_by_id": {
+      "type": "string"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "user_id",
+    "document_type",
+    "file_url"
+  ]
+}

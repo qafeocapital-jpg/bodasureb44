@@ -1,0 +1,47 @@
+{
+  "name": "Inspection",
+  "type": "object",
+  "properties": {
+    "vehicle_id": {
+      "type": "string"
+    },
+    "rider_id": {
+      "type": "string"
+    },
+    "inspector_id": {
+      "type": "string"
+    },
+    "county_id": {
+      "type": "string"
+    },
+    "location_lat": {
+      "type": "number"
+    },
+    "location_lng": {
+      "type": "number"
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "compliant",
+        "non_compliant"
+      ],
+      "default": "compliant"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "photo_url": {
+      "type": "string"
+    },
+    "inspected_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "vehicle_id",
+    "inspector_id",
+    "county_id"
+  ]
+}

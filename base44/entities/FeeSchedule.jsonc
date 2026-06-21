@@ -1,0 +1,38 @@
+{
+  "name": "FeeSchedule",
+  "type": "object",
+  "properties": {
+    "county_id": {
+      "type": "string"
+    },
+    "permit_type": {
+      "type": "string",
+      "enum": [
+        "weekly",
+        "monthly",
+        "quarterly",
+        "yearly"
+      ]
+    },
+    "amount_cents": {
+      "type": "integer"
+    },
+    "penalty_amount_cents": {
+      "type": "integer",
+      "default": 0
+    },
+    "grace_period_days": {
+      "type": "integer",
+      "default": 7
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "county_id",
+    "permit_type",
+    "amount_cents"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "Ward",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "sub_county_id": {
+      "type": "string"
+    },
+    "county_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "sub_county_id"
+  ]
+}

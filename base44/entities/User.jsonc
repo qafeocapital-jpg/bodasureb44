@@ -1,0 +1,98 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "phone": {
+      "type": "string"
+    },
+    "county_id": {
+      "type": "string"
+    },
+    "sub_county_id": {
+      "type": "string"
+    },
+    "ward_id": {
+      "type": "string"
+    },
+    "stage_id": {
+      "type": "string"
+    },
+    "kyc_status": {
+      "type": "string",
+      "enum": [
+        "none",
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "none"
+    },
+    "wallet_tier": {
+      "type": "integer",
+      "default": 0
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "rider",
+          "owner"
+        ]
+      },
+      "default": []
+    },
+    "profile_complete": {
+      "type": "boolean",
+      "default": false
+    },
+    "staff_type": {
+      "type": "string",
+      "enum": [
+        "none",
+        "county_admin",
+        "county_finance",
+        "county_enforcement",
+        "sub_county_officer",
+        "sacco_admin",
+        "sacco_treasurer",
+        "merchant_admin",
+        "field_agent",
+        "stage_official",
+        "super_admin",
+        "finance_admin"
+      ],
+      "default": "none"
+    },
+    "scope_entity_id": {
+      "type": "string"
+    },
+    "avatar_url": {
+      "type": "string"
+    },
+    "national_id": {
+      "type": "string"
+    },
+    "date_of_birth": {
+      "type": "string",
+      "format": "date"
+    },
+    "notification_prefs": {
+      "type": "object",
+      "properties": {
+        "sms": {
+          "type": "boolean",
+          "default": true
+        },
+        "push": {
+          "type": "boolean",
+          "default": true
+        },
+        "email": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

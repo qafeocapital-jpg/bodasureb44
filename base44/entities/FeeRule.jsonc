@@ -1,0 +1,43 @@
+{
+  "name": "FeeRule",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "product_type": {
+      "type": "string",
+      "enum": [
+        "lipa_county",
+        "lipisha",
+        "lipa_owner",
+        "penalty",
+        "insurance"
+      ]
+    },
+    "county_percentage": {
+      "type": "number",
+      "default": 60
+    },
+    "sacco_percentage": {
+      "type": "number",
+      "default": 20
+    },
+    "platform_percentage": {
+      "type": "number",
+      "default": 20
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "version": {
+      "type": "integer",
+      "default": 1
+    }
+  },
+  "required": [
+    "name",
+    "product_type"
+  ]
+}

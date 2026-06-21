@@ -6,7 +6,21 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
-// Add page imports here
+import { Navigate } from 'react-router-dom';
+import RiderLayout from './components/rider/RiderLayout';
+import StaffLayout from './components/staff/StaffLayout';
+import { countyNav, saccoNav, merchantNav, agentNav, stageNav, adminNav } from './lib/staffNav';
+import Home from './pages/rider/Home';
+import Wallet from './pages/rider/Wallet';
+import Bikes from './pages/rider/Bikes';
+import Compliance from './pages/rider/Compliance';
+import Account from './pages/rider/Account';
+import CountyDashboard from './pages/county/Dashboard';
+import SaccoDashboard from './pages/sacco/Dashboard';
+import MerchantDashboard from './pages/merchant/Dashboard';
+import AgentDashboard from './pages/agent/Dashboard';
+import StageDashboard from './pages/stage/Dashboard';
+import AdminOverview from './pages/admin/Overview';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -34,7 +48,47 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
-      {/* Add your page Route elements here */}
+      <Route path="/" element={<Navigate to="/app" replace />} />
+
+      {/* Rider App (mobile-first) */}
+      <Route element={<RiderLayout />}>
+        <Route path="/app" element={<Home />} />
+        <Route path="/app/wallet" element={<Wallet />} />
+        <Route path="/app/bikes" element={<Bikes />} />
+        <Route path="/app/compliance" element={<Compliance />} />
+        <Route path="/app/account" element={<Account />} />
+      </Route>
+
+      {/* County Portal (emerald) */}
+      <Route element={<StaffLayout accent="emerald" portalName="County" navItems={countyNav} />}>
+        <Route path="/county/dashboard" element={<CountyDashboard />} />
+      </Route>
+
+      {/* SACCO Portal (blue) */}
+      <Route element={<StaffLayout accent="blue" portalName="SACCO" navItems={saccoNav} />}>
+        <Route path="/sacco/dashboard" element={<SaccoDashboard />} />
+      </Route>
+
+      {/* Merchant Portal (emerald) */}
+      <Route element={<StaffLayout accent="emerald" portalName="Merchant" navItems={merchantNav} />}>
+        <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
+      </Route>
+
+      {/* Field Agent Portal (orange) */}
+      <Route element={<StaffLayout accent="orange" portalName="Field Agent" navItems={agentNav} />}>
+        <Route path="/agent/dashboard" element={<AgentDashboard />} />
+      </Route>
+
+      {/* Stage Portal (blue) */}
+      <Route element={<StaffLayout accent="blue" portalName="Stage" navItems={stageNav} />}>
+        <Route path="/stage/dashboard" element={<StageDashboard />} />
+      </Route>
+
+      {/* Super Admin Portal (orange) */}
+      <Route element={<StaffLayout accent="orange" portalName="Super Admin" navItems={adminNav} />}>
+        <Route path="/admin/overview" element={<AdminOverview />} />
+      </Route>
+
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

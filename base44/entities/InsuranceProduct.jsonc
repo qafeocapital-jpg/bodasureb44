@@ -1,0 +1,36 @@
+{
+  "name": "InsuranceProduct",
+  "type": "object",
+  "properties": {
+    "merchant_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "premium_cents": {
+      "type": "integer"
+    },
+    "coverage_type": {
+      "type": "string"
+    },
+    "duration_days": {
+      "type": "integer"
+    },
+    "commission_percentage": {
+      "type": "number"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "merchant_id",
+    "name",
+    "premium_cents"
+  ]
+}

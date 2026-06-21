@@ -1,0 +1,32 @@
+{
+  "name": "Stage",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "ward_id": {
+      "type": "string"
+    },
+    "county_id": {
+      "type": "string"
+    },
+    "location_lat": {
+      "type": "number"
+    },
+    "location_lng": {
+      "type": "number"
+    },
+    "member_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "description": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "county_id"
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "Penalty",
+  "type": "object",
+  "properties": {
+    "rider_id": {
+      "type": "string"
+    },
+    "vehicle_id": {
+      "type": "string"
+    },
+    "county_id": {
+      "type": "string"
+    },
+    "amount_cents": {
+      "type": "integer"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "paid",
+        "disputed",
+        "waived"
+      ],
+      "default": "pending"
+    },
+    "transaction_id": {
+      "type": "string"
+    },
+    "issued_by_id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "paid_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "rider_id",
+    "county_id",
+    "amount_cents",
+    "reason"
+  ]
+}
