@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Building2, Users, Bike, BadgeCheck, Database, Activity } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Building2, Users, Bike, BadgeCheck, Database, Activity, ChevronRight } from 'lucide-react';
 
 export default function AdminOverview() {
   const [stats, setStats] = useState({ counties: 0, riders: 0, bikes: 0, permits: 0 });
@@ -72,11 +73,11 @@ export default function AdminOverview() {
             <Database className="w-5 h-5 text-blue-600" />
             <h2 className="font-heading font-bold">Quick Actions</h2>
           </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between text-muted-foreground"><span>Add County</span><span className="text-orange-600">→</span></div>
-            <div className="flex items-center justify-between text-muted-foreground"><span>Review KYC</span><span className="text-orange-600">→</span></div>
-            <div className="flex items-center justify-between text-muted-foreground"><span>Configure Fees</span><span className="text-orange-600">→</span></div>
-            <div className="flex items-center justify-between text-muted-foreground"><span>View Transactions</span><span className="text-orange-600">→</span></div>
+          <div className="space-y-1 text-sm">
+            <Link to="/admin/counties" className="flex items-center justify-between text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg px-2 py-1.5 transition-colors"><span>Add County</span><ChevronRight className="w-4 h-4 text-orange-600" /></Link>
+            <Link to="/admin/kyc" className="flex items-center justify-between text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg px-2 py-1.5 transition-colors"><span>Review KYC</span><ChevronRight className="w-4 h-4 text-orange-600" /></Link>
+            <Link to="/admin/money" className="flex items-center justify-between text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg px-2 py-1.5 transition-colors"><span>Configure Fees</span><ChevronRight className="w-4 h-4 text-orange-600" /></Link>
+            <Link to="/admin/sasapay" className="flex items-center justify-between text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg px-2 py-1.5 transition-colors"><span>View Transactions</span><ChevronRight className="w-4 h-4 text-orange-600" /></Link>
           </div>
         </div>
       </div>

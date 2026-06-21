@@ -43,7 +43,10 @@ export default function LipaOwner() {
   async function handleConfirm() {
     setPinError('');
     if (pin.length !== 4) { setPinError('Enter your 4-digit PIN'); return; }
-    // In mock mode, accept any PIN
+    if (wallet.pin_hash && pin !== wallet.pin_hash) {
+      setPinError('Incorrect PIN. Please try again.');
+      return;
+    }
     setLoading(true);
     const cents = Math.round(parseFloat(amount) * 100);
     try {

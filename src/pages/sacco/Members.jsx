@@ -2,24 +2,29 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatDate } from '@/lib/format';
 import { Users, UserPlus, Check, X } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function SaccoMembers() {
+  const { user } = useAuth();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u?.scope_entity_id) {
-          const allUsers = await base44.entities.User.filter({ county_id: u.scope_entity_id, staff_type: 'none' });
+        if (user.county_id) {
+          const allUsers = await base44.entities.User.filter({ county_id: user.county_id, role: 'rider' });
+          setMembers(allUsers);
+        } else {
+          const allUsers = await base44.entities.User.filter({ role: 'rider' });
           setMembers(allUsers);
         }
       } catch (e) {}
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
   return (
     <div className="p-6 animate-fade-in">

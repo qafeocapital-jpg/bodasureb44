@@ -1,27 +1,34 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
-import { BadgeCheck, BarChart3, Plus, TrendingUp } from 'lucide-react';
+import { BadgeCheck, BarChart3, Plus, TrendingUp, Calendar, Pencil } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function CountyPermits() {
+  const { user } = useAuth();
   const [tab, setTab] = useState('register');
   const [permits, setPermits] = useState([]);
   const [schedules, setSchedules] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddSchedule, setShowAddSchedule] = useState(false);
   const [newSchedule, setNewSchedule] = useState({ permit_type: 'weekly', amount_cents: '', penalty_amount_cents: '', grace_period_days: '7' });
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [issueForm, setIssueForm] = useState({ vehicle_id: '', billing_cycle: 'weekly', start_date: new Date().toISOString().split('T')[0] });
+  const [issuing, setIssuing] = useState(false);
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
     try {
-      const [p, s] = await Promise.all([
+      const [p, s, v] = await Promise.all([
         base44.entities.Permit.filter({}, '-created_date', 50),
         base44.entities.FeeSchedule.filter({ is_active: true }),
+        base44.entities.Vehicle.filter({ status: 'approved' }),
       ]);
-      setPermits(p); setSchedules(s);
+      setPermits(p); setSchedules(s); setVehicles(v);
     } catch (e) {}
     setLoading(false);
   }
@@ -29,9 +36,8 @@ export default function CountyPermits() {
   async function addSchedule() {
     const cents = Math.round(parseFloat(newSchedule.amount_cents) * 100);
     if (!cents) return;
-    const u = await base44.auth.me();
     await base44.entities.FeeSchedule.create({
-      county_id: u.scope_entity_id || u.county_id || 'general',
+      county_id: user?.county_id || 'general',
       permit_type: newSchedule.permit_type,
       amount_cents: cents,
       penalty_amount_cents: Math.round(parseFloat(newSchedule.penalty_amount_cents || '0') * 100),
@@ -43,7 +49,37 @@ export default function CountyPermits() {
     load();
   }
 
-  // Analytics data
+  async function issuePermit() {
+    if (!issueForm.vehicle_id || !issueForm.billing_cycle) return;
+    const vehicle = vehicles.find(v => v.id === issueForm.vehicle_id);
+    if (!vehicle) return;
+
+    const startDate = new Date(issueForm.start_date || new Date());
+    const cycleDays = { weekly: 7, monthly: 30, quarterly: 90, yearly: 365 };
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + (cycleDays[issueForm.billing_cycle] || 30));
+
+    setIssuing(true);
+    try {
+      const ts = Date.now().toString();
+      await base44.entities.Permit.create({
+        vehicle_id: issueForm.vehicle_id,
+        rider_id: vehicle.rider_id || vehicle.owner_id,
+        county_id: user?.county_id || vehicle.county_id || 'general',
+        billing_cycle: issueForm.billing_cycle,
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        status: 'active',
+        issued_manually: true,
+        qr_code_data: `BODASURE-${issueForm.vehicle_id}-${ts}`,
+      });
+      setShowIssueModal(false);
+      setIssueForm({ vehicle_id: '', billing_cycle: 'weekly', start_date: new Date().toISOString().split('T')[0] });
+      load();
+    } catch (e) {}
+    setIssuing(false);
+  }
+
   const analytics = ['weekly', 'monthly', 'quarterly', 'yearly'].map(cycle => ({
     name: cycle,
     count: permits.filter(p => p.billing_cycle === cycle).length,
@@ -71,30 +107,39 @@ export default function CountyPermits() {
       {loading ? (
         <p className="text-sm text-muted-foreground text-center py-10">Loading...</p>
       ) : tab === 'register' ? (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Cycle</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Amount</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Start</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">End</th>
-              </tr>
-            </thead>
-            <tbody>
-              {permits.map(p => (
-                <tr key={p.id} className="border-t border-border hover:bg-accent/50">
-                  <td className="px-4 py-3 font-medium capitalize">{p.billing_cycle}</td>
-                  <td className="px-4 py-3">{formatKES(p.amount_paid_cents)}</td>
-                  <td className="px-4 py-3"><span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${p.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>{p.status}</span></td>
-                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(p.start_date)}</td>
-                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(p.end_date)}</td>
+        <div>
+          <div className="flex justify-end mb-3">
+            <button onClick={() => setShowIssueModal(true)} className="flex items-center gap-1 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-semibold">
+              <Calendar className="w-4 h-4" /> Issue Manually
+            </button>
+          </div>
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Cycle</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Amount</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Start</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">End</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Type</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {permits.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No permits issued</p>}
+              </thead>
+              <tbody>
+                {permits.map(p => (
+                  <tr key={p.id} className="border-t border-border hover:bg-accent/50">
+                    <td className="px-4 py-3 font-medium capitalize">{p.billing_cycle}</td>
+                    <td className="px-4 py-3">{formatKES(p.amount_paid_cents)}</td>
+                    <td className="px-4 py-3"><span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${p.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>{p.status}</span></td>
+                    <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(p.start_date)}</td>
+                    <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(p.end_date)}</td>
+                    <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{p.issued_manually ? 'Manual' : 'Online'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {permits.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No permits issued</p>}
+          </div>
         </div>
       ) : tab === 'analytics' ? (
         <div className="bg-card border border-border rounded-xl p-5">
@@ -165,6 +210,46 @@ export default function CountyPermits() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Issue Permit Manually Modal */}
+      {showIssueModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowIssueModal(false)} />
+          <div className="relative bg-card rounded-2xl p-6 w-full max-w-md">
+            <h3 className="font-heading font-bold text-lg mb-4">Issue Permit Manually</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Vehicle</label>
+                <select value={issueForm.vehicle_id} onChange={e => setIssueForm(f => ({ ...f, vehicle_id: e.target.value }))} className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm">
+                  <option value="">Select approved vehicle</option>
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>{v.plate_number} — {v.make} {v.model}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Billing Cycle</label>
+                <select value={issueForm.billing_cycle} onChange={e => setIssueForm(f => ({ ...f, billing_cycle: e.target.value }))} className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm">
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Start Date</label>
+                <input type="date" value={issueForm.start_date} onChange={e => setIssueForm(f => ({ ...f, start_date: e.target.value }))} className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setShowIssueModal(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold">Cancel</button>
+                <button onClick={issuePermit} disabled={!issueForm.vehicle_id || issuing} className="flex-1 bg-emerald-600 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50">
+                  {issuing ? 'Issuing...' : 'Issue Permit'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

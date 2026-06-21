@@ -1,10 +1,37 @@
+import { useEffect, useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { FileText, ShieldCheck, TrendingUp } from 'lucide-react';
 
 export default function MerchantDashboard() {
+  const { user } = useAuth();
+  const [stats, setStats] = useState({ products: 0, activePolicies: 0, totalPolicies: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const merchantId = user?.merchant_id || user?.scope_entity_id;
+        const [products, activePolicies, allPolicies] = await Promise.all([
+          base44.entities.InsuranceProduct.filter({ is_active: true }),
+          base44.entities.Policy.filter({ status: 'active' }),
+          base44.entities.Policy.filter({}),
+        ]);
+        setStats({
+          products: products.length,
+          activePolicies: activePolicies.length,
+          totalPolicies: allPolicies.length,
+        });
+      } catch (e) {}
+      setLoading(false);
+    }
+    load();
+  }, [user]);
+
   const kpis = [
-    { label: 'Products', value: 0, icon: FileText, color: 'text-blue-600 bg-blue-50' },
-    { label: 'Active Policies', value: 0, icon: ShieldCheck, color: 'text-emerald-600 bg-emerald-50' },
-    { label: 'Policies Sold', value: 0, icon: TrendingUp, color: 'text-orange-600 bg-orange-50' },
+    { label: 'Products', value: loading ? '...' : stats.products, icon: FileText, color: 'text-blue-600 bg-blue-50' },
+    { label: 'Active Policies', value: loading ? '...' : stats.activePolicies, icon: ShieldCheck, color: 'text-emerald-600 bg-emerald-50' },
+    { label: 'Policies Sold', value: loading ? '...' : stats.totalPolicies, icon: TrendingUp, color: 'text-orange-600 bg-orange-50' },
   ];
 
   return (

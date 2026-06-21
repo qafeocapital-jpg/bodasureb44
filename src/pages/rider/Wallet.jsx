@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
-import { ArrowDownToLine, ArrowUpFromLine, Send } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Send, AlertCircle } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Wallet() {
@@ -106,6 +106,16 @@ export default function Wallet() {
 
       {/* Action Form */}
       <div className="mt-5 bg-card border border-border rounded-2xl p-4">
+        {(activeTab === 'send' || activeTab === 'withdraw') && (wallet.tier || 0) < 2 && (
+          <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-center gap-3 mb-4">
+            <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-warning">Tier 2 Required</p>
+              <p className="text-xs text-muted-foreground mt-0.5">This feature requires KYC approval (Tier 2). Upload your ID documents to unlock.</p>
+            </div>
+            <Link to="/app/kyc" className="flex-shrink-0 bg-warning text-warning-foreground rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap">Verify Now</Link>
+          </div>
+        )}
         {activeTab === 'send' && (
           <div className="mb-3">
             <label className="text-xs font-medium text-muted-foreground">Recipient Phone</label>
@@ -128,7 +138,7 @@ export default function Wallet() {
         />
         <button
           onClick={handleAction}
-          disabled={loading || !amount}
+          disabled={loading || !amount || ((activeTab === 'send' || activeTab === 'withdraw') && (wallet.tier || 0) < 2)}
           className="w-full mt-4 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50 transition-opacity"
         >
           {loading ? 'Processing...' : `Confirm ${activeTab}`}

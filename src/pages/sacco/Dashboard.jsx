@@ -1,11 +1,43 @@
+import { useEffect, useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { formatKES } from '@/lib/format';
 import { Users, Bike, Banknote, UserPlus } from 'lucide-react';
 
 export default function SaccoDashboard() {
+  const { user } = useAuth();
+  const [stats, setStats] = useState({ members: 0, bikes: 0, dividends: 0, applications: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const countyId = user?.county_id;
+        const [members, bikes, settlements, applications] = await Promise.all([
+          countyId
+            ? base44.entities.User.filter({ county_id: countyId, role: 'rider' })
+            : base44.entities.User.filter({ role: 'rider' }),
+          base44.entities.Vehicle.filter({}),
+          base44.entities.Settlement.filter({ entity_type: 'sacco', status: 'pending' }),
+          base44.entities.Group.filter({ status: 'pending' }),
+        ]);
+        setStats({
+          members: members.length,
+          bikes: bikes.length,
+          dividends: settlements.reduce((sum, s) => sum + (s.amount_cents || 0), 0),
+          applications: applications.length,
+        });
+      } catch (e) {}
+      setLoading(false);
+    }
+    load();
+  }, [user]);
+
   const kpis = [
-    { label: 'Members', value: 0, icon: Users, color: 'text-blue-600 bg-blue-50' },
-    { label: 'Bikes', value: 0, icon: Bike, color: 'text-orange-600 bg-orange-50' },
-    { label: 'Dividends Pending', value: 'KES 0', icon: Banknote, color: 'text-violet-600 bg-violet-50' },
-    { label: 'Applications', value: 0, icon: UserPlus, color: 'text-emerald-600 bg-emerald-50' },
+    { label: 'Members', value: loading ? '...' : stats.members, icon: Users, color: 'text-blue-600 bg-blue-50' },
+    { label: 'Bikes', value: loading ? '...' : stats.bikes, icon: Bike, color: 'text-orange-600 bg-orange-50' },
+    { label: 'Dividends Pending', value: loading ? '...' : formatKES(stats.dividends), icon: Banknote, color: 'text-violet-600 bg-violet-50' },
+    { label: 'Applications', value: loading ? '...' : stats.applications, icon: UserPlus, color: 'text-emerald-600 bg-emerald-50' },
   ];
 
   return (

@@ -1,10 +1,40 @@
+import { useEffect, useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Users, BadgeCheck, MapPin } from 'lucide-react';
 
 export default function StageDashboard() {
+  const { user } = useAuth();
+  const [stats, setStats] = useState({ members: 0, compliant: 0, nonCompliant: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const stageId = user?.stage_id;
+        const [vehicles, permits] = await Promise.all([
+          stageId
+            ? base44.entities.Vehicle.filter({ stage_id: stageId })
+            : base44.entities.Vehicle.filter({}),
+          base44.entities.Permit.filter({ status: 'active' }),
+        ]);
+        const compliantVehicleIds = new Set(permits.map(p => p.vehicle_id));
+        const compliant = vehicles.filter(v => compliantVehicleIds.has(v.id)).length;
+        setStats({
+          members: vehicles.length,
+          compliant,
+          nonCompliant: vehicles.length - compliant,
+        });
+      } catch (e) {}
+      setLoading(false);
+    }
+    load();
+  }, [user]);
+
   const kpis = [
-    { label: 'Stage Members', value: 0, icon: Users, color: 'text-blue-600 bg-blue-50' },
-    { label: 'Compliant', value: 0, icon: BadgeCheck, color: 'text-emerald-600 bg-emerald-50' },
-    { label: 'Non-Compliant', value: 0, icon: MapPin, color: 'text-rose-600 bg-rose-50' },
+    { label: 'Stage Members', value: loading ? '...' : stats.members, icon: Users, color: 'text-blue-600 bg-blue-50' },
+    { label: 'Compliant', value: loading ? '...' : stats.compliant, icon: BadgeCheck, color: 'text-emerald-600 bg-emerald-50' },
+    { label: 'Non-Compliant', value: loading ? '...' : stats.nonCompliant, icon: MapPin, color: 'text-rose-600 bg-rose-50' },
   ];
 
   return (
