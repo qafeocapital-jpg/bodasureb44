@@ -1,7 +1,10 @@
-import { useState } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { Menu, X, LogOut } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { hasPortalAccess } from '@/lib/portals';
+import { useToast } from '@/components/ui/use-toast';
 
 const accentMap = {
   emerald: { bg: 'bg-emerald-600', text: 'text-emerald-600', light: 'bg-emerald-50', border: 'border-emerald-200' },
@@ -9,9 +12,27 @@ const accentMap = {
   orange: { bg: 'bg-orange-500', text: 'text-orange-600', light: 'bg-orange-50', border: 'border-orange-200' },
 };
 
-export default function StaffLayout({ accent = 'orange', portalName = 'Portal', navItems = [] }) {
+export default function StaffLayout({ accent = 'orange', portalName = 'Portal', navItems = [], requiredRole }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const accentCls = accentMap[accent] || accentMap.orange;
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (user && !hasPortalAccess(user.role, requiredRole)) {
+      toast({
+        title: 'Access denied',
+        description: 'You do not have permission to access this portal.',
+        variant: 'destructive',
+      });
+    }
+  }, [user]);
+
+  if (!user) return null;
+  if (!hasPortalAccess(user.role, requiredRole)) {
+    return <Navigate to="/app" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex">

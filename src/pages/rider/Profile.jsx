@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { ChevronLeft, ChevronRight, Check, MapPin } from 'lucide-react';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [counties, setCounties] = useState([]);
   const [subCounties, setSubCounties] = useState([]);
   const [wards, setWards] = useState([]);
@@ -24,29 +25,26 @@ export default function Profile() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          setUser(u);
-          setForm({
-            full_name: u.full_name || '',
-            phone: u.phone || '',
-            national_id: u.national_id || '',
-            county_id: u.county_id || '',
-            sub_county_id: u.sub_county_id || '',
-            ward_id: u.ward_id || '',
-            stage_id: u.stage_id || '',
-          });
-          if (u.county_id) {
-            const subs = await base44.entities.SubCounty.filter({ county_id: u.county_id });
-            setSubCounties(subs);
-            if (u.sub_county_id) {
-              const ws = await base44.entities.Ward.filter({ sub_county_id: u.sub_county_id });
-              setWards(ws);
-              if (u.ward_id) {
-                const sts = await base44.entities.Stage.filter({ ward_id: u.ward_id });
-                setStages(sts);
-              }
+        setForm({
+          full_name: user.full_name || '',
+          phone: user.phone || '',
+          national_id: user.national_id || '',
+          county_id: user.county_id || '',
+          sub_county_id: user.sub_county_id || '',
+          ward_id: user.ward_id || '',
+          stage_id: user.stage_id || '',
+        });
+        if (user.county_id) {
+          const subs = await base44.entities.SubCounty.filter({ county_id: user.county_id });
+          setSubCounties(subs);
+          if (user.sub_county_id) {
+            const ws = await base44.entities.Ward.filter({ sub_county_id: user.sub_county_id });
+            setWards(ws);
+            if (user.ward_id) {
+              const sts = await base44.entities.Stage.filter({ ward_id: user.ward_id });
+              setStages(sts);
             }
           }
         }
@@ -55,7 +53,7 @@ export default function Profile() {
       } catch (e) {}
     }
     load();
-  }, []);
+  }, [user]);
 
   async function handleCountyChange(countyId) {
     setForm(f => ({ ...f, county_id: countyId, sub_county_id: '', ward_id: '', stage_id: '' }));

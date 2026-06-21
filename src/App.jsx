@@ -106,7 +106,7 @@ const AuthenticatedApp = () => {
       </Route>
 
       {/* County Portal (emerald) */}
-      <Route element={<StaffLayout accent="emerald" portalName="County" navItems={countyNav} />}>
+      <Route element={<StaffLayout accent="emerald" portalName="County" navItems={countyNav} requiredRole="county_admin" />}>
         <Route path="/county/dashboard" element={<CountyDashboard />} />
         <Route path="/county/registrations" element={<CountyRegistrations />} />
         <Route path="/county/permits" element={<CountyPermits />} />
@@ -118,7 +118,7 @@ const AuthenticatedApp = () => {
       </Route>
 
       {/* SACCO Portal (blue) */}
-      <Route element={<StaffLayout accent="blue" portalName="SACCO" navItems={saccoNav} />}>
+      <Route element={<StaffLayout accent="blue" portalName="SACCO" navItems={saccoNav} requiredRole="sacco_admin" />}>
         <Route path="/sacco/dashboard" element={<SaccoDashboard />} />
         <Route path="/sacco/members" element={<SaccoMembers />} />
         <Route path="/sacco/bikes" element={<SaccoBikes />} />
@@ -126,28 +126,28 @@ const AuthenticatedApp = () => {
       </Route>
 
       {/* Merchant Portal (emerald) */}
-      <Route element={<StaffLayout accent="emerald" portalName="Merchant" navItems={merchantNav} />}>
+      <Route element={<StaffLayout accent="emerald" portalName="Merchant" navItems={merchantNav} requiredRole="merchant_admin" />}>
         <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
         <Route path="/merchant/products" element={<MerchantProducts />} />
         <Route path="/merchant/policies" element={<MerchantPolicies />} />
       </Route>
 
       {/* Field Agent Portal (orange) */}
-      <Route element={<StaffLayout accent="orange" portalName="Field Agent" navItems={agentNav} />}>
+      <Route element={<StaffLayout accent="orange" portalName="Field Agent" navItems={agentNav} requiredRole="field_agent" />}>
         <Route path="/agent/dashboard" element={<AgentDashboard />} />
         <Route path="/agent/invite" element={<AgentInvite />} />
         <Route path="/agent/history" element={<AgentHistory />} />
       </Route>
 
       {/* Stage Portal (blue) */}
-      <Route element={<StaffLayout accent="blue" portalName="Stage" navItems={stageNav} />}>
+      <Route element={<StaffLayout accent="blue" portalName="Stage" navItems={stageNav} requiredRole="stage_admin" />}>
         <Route path="/stage/dashboard" element={<StageDashboard />} />
         <Route path="/stage/members" element={<StageMembers />} />
         <Route path="/stage/compliance" element={<StageCompliance />} />
       </Route>
 
       {/* Super Admin Portal (orange) */}
-      <Route element={<StaffLayout accent="orange" portalName="Super Admin" navItems={adminNav} />}>
+      <Route element={<StaffLayout accent="orange" portalName="Super Admin" navItems={adminNav} requiredRole="super_admin" />}>
         <Route path="/admin/overview" element={<AdminOverview />} />
         <Route path="/admin/counties" element={<AdminCounties />} />
         <Route path="/admin/sasapay" element={<AdminSasaPay />} />

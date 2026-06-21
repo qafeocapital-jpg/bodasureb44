@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ArrowDownToLine, ArrowUpFromLine, Send } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Wallet() {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
@@ -15,24 +17,23 @@ export default function Wallet() {
   const [recipient, setRecipient] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
     async function loadData() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          setUser(u);
-          const w = await getOrCreateWallet(u.id);
-          setWallet(w);
-          const snapshots = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
-          if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
-          const txns = await base44.entities.Transaction.filter({ wallet_id: w.id }, '-created_date', 20);
-          setTransactions(txns);
-        }
+        const w = await getOrCreateWallet(user.id);
+        setWallet(w);
+        const snapshots = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
+        if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
+        const txns = await base44.entities.Transaction.filter({ wallet_id: w.id }, '-created_date', 20);
+        setTransactions(txns);
       } catch (e) {}
+      setDataLoaded(true);
     }
     loadData();
-  }, []);
+  }, [user]);
 
   async function handleAction() {
     const cents = Math.round(parseFloat(amount) * 100);
@@ -58,6 +59,8 @@ export default function Wallet() {
     }
     setLoading(false);
   }
+
+  if (!dataLoaded) return <PageSkeleton variant="hero-rows" />;
 
   if (!wallet) {
     return (

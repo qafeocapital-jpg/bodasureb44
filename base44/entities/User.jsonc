@@ -64,6 +64,19 @@
       ],
       "default": "none"
     },
+    "role": {
+      "type": "string",
+      "enum": [
+        "rider",
+        "county_admin",
+        "sacco_admin",
+        "merchant_admin",
+        "field_agent",
+        "stage_admin",
+        "super_admin"
+      ],
+      "default": "rider"
+    },
     "scope_entity_id": {
       "type": "string"
     },

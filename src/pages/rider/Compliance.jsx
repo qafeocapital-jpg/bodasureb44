@@ -1,23 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Compliance() {
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
           const checks = [
-            { label: 'Profile Complete', done: u.profile_complete, link: '/app/account' },
-            { label: 'KYC Documents Uploaded', done: u.kyc_status === 'approved' || u.kyc_status === 'pending', pending: u.kyc_status === 'pending', link: '/app/account' },
-            { label: 'KYC Approved', done: u.kyc_status === 'approved', link: '/app/account' },
+            { label: 'Profile Complete', done: user.profile_complete, link: '/app/account' },
+            { label: 'KYC Documents Uploaded', done: user.kyc_status === 'approved' || user.kyc_status === 'pending', pending: user.kyc_status === 'pending', link: '/app/account' },
+            { label: 'KYC Approved', done: user.kyc_status === 'approved', link: '/app/account' },
           ];
-          const bikes = await base44.entities.Vehicle.filter({ rider_id: u.id });
+          const bikes = await base44.entities.Vehicle.filter({ rider_id: user.id });
           const approvedBike = bikes.find(b => b.status === 'approved');
           checks.push(
             { label: 'Bike Registered', done: bikes.length > 0, link: '/app/bikes/register' },
@@ -28,14 +30,13 @@ export default function Compliance() {
             checks.push({ label: 'Active Permit', done: permits.length > 0, link: '/app/lipa-county' });
           }
           setItems(checks);
-        }
-      } catch (e) {}
-      setLoading(false);
-    }
+          } catch (e) {}
+          setLoading(false);
+          }
     load();
-  }, []);
+  }, [user]);
 
-  if (loading) return <div className="p-5 text-sm text-muted-foreground">Loading...</div>;
+  if (loading) return <PageSkeleton variant="hero-rows" />;
 
   const completed = items.filter(i => i.done).length;
   const pct = items.length > 0 ? Math.round((completed / items.length) * 100) : 0;

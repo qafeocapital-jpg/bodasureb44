@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { formatDate } from '@/lib/format';
 import { ChevronLeft, QrCode, BadgeCheck, ShieldCheck, AlertCircle, Download } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function BikeCertificate() {
   const navigate = useNavigate();
@@ -24,7 +25,7 @@ export default function BikeCertificate() {
     load();
   }, [id]);
 
-  if (loading) return <div className="p-5 text-sm text-muted-foreground">Loading...</div>;
+  if (loading) return <PageSkeleton variant="hero-rows" />;
 
   if (!bike) return (
     <div className="p-5 text-center">

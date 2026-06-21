@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, HandCoins, Loader2, CheckCircle2, XCircle, Receipt } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Lipisha() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [balance, setBalance] = useState(0);
   const [history, setHistory] = useState([]);
@@ -17,20 +20,18 @@ export default function Lipisha() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          const w = await getOrCreateWallet(u.id);
-          setWallet(w);
-          const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
-          if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);
-          const txns = await base44.entities.Transaction.filter({ wallet_id: w.id, type: 'lipisha' }, '-created_date', 10);
-          setHistory(txns);
-        }
+        const w = await getOrCreateWallet(user.id);
+        setWallet(w);
+        const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
+        if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);
+        const txns = await base44.entities.Transaction.filter({ wallet_id: w.id, type: 'lipisha' }, '-created_date', 10);
+        setHistory(txns);
       } catch (e) {}
     }
     load();
-  }, []);
+  }, [user]);
 
   async function handleCollect() {
     const cents = Math.round(parseFloat(amount) * 100);
@@ -57,6 +58,8 @@ export default function Lipisha() {
     }
     setLoading(false);
   }
+
+  if (!wallet) return <PageSkeleton variant="hero-rows" />;
 
   return (
     <div className="p-5 animate-fade-in">

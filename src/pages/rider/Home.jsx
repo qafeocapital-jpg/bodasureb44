@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
 import { ShieldCheck, AlertCircle } from 'lucide-react';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Home() {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [balance, setBalance] = useState(0);
   const [walletActive, setWalletActive] = useState(false);
   const [bikes, setBikes] = useState([]);
@@ -16,33 +18,30 @@ export default function Home() {
 
   useEffect(() => {
     async function loadData() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          setUser(u);
-          const wallets = await base44.entities.Wallet.filter({ user_id: u.id, entity_type: 'personal' });
-          if (wallets.length > 0) {
-            const w = wallets[0];
-            setWalletActive(w.status === 'active' || w.tier > 0);
-            const snapshots = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
-            if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
-          }
-          const [owned, ridden, kyc] = await Promise.all([
-            base44.entities.Vehicle.filter({ owner_id: u.id }),
-            base44.entities.Vehicle.filter({ rider_id: u.id }),
-            base44.entities.KycDocument.filter({ user_id: u.id }),
-          ]);
-          const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
-          setBikes(merged);
-          setKycDocs(kyc);
+        const wallets = await base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' });
+        if (wallets.length > 0) {
+          const w = wallets[0];
+          setWalletActive(w.status === 'active' || w.tier > 0);
+          const snapshots = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
+          if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
         }
-      } catch (e) {
-        // Not logged in — show placeholder
-      }
+        const [owned, ridden, kyc] = await Promise.all([
+          base44.entities.Vehicle.filter({ owner_id: user.id }),
+          base44.entities.Vehicle.filter({ rider_id: user.id }),
+          base44.entities.KycDocument.filter({ user_id: user.id }),
+        ]);
+        const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
+        setBikes(merged);
+        setKycDocs(kyc);
+      } catch (e) {}
       setLoading(false);
     }
     loadData();
-  }, []);
+  }, [user]);
+
+  if (loading) return <PageSkeleton variant="hero-grid" />;
 
   return (
     <div className="animate-fade-in">
@@ -53,9 +52,7 @@ export default function Home() {
         </p>
         <div className="mt-4">
           <p className="text-xs text-orange-100 uppercase tracking-wide font-medium">Wallet Balance</p>
-          <p className="text-3xl font-heading font-extrabold mt-0.5">
-            {loading ? '...' : formatKES(balance)}
-          </p>
+          <p className="text-3xl font-heading font-extrabold mt-0.5">{formatKES(balance)}</p>
         </div>
         <div className="flex items-center gap-2 mt-4">
           {walletActive ? (
@@ -74,13 +71,11 @@ export default function Home() {
 
       {/* Onboarding Progress Tiles */}
       <div className="px-4 pt-5">
-        {!loading && user && (
-          <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} />
-        )}
+        {user && <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} />}
       </div>
 
       {/* Notifications Banner */}
-      {!user?.profile_complete && !loading && (
+      {!user?.profile_complete && (
         <div className="px-4 pt-5">
           <Link to="/app/profile" className="block bg-warning/10 border border-warning/20 rounded-xl p-4">
             <div className="flex items-center gap-2">
@@ -96,7 +91,7 @@ export default function Home() {
 
       {/* Icon Grid Sections */}
       <div className="px-4 py-5 space-y-7">
-        {riderTileSections.map((section) => (
+        {user && riderTileSections.map((section) => (
           <div key={section.title}>
             <h2 className="text-sm font-heading font-bold text-foreground mb-3 px-1">{section.title}</h2>
             <div className="grid grid-cols-4 gap-3">

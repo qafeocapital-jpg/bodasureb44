@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { formatKES, formatDateTime, formatDate } from '@/lib/format';
+import { useAuth } from '@/lib/AuthContext';
+import { formatKES, formatDate } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
-import { ChevronLeft, BadgeCheck, Loader2, CheckCircle2, XCircle, Landmark, Receipt, AlertCircle } from 'lucide-react';
+import { ChevronLeft, BadgeCheck, Loader2, CheckCircle2, XCircle, AlertCircle, Receipt } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function LipaCounty() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [bikes, setBikes] = useState([]);
   const [feeSchedules, setFeeSchedules] = useState([]);
@@ -20,29 +22,26 @@ export default function LipaCounty() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          setUser(u);
-          const w = await getOrCreateWallet(u.id);
-          setWallet(w);
-          const owned = await base44.entities.Vehicle.filter({ owner_id: u.id, status: 'approved' });
-          const ridden = await base44.entities.Vehicle.filter({ rider_id: u.id, status: 'approved' });
-          const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
-          setBikes(merged);
+        const w = await getOrCreateWallet(user.id);
+        setWallet(w);
+        const owned = await base44.entities.Vehicle.filter({ owner_id: user.id, status: 'approved' });
+        const ridden = await base44.entities.Vehicle.filter({ rider_id: user.id, status: 'approved' });
+        const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
+        setBikes(merged);
 
-          if (merged.length > 0) {
-            const bike = merged[0];
-            const schedules = await base44.entities.FeeSchedule.filter({ county_id: bike.county_id, is_active: true });
-            setFeeSchedules(schedules);
-            const perms = await base44.entities.Permit.filter({ rider_id: u.id }, '-created_date', 10);
-            setPermits(perms);
-          }
+        if (merged.length > 0) {
+          const bike = merged[0];
+          const schedules = await base44.entities.FeeSchedule.filter({ county_id: bike.county_id, is_active: true });
+          setFeeSchedules(schedules);
+          const perms = await base44.entities.Permit.filter({ rider_id: user.id }, '-created_date', 10);
+          setPermits(perms);
         }
       } catch (e) {}
     }
     load();
-  }, []);
+  }, [user]);
 
   async function handleBikeChange(bikeId) {
     setSelectedBike(bikeId);
@@ -99,7 +98,7 @@ export default function LipaCounty() {
 
       await base44.entities.Permit.create({
         vehicle_id: selectedBike,
-        rider_id: user.id,
+        rider_id: user?.id,
         county_id: selectedBikeObj.county_id,
         billing_cycle: selectedCycle,
         start_date: now.toISOString(),
@@ -120,7 +119,7 @@ export default function LipaCounty() {
       }
 
       setResult({ success: true, amount: selectedSchedule.amount_cents, reference: res.reference, cycle: selectedCycle });
-      const perms = await base44.entities.Permit.filter({ rider_id: user.id }, '-created_date', 10);
+      const perms = await base44.entities.Permit.filter({ rider_id: user?.id }, '-created_date', 10);
       setPermits(perms);
       setSelectedBike('');
       setSelectedCycle('');
@@ -129,6 +128,8 @@ export default function LipaCounty() {
     }
     setLoading(false);
   }
+
+  if (!wallet && bikes.length === 0) return <PageSkeleton variant="hero-rows" />;
 
   return (
     <div className="p-5 animate-fade-in">

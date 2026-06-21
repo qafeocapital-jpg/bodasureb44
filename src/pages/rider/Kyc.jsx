@@ -1,12 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { ChevronLeft, Upload, CheckCircle2, Clock, XCircle, IdCard, Camera } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Kyc() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadingType, setUploadingType] = useState(null);
   const fileRefs = {
@@ -17,15 +20,17 @@ export default function Kyc() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) setUser(u);
-        const userDocs = await base44.entities.KycDocument.filter({ user_id: u.id });
+        const userDocs = await base44.entities.KycDocument.filter({ user_id: user.id });
         setDocs(userDocs);
       } catch (e) {}
+      setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
+
+  if (loading) return <PageSkeleton variant="hero-rows" />;
 
   const docTypes = [
     { key: 'id_front', label: 'ID Card Front', icon: IdCard },
@@ -55,7 +60,7 @@ export default function Kyc() {
         setDocs(prev => prev.map(d => d.id === existing.id ? updated : d));
       } else {
         const newDoc = await base44.entities.KycDocument.create({
-          user_id: user.id,
+          user_id: user?.id,
           document_type: type,
           file_url,
           status: 'pending',
@@ -65,7 +70,6 @@ export default function Kyc() {
 
       if (docTypes.every(dt => dt.key === type || docs.find(d => d.document_type === dt.key))) {
         await base44.auth.updateMe({ kyc_status: 'pending' });
-        setUser(u => ({ ...u, kyc_status: 'pending' }));
       }
     } catch (e) {
       console.error(e);

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, ShieldCheck, Loader2, CheckCircle2, XCircle, Plus } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Insurance() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [bikes, setBikes] = useState([]);
   const [products, setProducts] = useState([]);
@@ -21,26 +23,23 @@ export default function Insurance() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          setUser(u);
-          const w = await getOrCreateWallet(u.id);
-          setWallet(w);
-          const owned = await base44.entities.Vehicle.filter({ owner_id: u.id, status: 'approved' });
-          const ridden = await base44.entities.Vehicle.filter({ rider_id: u.id, status: 'approved' });
-          const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
-          setBikes(merged);
-          const prods = await base44.entities.InsuranceProduct.filter({ is_active: true });
-          setProducts(prods);
-          const userPolicies = await base44.entities.Policy.filter({ rider_id: u.id, status: 'active' });
-          setPolicies(userPolicies);
-        }
+        const w = await getOrCreateWallet(user.id);
+        setWallet(w);
+        const owned = await base44.entities.Vehicle.filter({ owner_id: user.id, status: 'approved' });
+        const ridden = await base44.entities.Vehicle.filter({ rider_id: user.id, status: 'approved' });
+        const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
+        setBikes(merged);
+        const prods = await base44.entities.InsuranceProduct.filter({ is_active: true });
+        setProducts(prods);
+        const userPolicies = await base44.entities.Policy.filter({ rider_id: user.id, status: 'active' });
+        setPolicies(userPolicies);
       } catch (e) {}
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
   async function handlePurchase() {
     if (!selectedBike || !selectedProduct) return;
@@ -63,7 +62,7 @@ export default function Insurance() {
 
       await base44.entities.Policy.create({
         vehicle_id: selectedBike,
-        rider_id: user.id,
+        rider_id: user?.id,
         product_id: product.id,
         merchant_id: product.merchant_id,
         start_date: now.toISOString(),
@@ -77,7 +76,7 @@ export default function Insurance() {
       setShowPurchase(false);
       setSelectedBike('');
       setSelectedProduct('');
-      const userPolicies = await base44.entities.Policy.filter({ rider_id: user.id, status: 'active' });
+      const userPolicies = await base44.entities.Policy.filter({ rider_id: user?.id, status: 'active' });
       setPolicies(userPolicies);
     } catch (e) {
       setResult({ success: false, message: 'Purchase failed. Try again.' });
@@ -85,7 +84,7 @@ export default function Insurance() {
     setPaying(false);
   }
 
-  if (loading) return <div className="p-5 text-sm text-muted-foreground">Loading...</div>;
+  if (loading) return <PageSkeleton variant="hero-rows" />;
 
   return (
     <div className="p-5 animate-fade-in">

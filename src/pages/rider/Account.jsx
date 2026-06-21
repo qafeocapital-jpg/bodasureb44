@@ -1,20 +1,12 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { User, FileCheck, Bell, Lock, Headphones, LogOut, ChevronRight } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
+import { getAccessiblePortals } from '@/lib/portals';
+import { User, FileCheck, Bell, Lock, Headphones, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
 
 export default function Account() {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const u = await base44.auth.me();
-        if (u) setUser(u);
-      } catch (e) {}
-    }
-    load();
-  }, []);
+  const { user } = useAuth();
+  const portals = getAccessiblePortals(user?.role);
 
   const menuItems = [
     { label: 'Profile', icon: User, desc: 'Edit your personal details', link: '/app/profile' },
@@ -35,7 +27,14 @@ export default function Account() {
             <User className="w-7 h-7 text-primary" />
           </div>
           <div className="flex-1">
-            <p className="font-heading font-bold text-base">{user?.full_name || 'BodaSure Rider'}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-heading font-bold text-base">{user?.full_name || 'BodaSure Rider'}</p>
+              {user?.role === 'super_admin' && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5">
+                  <ShieldCheck className="w-3 h-3" /> Super Admin
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">{user?.phone || user?.email || 'Not set'}</p>
             <span className="inline-block mt-1 text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">
               Tier {user?.wallet_tier || 0}
@@ -58,6 +57,26 @@ export default function Account() {
           </Link>
         ))}
       </div>
+
+      {/* Portal Switcher */}
+      {portals.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-sm font-heading font-bold text-foreground mb-3">My Portals</h2>
+          <div className="space-y-2">
+            {portals.map((portal, i) => (
+              <Link
+                key={i}
+                to={portal.path}
+                className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3 hover:bg-accent transition-colors"
+              >
+                <span className={`w-3 h-3 rounded-full ${portal.color}`} />
+                <span className="flex-1 text-sm font-medium">{portal.name}</span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Logout */}
       <button

@@ -1,25 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatDate } from '@/lib/format';
 import { ChevronLeft, MapPin, Users, BadgeCheck, AlertCircle, Bell } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Stage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [stage, setStage] = useState(null);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u?.stage_id) {
-          const stages = await base44.entities.Stage.filter({ id: u.stage_id });
+        if (user.stage_id) {
+          const stages = await base44.entities.Stage.filter({ id: user.stage_id });
           if (stages.length > 0) {
             setStage(stages[0]);
-            // Get riders at this stage
-            const stageMembers = await base44.entities.User.filter({ stage_id: u.stage_id, staff_type: 'none' });
+            const stageMembers = await base44.entities.User.filter({ stage_id: user.stage_id, staff_type: 'none' });
             setMembers(stageMembers);
           }
         }
@@ -27,9 +29,9 @@ export default function Stage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
-  if (loading) return <div className="p-5 text-sm text-muted-foreground">Loading...</div>;
+  if (loading) return <PageSkeleton variant="hero-rows" />;
 
   if (!stage) {
     return (

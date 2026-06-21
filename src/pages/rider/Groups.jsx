@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, Users, UserPlus, PiggyBank, BarChart3, Loader2, CheckCircle2 } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Groups() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [groups, setGroups] = useState([]);
   const [myGroups, setMyGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,21 +20,16 @@ export default function Groups() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          setUser(u);
-          const allGroups = await base44.entities.Group.filter({ county_id: u.county_id, status: 'active' });
-          setGroups(allGroups);
-          // For mock, assume user is a member of groups they "joined"
-          // In real app this would be a membership table
-          setMyGroups(allGroups.slice(0, 1)); // mock: first group is "mine"
-        }
+        const allGroups = await base44.entities.Group.filter({ county_id: user.county_id, status: 'active' });
+        setGroups(allGroups);
+        setMyGroups(allGroups.slice(0, 1));
       } catch (e) {}
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
   async function handleCreate() {
     if (!newGroupName || !user?.county_id) return;
@@ -67,7 +64,7 @@ export default function Groups() {
     setCreating(false);
   }
 
-  if (loading) return <div className="p-5 text-sm text-muted-foreground">Loading...</div>;
+  if (loading) return <PageSkeleton variant="hero-rows" />;
 
   return (
     <div className="p-5 animate-fade-in">

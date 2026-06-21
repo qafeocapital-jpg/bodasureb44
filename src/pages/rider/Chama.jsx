@@ -4,10 +4,12 @@ import { base44 } from '@/api/base44Client';
 import { formatKES, formatDate, formatDateTime } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, PiggyBank, Users, Loader2, CheckCircle2, Coins, ArrowUpFromLine } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function Chama() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [groupId, setGroupId] = useState(null);
   const [group, setGroup] = useState(null);
   const [groupWallet, setGroupWallet] = useState(null);
@@ -21,38 +23,35 @@ export default function Chama() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          const uw = await getOrCreateWallet(u.id);
-          setUserWallet(uw);
+        const uw = await getOrCreateWallet(user.id);
+        setUserWallet(uw);
 
-          let gId = location.state?.groupId;
-          if (!gId) {
-            // Get user's first group as fallback
-            const myGroups = await base44.entities.Group.filter({ county_id: u.county_id, status: 'active' });
-            if (myGroups.length > 0) gId = myGroups[0].id;
-          }
-          if (gId) {
-            setGroupId(gId);
-            const groups = await base44.entities.Group.filter({ id: gId });
-            if (groups.length > 0) setGroup(groups[0]);
+        let gId = location.state?.groupId;
+        if (!gId) {
+          const myGroups = await base44.entities.Group.filter({ county_id: user.county_id, status: 'active' });
+          if (myGroups.length > 0) gId = myGroups[0].id;
+        }
+        if (gId) {
+          setGroupId(gId);
+          const groups = await base44.entities.Group.filter({ id: gId });
+          if (groups.length > 0) setGroup(groups[0]);
 
-            const groupWallets = await base44.entities.Wallet.filter({ group_id: gId, entity_type: 'business' });
-            if (groupWallets.length > 0) {
-              const gw = groupWallets[0];
-              setGroupWallet(gw);
-              const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: gw.id });
-              if (snaps.length > 0) setPoolBalance(snaps[0].balance_cents || 0);
-              const txns = await base44.entities.Transaction.filter({ wallet_id: gw.id, type: 'chama' }, '-created_date', 10);
-              setTransactions(txns);
-            }
+          const groupWallets = await base44.entities.Wallet.filter({ group_id: gId, entity_type: 'business' });
+          if (groupWallets.length > 0) {
+            const gw = groupWallets[0];
+            setGroupWallet(gw);
+            const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: gw.id });
+            if (snaps.length > 0) setPoolBalance(snaps[0].balance_cents || 0);
+            const txns = await base44.entities.Transaction.filter({ wallet_id: gw.id, type: 'chama' }, '-created_date', 10);
+            setTransactions(txns);
           }
         }
       } catch (e) {}
     }
     load();
-  }, []);
+  }, [user]);
 
   async function handleContribute() {
     const cents = Math.round(parseFloat(amount) * 100);

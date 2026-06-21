@@ -1,27 +1,28 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Plus, Bike as BikeIcon, BadgeCheck, Clock, ChevronRight, QrCode } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Bikes() {
+  const { user } = useAuth();
   const [bikes, setBikes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          const owned = await base44.entities.Vehicle.filter({ owner_id: u.id });
-          const ridden = await base44.entities.Vehicle.filter({ rider_id: u.id });
-          const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
-          setBikes(merged);
-        }
+        const owned = await base44.entities.Vehicle.filter({ owner_id: user.id });
+        const ridden = await base44.entities.Vehicle.filter({ rider_id: user.id });
+        const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
+        setBikes(merged);
       } catch (e) {}
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
   return (
     <div className="p-5 animate-fade-in">
@@ -33,7 +34,7 @@ export default function Bikes() {
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-muted-foreground text-sm">Loading...</div>
+        <PageSkeleton variant="hero-rows" />
       ) : bikes.length === 0 ? (
         <div className="bg-accent rounded-2xl p-8 text-center">
           <BikeIcon className="w-12 h-12 mx-auto text-muted-foreground mb-3" />

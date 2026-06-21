@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, UserCheck, Loader2, CheckCircle2, XCircle, Receipt } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function LipaOwner() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [bikes, setBikes] = useState([]);
   const [selectedBike, setSelectedBike] = useState('');
@@ -21,23 +23,20 @@ export default function LipaOwner() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          setUser(u);
-          const w = await getOrCreateWallet(u.id);
-          setWallet(w);
-          // Get bikes the user rides but does NOT own
-          const ridden = await base44.entities.Vehicle.filter({ rider_id: u.id, status: 'approved' });
-          const notOwned = ridden.filter(b => !b.is_owner_rider && b.owner_id !== u.id);
-          setBikes(notOwned);
-          const txns = await base44.entities.Transaction.filter({ wallet_id: w.id, type: 'lipa_owner' }, '-created_date', 10);
-          setHistory(txns);
-        }
+        const w = await getOrCreateWallet(user.id);
+        setWallet(w);
+        // Get bikes the user rides but does NOT own
+        const ridden = await base44.entities.Vehicle.filter({ rider_id: user.id, status: 'approved' });
+        const notOwned = ridden.filter(b => !b.is_owner_rider && b.owner_id !== user.id);
+        setBikes(notOwned);
+        const txns = await base44.entities.Transaction.filter({ wallet_id: w.id, type: 'lipa_owner' }, '-created_date', 10);
+        setHistory(txns);
       } catch (e) {}
     }
     load();
-  }, []);
+  }, [user]);
 
   const selectedBikeObj = bikes.find(b => b.id === selectedBike);
 
@@ -82,6 +81,8 @@ export default function LipaOwner() {
     if (!selectedBike || !amount) return;
     setShowPin(true);
   }
+
+  if (!wallet) return <PageSkeleton variant="hero-rows" />;
 
   return (
     <div className="p-5 animate-fade-in">

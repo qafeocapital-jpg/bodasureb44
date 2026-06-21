@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, Phone, Wifi, Zap, Droplet, Tv, Receipt, Loader2, CheckCircle2, XCircle, Coins } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Services() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [balance, setBalance] = useState(0);
   const [selectedService, setSelectedService] = useState(null);
@@ -18,19 +20,16 @@ export default function Services() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          setUser(u);
-          const w = await getOrCreateWallet(u.id);
-          setWallet(w);
-          const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
-          if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);
-        }
+        const w = await getOrCreateWallet(user.id);
+        setWallet(w);
+        const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
+        if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);
       } catch (e) {}
     }
     load();
-  }, []);
+  }, [user]);
 
   const services = [
     { key: 'airtime', label: 'Airtime', icon: Phone, color: 'bg-orange-50 text-orange-600', placeholder: 'Phone number' },
@@ -65,6 +64,8 @@ export default function Services() {
     }
     setLoading(false);
   }
+
+  if (!wallet) return <PageSkeleton variant="hero-rows" />;
 
   const isTier2 = user?.wallet_tier >= 2;
 

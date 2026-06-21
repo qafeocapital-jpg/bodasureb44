@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, FileCheck, Loader2 } from 'lucide-react';
+import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function WalletActivate() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [step, setStep] = useState(0);
   const [otp, setOtp] = useState('');
@@ -19,22 +21,19 @@ export default function WalletActivate() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const u = await base44.auth.me();
-        if (u) {
-          setUser(u);
-          setIdentity({
-            full_name: u.full_name || '',
-            national_id: u.national_id || '',
-            date_of_birth: u.date_of_birth || '',
-          });
-          const w = await getOrCreateWallet(u.id);
-          setWallet(w);
-        }
+        setIdentity({
+          full_name: user.full_name || '',
+          national_id: user.national_id || '',
+          date_of_birth: user.date_of_birth || '',
+        });
+        const w = await getOrCreateWallet(user.id);
+        setWallet(w);
       } catch (e) {}
     }
     load();
-  }, []);
+  }, [user]);
 
   function sendOtp() {
     setOtpSent(true);
@@ -58,7 +57,7 @@ export default function WalletActivate() {
         tier: 1,
         status: 'active',
         pin_hash: btoa(pin),
-        sasapay_customer_id: `mock_${user.id}`,
+        sasapay_customer_id: `mock_${user?.id}`,
       });
       await base44.auth.updateMe({ wallet_tier: 1 });
       setStep(3);
@@ -66,7 +65,7 @@ export default function WalletActivate() {
     setSaving(false);
   }
 
-  if (!user) return <div className="p-5 text-sm text-muted-foreground">Loading...</div>;
+  if (!user) return <PageSkeleton variant="hero-rows" />;
 
   const steps = [
     { title: 'Verify Phone', icon: Shield },

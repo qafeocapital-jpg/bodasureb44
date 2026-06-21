@@ -1,10 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { ChevronLeft, ChevronRight, Check, Bike as BikeIcon, MapPin, Camera, FileText } from 'lucide-react';
 
 export default function BikeRegister() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [counties, setCounties] = useState([]);
   const [subCounties, setSubCounties] = useState([]);
@@ -109,7 +111,6 @@ export default function BikeRegister() {
   async function handleSubmit() {
     setSaving(true);
     try {
-      const u = await base44.auth.me();
       const isOwnerRider = form.role === 'owner_rider' || form.role === 'rider';
       const isOwner = form.role === 'owner' || form.role === 'owner_rider';
 
@@ -118,8 +119,8 @@ export default function BikeRegister() {
         make: form.make,
         color: form.color,
         year: form.year ? parseInt(form.year) : null,
-        owner_id: isOwner ? u.id : null,
-        rider_id: u.id,
+        owner_id: isOwner ? user.id : null,
+        rider_id: user.id,
         county_id: form.county_id,
         stage_id: form.stage_id || null,
         status: 'pending',
