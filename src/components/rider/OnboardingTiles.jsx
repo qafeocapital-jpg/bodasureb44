@@ -1,50 +1,50 @@
 import { Link } from 'react-router-dom';
-import { User, Bike, FileCheck, BadgeCheck, Award, CheckCircle2, Clock, Lock } from 'lucide-react';
+import { CheckCircle2, Lock, Clock } from 'lucide-react';
+import { ONBOARDING_PHASES, getOnboardingPhase } from '@/lib/onboarding';
 
-export default function OnboardingTiles({ user, bikes, kycDocs }) {
-  const hasProfile = user?.profile_complete;
-  const hasBike = bikes.length > 0;
-  const hasDocs = kycDocs.length > 0;
-  const hasApprovedBike = bikes.some(b => b.status === 'approved');
-  const kycApproved = user?.kyc_status === 'approved';
+const TILE_COLORS = [
+  'bg-orange-50 text-orange-600',
+  'bg-blue-50 text-blue-600',
+  'bg-violet-50 text-violet-600',
+  'bg-blue-50 text-blue-600',
+  'bg-emerald-50 text-emerald-600',
+];
 
-  const tiles = [
-    { label: 'Profile', icon: User, done: hasProfile, link: '/app/profile', color: 'bg-orange-50 text-orange-600' },
-    { label: 'Vehicle', icon: Bike, done: hasBike, link: '/app/bikes/register', color: 'bg-blue-50 text-blue-600' },
-    { label: 'Documents', icon: FileCheck, done: hasDocs, pending: kycDocs.some(d => d.status === 'pending'), link: '/app/kyc', color: 'bg-violet-50 text-violet-600' },
-    { label: 'Approvals', icon: BadgeCheck, done: hasApprovedBike && kycApproved, pending: hasBike && !hasApprovedBike, link: '/app/compliance', color: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Leadership', icon: Award, done: false, link: '/app/account', color: 'bg-amber-50 text-amber-600' },
-  ];
+export default function OnboardingTiles({ user, bikes, kycDocs, groupMembers }) {
+  const phase = getOnboardingPhase(user, bikes, groupMembers);
 
   return (
     <div>
       <div className="flex items-center justify-between mb-3 px-1">
         <h2 className="text-sm font-heading font-bold text-foreground">Complete Your Setup</h2>
+        {phase >= 5 && <span className="text-xs font-medium text-success">All done!</span>}
       </div>
       <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
-        {tiles.map((tile) => {
-          const Icon = tile.icon;
+        {ONBOARDING_PHASES.map((p, i) => {
+          const Icon = p.icon;
+          const done = i < phase;
+          const pending = i === phase;
           return (
             <Link
-              key={tile.label}
-              to={tile.link}
+              key={p.id}
+              to="/app/profile"
               className="flex-shrink-0 w-28 bg-card border border-border rounded-xl p-3 hover:bg-accent transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${tile.color}`}>
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${TILE_COLORS[i]}`}>
                   <Icon className="w-5 h-5" />
                 </div>
-                {tile.done ? (
+                {done ? (
                   <CheckCircle2 className="w-4 h-4 text-success" />
-                ) : tile.pending ? (
+                ) : pending ? (
                   <Clock className="w-4 h-4 text-warning" />
                 ) : (
                   <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                 )}
               </div>
-              <p className="text-xs font-semibold">{tile.label}</p>
-              <p className={`text-[10px] ${tile.done ? 'text-success' : tile.pending ? 'text-warning' : 'text-muted-foreground'}`}>
-                {tile.done ? 'Complete' : tile.pending ? 'Pending' : 'In progress'}
+              <p className="text-xs font-semibold">{p.short}</p>
+              <p className={`text-[10px] ${done ? 'text-success' : pending ? 'text-warning' : 'text-muted-foreground'}`}>
+                {done ? 'Complete' : pending ? 'In progress' : 'Locked'}
               </p>
             </Link>
           );

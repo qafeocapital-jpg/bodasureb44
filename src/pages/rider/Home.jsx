@@ -6,6 +6,7 @@ import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
 import { ShieldCheck, AlertCircle, Megaphone } from 'lucide-react';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
+import { getOnboardingPhase } from '@/lib/onboarding';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Home() {
@@ -14,6 +15,7 @@ export default function Home() {
   const [walletActive, setWalletActive] = useState(false);
   const [bikes, setBikes] = useState([]);
   const [kycDocs, setKycDocs] = useState([]);
+  const [groupMembers, setGroupMembers] = useState([]);
   const [latestAnnouncement, setLatestAnnouncement] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -28,14 +30,16 @@ export default function Home() {
           const snapshots = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
           if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
         }
-        const [owned, ridden, kyc] = await Promise.all([
+        const [owned, ridden, kyc, gms] = await Promise.all([
           base44.entities.Vehicle.filter({ owner_id: user.id }),
           base44.entities.Vehicle.filter({ rider_id: user.id }),
           base44.entities.KycDocument.filter({ user_id: user.id }),
+          base44.entities.GroupMember.filter({ user_id: user.id }),
         ]);
         const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
         setBikes(merged);
         setKycDocs(kyc);
+        setGroupMembers(gms);
         // Fetch latest published announcement for riders
         try {
           const announcements = await base44.entities.Announcement.filter({ status: 'published' }, '-created_date', 10);
@@ -93,7 +97,7 @@ export default function Home() {
 
       {/* Onboarding Progress Tiles */}
       <div className="px-4 pt-5">
-        {user && <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} />}
+        {user && <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} groupMembers={groupMembers} />}
       </div>
 
       {/* Latest Announcement Banner */}
@@ -110,14 +114,14 @@ export default function Home() {
       )}
 
       {/* Notifications Banner */}
-      {!user?.profile_complete && (
+      {getOnboardingPhase(user, bikes, groupMembers) < 5 && (
         <div className="px-4 pt-5">
           <Link to="/app/profile" className="block bg-warning/10 border border-warning/20 rounded-xl p-4">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-warning">Complete your profile</p>
-                <p className="text-xs text-muted-foreground">Add your name and county to unlock wallet features</p>
+                <p className="text-xs text-muted-foreground">Finish your setup to unlock all features</p>
               </div>
             </div>
           </Link>

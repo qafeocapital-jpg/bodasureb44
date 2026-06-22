@@ -1,0 +1,130 @@
+import { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
+import PhoneInput from '@/components/ui/PhoneInput';
+import { ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
+
+export default function PhasePersonal({ user, counties, onSaved, onBack }) {
+  const [form, setForm] = useState({
+    full_name: user?.full_name || '',
+    phone: normalizePhone(user?.phone) || user?.phone || '',
+    national_id: user?.national_id || '',
+    county_id: user?.county_id || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+  const [idError, setIdError] = useState('');
+
+  const isNationalIdValid = (id) => /^\d{7,8}$/.test((id || '').trim());
+
+  const canProceed = () =>
+    form.full_name?.trim() &&
+    isValidKenyanPhone(form.phone) &&
+    isNationalIdValid(form.national_id) &&
+    form.county_id;
+
+  async function checkPhoneUniqueness() {
+    if (!form.phone || !isValidKenyanPhone(form.phone)) { setPhoneError(''); return false; }
+    if (form.phone === normalizePhone(user?.phone)) { setPhoneError(''); return false; }
+    try {
+      const existing = await base44.entities.User.filter({ phone: form.phone });
+      if (existing.length > 0 && existing[0].id !== user?.id) {
+        setPhoneError('This phone is already registered.');
+        return true;
+      }
+      setPhoneError('');
+      return false;
+    } catch (e) { setPhoneError(''); return false; }
+  }
+
+  async function checkIdUniqueness() {
+    const id = (form.national_id || '').trim();
+    if (!id || !isNationalIdValid(id)) { setIdError(''); return false; }
+    if (id === user?.national_id) { setIdError(''); return false; }
+    try {
+      const existing = await base44.entities.User.filter({ national_id: id });
+      if (existing.length > 0 && existing[0].id !== user?.id) {
+        setIdError('This ID is already registered.');
+        return true;
+      }
+      setIdError('');
+      return false;
+    } catch (e) { setIdError(''); return false; }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const phoneTaken = await checkPhoneUniqueness();
+      const idTaken = await checkIdUniqueness();
+      if (phoneTaken || idTaken) { setSaving(false); return; }
+      await base44.auth.updateMe({
+        full_name: form.full_name.trim(),
+        phone: form.phone,
+        national_id: form.national_id.trim(),
+        county_id: form.county_id,
+      });
+      await onSaved();
+    } catch (e) {}
+    setSaving(false);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Full Name</label>
+        <input
+          type="text"
+          value={form.full_name}
+          onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
+          placeholder="John Mwangi"
+          className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+      </div>
+      <PhoneInput
+        value={form.phone}
+        onChange={(e164) => setForm(f => ({ ...f, phone: e164 }))}
+        onBlur={checkPhoneUniqueness}
+        error={phoneError}
+      />
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={form.national_id}
+          onChange={e => setForm(f => ({ ...f, national_id: e.target.value.replace(/[^\d]/g, '') }))}
+          onBlur={checkIdUniqueness}
+          placeholder="00000000"
+          maxLength={8}
+          className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        {idError && <p className="text-xs text-destructive mt-1">{idError}</p>}
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">County You Operate From</label>
+        <select
+          value={form.county_id}
+          onChange={e => setForm(f => ({ ...f, county_id: e.target.value }))}
+          className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="">Select county</option>
+          {counties.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <p className="text-[10px] text-muted-foreground mt-1.5">This determines your fee schedules and compliance scoping.</p>
+      </div>
+      <div className="flex gap-2 pt-2">
+        <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={!canProceed() || saving}
+          className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Save & Continue <ChevronRight className="w-4 h-4" /></>}
+        </button>
+      </div>
+    </div>
+  );
+}
