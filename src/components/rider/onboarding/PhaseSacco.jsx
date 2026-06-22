@@ -36,10 +36,18 @@ export default function PhaseSacco({ user, counties, groupMembers, onJoined, onB
         status: 'pending',
         joined_date: new Date().toISOString(),
       });
+      await base44.auth.updateMe({ onboarding_complete: true });
       setJoinedId(sacco.id);
       setTimeout(() => onJoined(), 800);
     } catch (e) {}
     setJoining(null);
+  }
+
+  async function handleSkip() {
+    try {
+      await base44.auth.updateMe({ onboarding_complete: true });
+    } catch (e) {}
+    onJoined();
   }
 
   if (loading) {
@@ -101,7 +109,7 @@ export default function PhaseSacco({ user, counties, groupMembers, onJoined, onB
       )}
 
       <button
-        onClick={onJoined}
+        onClick={handleSkip}
         className="w-full text-center text-sm text-muted-foreground py-2 font-medium"
       >
         Skip for now

@@ -19,6 +19,7 @@ export function getOnboardingPhase(user, vehicles, groupMembers) {
   const latestBike = sorted[0];
   if (!latestBike?.sub_county_id || !latestBike?.ward_id || !latestBike?.stage_id) return 2;
   if (!user?.stage_id) return 3;
+  if (user?.onboarding_complete) return 5;
   if (!groupMembers || groupMembers.length === 0) return 4;
   return 5;
 }
