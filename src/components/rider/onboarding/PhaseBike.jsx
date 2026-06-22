@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { normalizePhone } from '@/lib/phone';
 import { auditLog } from '@/lib/audit';
-import { ChevronRight, ChevronLeft, Loader2, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Loader2, Check, MapPin } from 'lucide-react';
 
-export default function PhaseBike({ user, onSaved, onBack }) {
+export default function PhaseBike({ user, counties, onSaved, onBack }) {
   const [form, setForm] = useState({
     role: 'rider',
     plate_number: '',
@@ -57,6 +57,16 @@ export default function PhaseBike({ user, onSaved, onBack }) {
 
   return (
     <div className="space-y-4">
+      {user.county_id && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-primary">{counties?.find(c => c.id === user.county_id)?.name || 'Your County'} 📍</p>
+            <p className="text-[10px] text-muted-foreground">Auto-filled from Phase 1 — your bike will be registered here</p>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         {[
           { val: 'rider', label: 'I ride this bike', desc: 'Someone else owns it' },

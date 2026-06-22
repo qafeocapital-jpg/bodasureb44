@@ -89,6 +89,7 @@ export default function Profile() {
         {currentPhase === 1 && (
           <PhaseBike
             user={user}
+            counties={counties}
             onSaved={handlePhaseComplete}
             onBack={() => setCurrentPhase(0)}
           />
@@ -112,6 +113,7 @@ export default function Profile() {
         {currentPhase === 4 && (
           <PhaseSacco
             user={user}
+            counties={counties}
             groupMembers={groupMembers}
             onJoined={handlePhaseComplete}
             onBack={() => setCurrentPhase(3)}

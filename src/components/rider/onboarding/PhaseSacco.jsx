@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { ChevronLeft, Loader2, Users, UserPlus, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, Loader2, Users, UserPlus, CheckCircle2, MapPin } from 'lucide-react';
 
-export default function PhaseSacco({ user, groupMembers, onJoined, onBack }) {
+export default function PhaseSacco({ user, counties, groupMembers, onJoined, onBack }) {
   const [saccos, setSaccos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(null);
@@ -52,6 +52,16 @@ export default function PhaseSacco({ user, groupMembers, onJoined, onBack }) {
 
   return (
     <div className="space-y-4">
+      {user.county_id && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-primary">{counties?.find(c => c.id === user.county_id)?.name || 'Your County'} 📍</p>
+            <p className="text-[10px] text-muted-foreground">Auto-filled from Phase 1 — showing SACCOs in your county</p>
+          </div>
+        </div>
+      )}
+
       <p className="text-sm text-muted-foreground">Join a SACCO in your county to access group benefits and welfare.</p>
 
       {saccos.length === 0 ? (
