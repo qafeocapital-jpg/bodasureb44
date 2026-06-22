@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { formatKES, formatDateTime } from '@/lib/format';
-import { Landmark, TrendingUp, FileText, Banknote } from 'lucide-react';
+import { formatKES, formatDateTime, formatDate } from '@/lib/format';
+import { Landmark, TrendingUp, FileText, Banknote, AlertCircle } from 'lucide-react';
 
 export default function CountyRevenue() {
   const { user } = useAuth();
   const [tab, setTab] = useState('dashboard');
   const [transactions, setTransactions] = useState([]);
   const [settlements, setSettlements] = useState([]);
+  const [arrears, setArrears] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const countyId = user?.scope_entity_id || user?.county_id;
@@ -38,10 +39,50 @@ export default function CountyRevenue() {
         skip += batchLimit;
       }
 
-      const [setts] = await Promise.all([
-        base44.entities.Settlement.filter(countyId ? { entity_type: 'county', entity_id: countyId } : { entity_type: 'county' }, '-created_date', 20),
-      ]);
-      setTransactions(scopedTxns); setSettlements(setts);
+      // Fetch county-scoped settlements
+      const setts = await base44.entities.Settlement.filter(
+        countyId ? { entity_type: 'county', entity_id: countyId } : { entity_type: 'county' },
+        '-created_date', 20
+      );
+
+      // Compute arrears: vehicles with no active permit OR most recent permit expired
+      const arrearsList = [];
+      for (const v of vehicles) {
+        const permits = await base44.entities.Permit.filter({ vehicle_id: v.id }, '-created_date', 5);
+        const activePermits = permits.filter(p => p.status === 'active' && (!p.end_date || new Date(p.end_date) > new Date()));
+        if (activePermits.length === 0) {
+          const mostRecent = permits[0];
+          const isExpired = mostRecent && (mostRecent.status === 'expired' || (mostRecent.end_date && new Date(mostRecent.end_date) < new Date()));
+          if (isExpired || !mostRecent) {
+            // Fetch rider/owner name
+            let ownerName = 'Unknown';
+            if (v.rider_id) {
+              const riderUsers = await base44.entities.User.filter({ id: v.rider_id });
+              if (riderUsers[0]) ownerName = riderUsers[0].full_name || 'Unknown';
+            } else if (v.owner_id) {
+              const ownerUsers = await base44.entities.User.filter({ id: v.owner_id });
+              if (ownerUsers[0]) ownerName = ownerUsers[0].full_name || 'Unknown';
+            }
+
+            const lastPermitDate = mostRecent?.end_date || mostRecent?.created_date;
+            const daysOverdue = lastPermitDate
+              ? Math.floor((Date.now() - new Date(lastPermitDate).getTime()) / (1000 * 60 * 60 * 24))
+              : null;
+
+            arrearsList.push({
+              id: v.id,
+              plate: v.plate_number,
+              ownerName,
+              lastPermitDate,
+              daysOverdue,
+            });
+          }
+        }
+      }
+
+      setTransactions(scopedTxns);
+      setSettlements(setts);
+      setArrears(arrearsList);
     } catch (e) {}
     setLoading(false);
   }
@@ -52,6 +93,7 @@ export default function CountyRevenue() {
     { id: 'dashboard', label: 'Revenue', icon: TrendingUp },
     { id: 'ledger', label: 'Ledger', icon: FileText },
     { id: 'settlements', label: 'Settlements', icon: Banknote },
+    { id: 'arrears', label: 'Arrears', icon: AlertCircle },
   ];
 
   return (
@@ -63,6 +105,9 @@ export default function CountyRevenue() {
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-emerald-600 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}>
             <t.icon className="w-4 h-4" /> {t.label}
+            {t.id === 'arrears' && arrears.length > 0 && (
+              <span className={`text-xs rounded-full px-1.5 py-0.5 ${tab === t.id ? 'bg-white/20' : 'bg-destructive/10 text-destructive'}`}>{arrears.length}</span>
+            )}
           </button>
         ))}
       </div>
@@ -88,8 +133,10 @@ export default function CountyRevenue() {
               <p className="text-xs text-muted-foreground">Settlements</p>
             </div>
             <div className="bg-card border border-border rounded-xl p-4">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-amber-50 text-amber-600 mb-3"><TrendingUp className="w-5 h-5" /></div>
-              <p className="text-2xl font-heading font-bold">0</p>
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${arrears.length > 0 ? 'bg-destructive/10 text-destructive' : 'bg-amber-50 text-amber-600'}`}>
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <p className="text-2xl font-heading font-bold">{arrears.length}</p>
               <p className="text-xs text-muted-foreground">Arrears</p>
             </div>
           </div>
@@ -118,7 +165,7 @@ export default function CountyRevenue() {
           </table>
           {transactions.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No transactions yet</p>}
         </div>
-      ) : (
+      ) : tab === 'settlements' ? (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted">
@@ -141,6 +188,39 @@ export default function CountyRevenue() {
             </tbody>
           </table>
           {settlements.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No settlements yet</p>}
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Plate</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Owner/Rider</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Last Permit Date</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Days Overdue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {arrears.map(a => (
+                <tr key={a.id} className="border-t border-border hover:bg-accent/50">
+                  <td className="px-4 py-3 font-semibold">{a.plate}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{a.ownerName}</td>
+                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{a.lastPermitDate ? formatDate(a.lastPermitDate) : 'Never'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${a.daysOverdue !== null && a.daysOverdue > 30 ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}`}>
+                      {a.daysOverdue !== null ? `${a.daysOverdue} days` : 'No permit'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {arrears.length === 0 && (
+            <div className="text-center py-8">
+              <AlertCircle className="w-8 h-8 mx-auto text-success mb-2" />
+              <p className="text-sm text-success font-medium">No arrears — all vehicles have active permits</p>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -3,9 +3,12 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { auditLog } from '@/lib/audit';
-import { Users, Bike, BadgeCheck, FileText, MapPin, ArrowLeftRight } from 'lucide-react';
+import { Users, Bike, BadgeCheck, FileText, MapPin, ArrowLeftRight, Plus, Pencil } from 'lucide-react';
 import BikeDetailSheet from '@/components/BikeDetailSheet';
+import RiderDetailSheet from '@/components/county/RiderDetailSheet';
+import StageModal from '@/components/county/StageModal';
 import { formatPhoneDisplay } from '@/lib/phone';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function CountyRegistrations() {
   const { user } = useAuth();
@@ -16,6 +19,10 @@ export default function CountyRegistrations() {
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detailVehicleId, setDetailVehicleId] = useState(null);
+  const [selectedRiderId, setSelectedRiderId] = useState(null);
+  const [showStageModal, setShowStageModal] = useState(false);
+  const [editingStage, setEditingStage] = useState(null);
+  const { toast } = useToast();
 
   const countyId = user?.scope_entity_id || user?.county_id;
 
@@ -51,6 +58,28 @@ export default function CountyRegistrations() {
     const u = await base44.auth.me();
     await base44.entities.Vehicle.update(id, { status: 'rejected', rejection_reason: reason || 'Did not meet requirements' });
     await auditLog({ userId: u.id, action: 'vehicle_rejected', entityType: 'Vehicle', entityId: id, description: `Vehicle rejected via Registrations page` });
+    load();
+  }
+
+  async function handleStageSubmit(data) {
+    const u = await base44.auth.me();
+    if (editingStage) {
+      await base44.entities.Stage.update(editingStage.id, {
+        name: data.name,
+        description: data.description,
+      });
+      await auditLog({ userId: u.id, action: 'stage_updated', entityType: 'Stage', entityId: editingStage.id, description: `Stage "${data.name}" updated` });
+      toast({ title: 'Stage updated' });
+    } else {
+      const stage = await base44.entities.Stage.create({
+        name: data.name,
+        description: data.description,
+        county_id: countyId || '',
+      });
+      await auditLog({ userId: u.id, action: 'stage_created', entityType: 'Stage', entityId: stage.id, description: `Stage "${data.name}" created` });
+      toast({ title: 'Stage created' });
+    }
+    setEditingStage(null);
     load();
   }
 
@@ -103,7 +132,7 @@ export default function CountyRegistrations() {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(r.created_date)}</td>
                   <td className="px-4 py-3 text-right">
-                    <button className="text-xs text-emerald-600 font-semibold hover:underline">View</button>
+                    <button onClick={() => setSelectedRiderId(r.id)} className="text-xs text-emerald-600 font-semibold hover:underline">View</button>
                   </td>
                 </tr>
               ))}
@@ -167,24 +196,46 @@ export default function CountyRegistrations() {
           )}
         </div>
       ) : tab === 'stages' && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {stages.map(s => (
-            <div key={s.id} className="bg-card border border-border rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <MapPin className="w-4 h-4 text-emerald-600" />
-                <p className="font-heading font-bold text-sm">{s.name}</p>
+        <div>
+          <div className="flex justify-end mb-3">
+            <button onClick={() => { setEditingStage(null); setShowStageModal(true); }} className="flex items-center gap-1 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-semibold">
+              <Plus className="w-4 h-4" /> Add Stage
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {stages.map(s => (
+              <div key={s.id} className="bg-card border border-border rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-emerald-600" />
+                    <p className="font-heading font-bold text-sm">{s.name}</p>
+                  </div>
+                  <button onClick={() => { setEditingStage(s); setShowStageModal(true); }} className="text-muted-foreground hover:text-foreground p-1">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">{s.member_count || 0} members</p>
+                {s.description && <p className="text-xs text-muted-foreground mt-1">{s.description}</p>}
               </div>
-              <p className="text-xs text-muted-foreground">{s.member_count || 0} members</p>
-              {s.description && <p className="text-xs text-muted-foreground mt-1">{s.description}</p>}
-            </div>
-          ))}
-          {stages.length === 0 && <p className="text-sm text-muted-foreground col-span-full text-center py-8">No stages registered</p>}
+            ))}
+            {stages.length === 0 && <p className="text-sm text-muted-foreground col-span-full text-center py-8">No stages registered</p>}
+          </div>
         </div>
       )}
 
       {detailVehicleId && (
         <BikeDetailSheet vehicleId={detailVehicleId} onClose={() => setDetailVehicleId(null)} isStaff accent="emerald" />
       )}
+
+      <RiderDetailSheet riderId={selectedRiderId} onClose={() => setSelectedRiderId(null)} />
+
+      <StageModal
+        open={showStageModal}
+        onClose={() => { setShowStageModal(false); setEditingStage(null); }}
+        onSubmit={handleStageSubmit}
+        editingStage={editingStage}
+        countyId={countyId}
+      />
     </div>
   );
 }
