@@ -296,10 +296,10 @@ export default function Home() {
 
                 return (
                   <TileElement key={tile.label} {...tileConfig}>
-                    <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center transition-transform ${
-                      isLocked ? 'bg-slate-100 text-slate-400 active:scale-95' : 
-                      isSoon ? 'bg-slate-100 text-slate-400 active:scale-95' : 
-                      `${tileColors[tile.color]} active:scale-95`
+                    <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-150 ease-out ${
+                      isLocked ? 'bg-slate-100 text-slate-400 active:scale-110' : 
+                      isSoon ? 'bg-slate-100 text-slate-400 active:scale-110' : 
+                      `${tileColors[tile.color]} active:scale-110`
                     }`}>
                       <Icon className="w-6 h-6" strokeWidth={2} />
                       {isLocked && (

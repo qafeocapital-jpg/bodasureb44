@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
@@ -14,10 +14,15 @@ import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Wallet() {
   const { user } = useAuth();
+  const location = useLocation();
   const [wallet, setWallet] = useState(null);
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
-  const [activeTab, setActiveTab] = useState('deposit');
+  
+  // Read tab from query params or default to 'deposit'
+  const queryParams = new URLSearchParams(location.search);
+  const tabFromUrl = queryParams.get('tab') || 'deposit';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,6 +46,15 @@ export default function Wallet() {
     }
     loadData();
   }, [user]);
+
+  // Update active tab when URL params change
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const tab = queryParams.get('tab');
+    if (tab && ['deposit', 'withdraw', 'send', 'history'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   async function handleConfirmClick() {
     const cents = Math.round(parseFloat(amount) * 100);

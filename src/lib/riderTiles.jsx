@@ -5,7 +5,7 @@ import {
   Users, UserPlus, PiggyBank, BarChart3, MessageCircle, Banknote,
   Phone, Wifi, Zap, Droplet, Tv, CreditCard, Gift, Coins,
   Home, GraduationCap, HeartPulse, Briefcase, ShoppingCart, Fuel,
-  User, FileCheck, Lock, Headphones, CircleHelp
+  User, FileCheck, Lock, Headphones, CircleHelp, ArrowDownToLine, ArrowUpFromLine
 } from 'lucide-react';
 
 export const tileColors = {
@@ -27,10 +27,13 @@ export const riderTileSections = [
     title: 'My Money',
     tiles: [
       { label: 'Wallet', icon: Wallet, color: 'orange', path: '/app/wallet', status: 'live' },
-      { label: 'Transactions', icon: Receipt, color: 'blue', path: '/app/wallet', status: 'live' },
-      { label: 'Collect Fare', icon: HandCoins, color: 'green', path: '/app/lipisha', status: 'live' },
-      { label: 'Send Money', icon: Send, color: 'violet', path: '/app/wallet', status: 'live' },
-      { label: 'Statements', icon: FileText, color: 'amber', path: '/app/wallet', status: 'live' },
+      { label: 'Lipisha Fare', icon: HandCoins, color: 'green', path: '/app/lipisha', status: 'live' },
+      { label: 'Lipa County', icon: Landmark, color: 'blue', path: '/app/lipa-county', status: 'live' },
+      { label: 'Deposit', icon: ArrowDownToLine, color: 'emerald', path: '/app/wallet?tab=deposit', status: 'live' },
+      { label: 'Withdraw', icon: ArrowUpFromLine, color: 'rose', path: '/app/wallet?tab=withdraw', status: 'live' },
+      { label: 'Send Money', icon: Send, color: 'violet', path: '/app/wallet?tab=send', status: 'live' },
+      { label: 'Lipa Owner', icon: UserCheck, color: 'amber', path: '/app/lipa-owner', status: 'live', requiresTier2: true },
+      { label: 'Transactions', icon: History, color: 'indigo', path: '/app/wallet?tab=history', status: 'live' },
     ]
   },
   {
