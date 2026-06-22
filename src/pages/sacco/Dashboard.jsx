@@ -11,14 +11,20 @@ export default function SaccoDashboard() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const countyId = user?.county_id;
+        const countyId = user?.scope_entity_id || user?.county_id;
+        const saccoGroupId = user?.scope_entity_id;
         const [members, bikes, settlements, applications] = await Promise.all([
           countyId
             ? base44.entities.User.filter({ county_id: countyId, role: 'rider' })
             : base44.entities.User.filter({ role: 'rider' }),
-          base44.entities.Vehicle.filter({}),
-          base44.entities.Settlement.filter({ entity_type: 'sacco', status: 'pending' }),
+          countyId
+            ? base44.entities.Vehicle.filter({ county_id: countyId })
+            : base44.entities.Vehicle.filter({}),
+          saccoGroupId
+            ? base44.entities.Settlement.filter({ entity_type: 'sacco', entity_id: saccoGroupId, status: 'pending' })
+            : base44.entities.Settlement.filter({ entity_type: 'sacco', status: 'pending' }),
           base44.entities.Group.filter({ status: 'pending' }),
         ]);
         setStats({

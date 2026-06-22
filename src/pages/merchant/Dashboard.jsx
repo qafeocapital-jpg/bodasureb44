@@ -10,12 +10,19 @@ export default function MerchantDashboard() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
         const merchantId = user?.merchant_id || user?.scope_entity_id;
         const [products, activePolicies, allPolicies] = await Promise.all([
-          base44.entities.InsuranceProduct.filter({ is_active: true }),
-          base44.entities.Policy.filter({ status: 'active' }),
-          base44.entities.Policy.filter({}),
+          merchantId
+            ? base44.entities.InsuranceProduct.filter({ merchant_id: merchantId, is_active: true })
+            : base44.entities.InsuranceProduct.filter({ is_active: true }),
+          merchantId
+            ? base44.entities.Policy.filter({ merchant_id: merchantId, status: 'active' })
+            : base44.entities.Policy.filter({ status: 'active' }),
+          merchantId
+            ? base44.entities.Policy.filter({ merchant_id: merchantId })
+            : base44.entities.Policy.filter({}),
         ]);
         setStats({
           products: products.length,

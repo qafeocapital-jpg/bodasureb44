@@ -1,22 +1,28 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatDate } from '@/lib/format';
 import { ShieldCheck } from 'lucide-react';
 
 export default function MerchantPolicies() {
+  const { user } = useAuth();
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const p = await base44.entities.Policy.filter({}, '-created_date', 50);
+        const merchantId = user?.merchant_id || user?.scope_entity_id;
+        const p = merchantId
+          ? await base44.entities.Policy.filter({ merchant_id: merchantId }, '-created_date', 50)
+          : await base44.entities.Policy.filter({}, '-created_date', 50);
         setPolicies(p);
       } catch (e) {}
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
   return (
     <div className="p-6 animate-fade-in">

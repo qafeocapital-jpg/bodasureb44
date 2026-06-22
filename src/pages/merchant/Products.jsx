@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { auditLog } from '@/lib/audit';
+import { useToast } from '@/components/ui/use-toast';
 import { formatKES } from '@/lib/format';
 import { FileText, Plus, Pencil } from 'lucide-react';
 
 export default function MerchantProducts() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -30,19 +35,25 @@ export default function MerchantProducts() {
     const u = await base44.auth.me();
     const cents = Math.round(parseFloat(newProduct.premium) * 100);
     if (!newProduct.name || !cents) return;
-    await base44.entities.InsuranceProduct.create({
-      merchant_id: u.scope_entity_id || 'general',
-      name: newProduct.name,
-      description: newProduct.description,
-      premium_cents: cents,
-      coverage_type: newProduct.coverage_type,
-      duration_days: parseInt(newProduct.duration_days) || 365,
-      commission_percentage: 10,
-      is_active: true,
-    });
-    setShowAdd(false);
-    setNewProduct({ name: '', description: '', premium: '', coverage_type: '', duration_days: '365' });
-    load();
+    try {
+      await base44.entities.InsuranceProduct.create({
+        merchant_id: u.scope_entity_id || 'general',
+        name: newProduct.name,
+        description: newProduct.description,
+        premium_cents: cents,
+        coverage_type: newProduct.coverage_type,
+        duration_days: parseInt(newProduct.duration_days) || 365,
+        commission_percentage: 10,
+        is_active: true,
+      });
+      await auditLog({ userId: u.id, action: 'product_created', entityType: 'InsuranceProduct', description: `Created product: ${newProduct.name} (${formatKES(cents)})` });
+      toast({ title: 'Product created', description: newProduct.name });
+      setShowAdd(false);
+      setNewProduct({ name: '', description: '', premium: '', coverage_type: '', duration_days: '365' });
+      load();
+    } catch (e) {
+      toast({ title: 'Failed to create product', description: e.message, variant: 'destructive' });
+    }
   }
 
   return (

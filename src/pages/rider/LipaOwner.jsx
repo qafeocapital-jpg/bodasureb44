@@ -6,6 +6,7 @@ import { formatKES, formatDateTime } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { verifyPin } from '@/lib/pin';
 import { checkServiceAccess } from '@/lib/serviceAccess';
+import { auditLog } from '@/lib/audit';
 import UnlockSheet from '@/components/rider/UnlockSheet';
 import { ChevronLeft, UserCheck, Loader2, CheckCircle2, XCircle, Receipt } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
@@ -89,6 +90,34 @@ export default function LipaOwner() {
       setPin('');
       setSelectedBike('');
       setShowPin(false);
+
+      // Phase 6: Notify the owner of the payment
+      const ownerId = selectedBikeObj?.owner_id;
+      if (ownerId) {
+        try {
+          const ownerUser = owners[ownerId];
+          // Create an in-app announcement for the owner
+          await base44.entities.Announcement.create({
+            title: `Owner Payment Received`,
+            body: `You received ${formatKES(cents)} from ${user.full_name || 'a rider'} for bike ${selectedBikeObj.plate_number}. Ref: ${res.reference}`,
+            audience: 'riders',
+            county_id: selectedBikeObj.county_id || null,
+            status: 'published',
+          });
+          // Send email notification if owner has an email
+          if (ownerUser?.email) {
+            await base44.integrations.Core.SendEmail({
+              to: ownerUser.email,
+              subject: 'BodaSure — Owner Payment Received',
+              body: `Hello ${ownerUser.full_name || 'Owner'},<br><br>You have received ${formatKES(cents)} from ${user.full_name || 'a rider'} for bike <strong>${selectedBikeObj.plate_number}</strong>.<br><br>Reference: ${res.reference}<br><br>Thank you for using BodaSure.`,
+            });
+          }
+        } catch (e) {}
+      }
+
+      // Audit log the payment
+      await auditLog({ userId: user.id, action: 'lipa_owner_payment', entityType: 'Transaction', entityId: res.transaction?.id, description: `Paid owner ${formatKES(cents)} for bike ${selectedBikeObj.plate_number}. Ref: ${res.reference}` });
+
       const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipa_owner' }, '-created_date', 10);
       setHistory(txns);
     } catch (e) {

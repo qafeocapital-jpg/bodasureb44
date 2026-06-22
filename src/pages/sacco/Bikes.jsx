@@ -15,7 +15,7 @@ export default function SaccoBikes() {
   useEffect(() => {
     async function load() {
       try {
-        const countyId = user?.county_id;
+        const countyId = user?.scope_entity_id || user?.county_id;
         const b = countyId
           ? await base44.entities.Vehicle.filter({ county_id: countyId })
           : await base44.entities.Vehicle.filter({});

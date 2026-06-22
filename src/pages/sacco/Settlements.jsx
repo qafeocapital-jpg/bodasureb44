@@ -1,27 +1,47 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { auditLog } from '@/lib/audit';
+import { useToast } from '@/components/ui/use-toast';
 import { formatKES, formatDate } from '@/lib/format';
 import { Banknote, Check } from 'lucide-react';
 
 export default function SaccoSettlements() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [settlements, setSettlements] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const saccoGroupId = user?.scope_entity_id;
+
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const s = await base44.entities.Settlement.filter({ entity_type: 'sacco' }, '-created_date', 20);
+        const filter = saccoGroupId
+          ? { entity_type: 'sacco', entity_id: saccoGroupId }
+          : { entity_type: 'sacco' };
+        const s = await base44.entities.Settlement.filter(filter, '-created_date', 20);
         setSettlements(s);
       } catch (e) {}
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
   async function markPaid(id) {
-    await base44.entities.Settlement.update(id, { status: 'processed', settled_at: new Date().toISOString() });
-    const s = await base44.entities.Settlement.filter({ entity_type: 'sacco' }, '-created_date', 20);
-    setSettlements(s);
+    try {
+      await base44.entities.Settlement.update(id, { status: 'processed', settled_at: new Date().toISOString() });
+      await auditLog({ userId: user.id, action: 'settlement_marked_paid', entityType: 'Settlement', entityId: id, description: 'SACCO settlement marked as paid' });
+      toast({ title: 'Settlement marked as paid' });
+      const filter = saccoGroupId
+        ? { entity_type: 'sacco', entity_id: saccoGroupId }
+        : { entity_type: 'sacco' };
+      const s = await base44.entities.Settlement.filter(filter, '-created_date', 20);
+      setSettlements(s);
+    } catch (e) {
+      toast({ title: 'Failed to update settlement', description: e.message, variant: 'destructive' });
+    }
   }
 
   return (

@@ -14,8 +14,9 @@ export default function SaccoMembers() {
     async function load() {
       if (!user) return;
       try {
-        if (user.county_id) {
-          const allUsers = await base44.entities.User.filter({ county_id: user.county_id, role: 'rider' });
+        const countyId = user?.scope_entity_id || user?.county_id;
+        if (countyId) {
+          const allUsers = await base44.entities.User.filter({ county_id: countyId, role: 'rider' });
           setMembers(allUsers);
         } else {
           const allUsers = await base44.entities.User.filter({ role: 'rider' });
