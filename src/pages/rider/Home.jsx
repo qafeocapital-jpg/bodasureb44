@@ -8,7 +8,7 @@ import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCi
 import { formatPlate } from '@/lib/plate';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import { getOnboardingPhase } from '@/lib/onboarding';
-import { getKycLevel } from '@/components/ui/KycLevelBadge';
+import { getKycLevel, KYC_LEVEL_CONFIG } from '@/components/ui/KycLevelBadge';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import { getTaskStatuses } from '@/lib/verification';
 
@@ -108,7 +108,7 @@ export default function Home() {
           {walletActive ? (
             <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full px-3 py-1">
               <ShieldCheck className="w-4 h-4" />
-              <span className="text-xs font-medium">Wallet Active · Level {getKycLevel(user)}</span>
+              <span className="text-xs font-medium">Wallet Active · {KYC_LEVEL_CONFIG[getKycLevel(user)].label}</span>
             </div>
           ) : (
             <Link to="/app/wallet/activate" className="flex items-center gap-1.5 bg-white text-primary rounded-full px-3 py-1.5 font-semibold text-xs hover:bg-orange-50 transition-colors">

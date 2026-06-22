@@ -87,30 +87,30 @@ export default function ComplianceChecklist({ user, vehicle, taskStatuses, walle
             label="ID Verification (Front & Back)"
             status={taskStatusMap.id || 'not_started'}
             subLabel={taskStatusMap.id === 'submitted' ? 'Awaiting review' : undefined}
-            link="/app/kyc"
+            link="/app/profile"
           />
           <ChecklistRow
             label="Bike Photos (4 angles)"
             status={taskStatusMap.bike || 'not_started'}
             subLabel={taskStatusMap.bike === 'submitted' ? 'Awaiting review' : undefined}
-            link="/app/kyc"
+            link="/app/profile"
           />
           <ChecklistRow
             label="Rider Selfie"
             status={taskStatusMap.selfie || 'not_started'}
             subLabel={taskStatusMap.selfie === 'submitted' ? 'Awaiting review' : undefined}
-            link="/app/kyc"
+            link="/app/profile"
           />
           <ChecklistRow
             label="Phone Verification (OTP)"
             status={taskStatusMap.phone || 'not_started'}
-            link="/app/kyc"
+            link="/app/profile"
           />
           <ChecklistRow
             label="Owner Verification"
             status={taskStatusMap.owner || 'not_started'}
             subLabel={taskStatusMap.owner === 'in_progress' ? 'Invitation sent, awaiting response' : undefined}
-            link="/app/kyc"
+            link="/app/profile"
           />
         </div>
       </div>
@@ -125,10 +125,10 @@ export default function ComplianceChecklist({ user, vehicle, taskStatuses, walle
             link="/app/wallet/activate"
           />
           <ChecklistRow
-            label="KYC Approved (Tier 2)"
-            status={user?.kyc_status === 'approved' ? 'verified' : user?.kyc_status === 'pending' ? 'submitted' : 'not_started'}
+            label="KYC Verified"
+            status={user?.kyc_status === 'verified' ? 'verified' : user?.kyc_status === 'pending' ? 'submitted' : 'not_started'}
             subLabel={user?.kyc_status === 'pending' ? 'Under review' : undefined}
-            link="/app/kyc"
+            link="/app/profile"
           />
         </div>
       </div>

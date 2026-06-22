@@ -47,27 +47,21 @@ export default function AdminKyc() {
 
   async function approve(id) {
     const doc = docs.find(d => d.id === id);
-    const u = await base44.auth.me();
-    await base44.entities.KycDocument.update(id, { status: 'approved', reviewed_by_id: u.id, reviewed_at: new Date().toISOString() });
-    if (doc?.user_id) {
-      // Only upgrade user when ALL their docs are approved
-      const userDocs = await base44.entities.KycDocument.filter({ user_id: doc.user_id });
-      const allApproved = userDocs.length > 0 && userDocs.every(d => d.status === 'approved');
-      if (allApproved) {
-        await base44.entities.User.update(doc.user_id, { kyc_status: 'approved', wallet_tier: 2 });
-        const wallets = await base44.entities.Wallet.filter({ user_id: doc.user_id, entity_type: 'personal' });
-        if (wallets.length > 0) {
-          await base44.entities.Wallet.update(wallets[0].id, { tier: 2, status: 'active' });
-        }
-        await auditLog({ userId: u.id, action: 'kyc_approved', entityType: 'KycDocument', entityId: id, description: `All KYC documents approved for user ${doc.user_id} — upgraded to Level 2` });
-        toast({ title: 'KYC Approved', description: 'All documents approved. User upgraded to Level 2.' });
+    try {
+      const result = await base44.functions.invoke('processKycDecision', {
+        docId: id,
+        userId: doc?.user_id,
+        action: 'approve',
+      });
+      if (result.data?.allApproved) {
+        toast({ title: 'KYC Complete', description: 'All documents approved. User verified.' });
       } else {
-        const approvedCount = userDocs.filter(d => d.status === 'approved').length;
-        await auditLog({ userId: u.id, action: 'kyc_doc_approved', entityType: 'KycDocument', entityId: id, description: `KYC document (${doc?.document_type}) approved for user ${doc?.user_id}` });
-        toast({ title: 'Document Approved', description: `${approvedCount}/${userDocs.length} documents approved.` });
+        toast({ title: 'Document Approved', description: 'Document approved. Waiting for remaining documents.' });
       }
+      load();
+    } catch (e) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
-    load();
   }
 
   function openReject(doc) {
@@ -79,13 +73,13 @@ export default function AdminKyc() {
     if (!rejectingDoc || rejectReason.trim().length < 10) return;
     setRejecting(true);
     try {
-      const u = await base44.auth.me();
-      await base44.entities.KycDocument.update(rejectingDoc.id, { status: 'rejected', rejection_reason: rejectReason.trim(), reviewed_by_id: u.id, reviewed_at: new Date().toISOString() });
-      if (rejectingDoc?.user_id) {
-        await base44.entities.User.update(rejectingDoc.user_id, { kyc_status: 'rejected' });
-      }
-      await auditLog({ userId: u.id, action: 'kyc_rejected', entityType: 'KycDocument', entityId: rejectingDoc.id, description: `KYC document (${rejectingDoc?.document_type}) rejected for user ${rejectingDoc?.user_id}. Reason: ${rejectReason.trim()}` });
-      toast({ title: 'KYC Rejected', description: 'User has been notified.', variant: 'destructive' });
+      await base44.functions.invoke('processKycDecision', {
+        docId: rejectingDoc.id,
+        userId: rejectingDoc.user_id,
+        action: 'reject',
+        reason: rejectReason.trim(),
+      });
+      toast({ title: 'Document Rejected', description: 'User has been notified.', variant: 'destructive' });
       setRejectingDoc(null);
       setRejectReason('');
       load();

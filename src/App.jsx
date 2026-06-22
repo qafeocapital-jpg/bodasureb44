@@ -16,7 +16,7 @@ import Bikes from './pages/rider/Bikes';
 import Compliance from './pages/rider/Compliance';
 import Account from './pages/rider/Account';
 import Profile from './pages/rider/Profile';
-import Kyc from './pages/rider/Kyc';
+
 import WalletActivate from './pages/rider/WalletActivate';
 import BikeRegister from './pages/rider/BikeRegister';
 
@@ -98,7 +98,7 @@ const AuthenticatedApp = () => {
         <Route path="/app/compliance" element={<Compliance />} />
         <Route path="/app/account" element={<Account />} />
         <Route path="/app/profile" element={<Profile />} />
-        <Route path="/app/kyc" element={<Kyc />} />
+
         <Route path="/app/wallet/activate" element={<WalletActivate />} />
         <Route path="/app/bikes/register" element={<BikeRegister />} />
         <Route path="/app/lipisha" element={<Lipisha />} />

@@ -40,6 +40,12 @@
     "reviewed_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "provider_name": {
+      "type": "string"
+    },
+    "provider_reference": {
+      "type": "string"
     }
   },
   "required": [
