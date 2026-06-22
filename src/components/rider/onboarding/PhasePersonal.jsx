@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
-import { ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Loader2, AlertTriangle } from 'lucide-react';
 
 export default function PhasePersonal({ user, counties, initialValues, onDraftChange, onSaved, onBack }) {
   const [form, setForm] = useState({
@@ -14,6 +14,7 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
   const [saving, setSaving] = useState(false);
   const [phoneError, setPhoneError] = useState('');
   const [idError, setIdError] = useState('');
+  const [saveError, setSaveError] = useState('');
 
   const updateForm = (partial) => {
     const next = { ...form, ...partial };
@@ -60,6 +61,7 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
 
   async function handleSave() {
     setSaving(true);
+    setSaveError('');
     try {
       const phoneTaken = await checkPhoneUniqueness();
       const idTaken = await checkIdUniqueness();
@@ -71,7 +73,9 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
         county_id: form.county_id,
       });
       await onSaved();
-    } catch (e) {}
+    } catch (e) {
+      setSaveError(e.message || 'Failed to save profile. Please try again.');
+    }
     setSaving(false);
   }
 
@@ -119,6 +123,13 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
         </select>
         <p className="text-[10px] text-muted-foreground mt-1.5">This determines your fee schedules and compliance scoping.</p>
       </div>
+      {saveError && (
+        <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-destructive">{saveError}</p>
+        </div>
+      )}
+
       <div className="flex gap-2 pt-2">
         <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">
           <ChevronLeft className="w-4 h-4" />

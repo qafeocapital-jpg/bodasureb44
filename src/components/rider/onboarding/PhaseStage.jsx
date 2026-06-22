@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { ChevronRight, ChevronLeft, Loader2, MapPin, Users } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Loader2, MapPin, Users, AlertTriangle } from 'lucide-react';
 
 export default function PhaseStage({ user, vehicle, onSaved, onBack }) {
   const [stage, setStage] = useState(null);
@@ -8,27 +8,27 @@ export default function PhaseStage({ user, vehicle, onSaved, onBack }) {
   const [subCounty, setSubCounty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     async function load() {
       if (!vehicle?.stage_id) { setLoading(false); return; }
       try {
-        const stages = await base44.entities.Stage.filter({ id: vehicle.stage_id });
-        if (stages[0]) {
-          const s = stages[0];
+        const s = await base44.entities.Stage.get(vehicle.stage_id);
+        if (s) {
           setStage(s);
           if (s.ward_id) {
-            const wards = await base44.entities.Ward.filter({ id: s.ward_id });
-            if (wards[0]) {
-              setWard(wards[0]);
-              if (wards[0].sub_county_id) {
-                const subs = await base44.entities.SubCounty.filter({ id: wards[0].sub_county_id });
-                if (subs[0]) setSubCounty(subs[0]);
+            const w = await base44.entities.Ward.get(s.ward_id);
+            if (w) {
+              setWard(w);
+              if (w.sub_county_id) {
+                const sub = await base44.entities.SubCounty.get(w.sub_county_id);
+                if (sub) setSubCounty(sub);
               }
             }
           }
         }
-      } catch (e) {}
+      } catch (e) { setError('Failed to load stage details'); }
       setLoading(false);
     }
     load();
@@ -36,10 +36,13 @@ export default function PhaseStage({ user, vehicle, onSaved, onBack }) {
 
   async function handleConfirm() {
     setSaving(true);
+    setError('');
     try {
       await base44.auth.updateMe({ stage_id: vehicle.stage_id, profile_complete: true });
       await onSaved();
-    } catch (e) {}
+    } catch (e) {
+      setError(e.message || 'Failed to confirm stage. Please try again.');
+    }
     setSaving(false);
   }
 
@@ -79,6 +82,13 @@ export default function PhaseStage({ user, vehicle, onSaved, onBack }) {
           <span className="text-xs font-medium">{stage.member_count || 0} members</span>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-destructive">{error}</p>
+        </div>
+      )}
 
       <div className="flex gap-2 pt-2">
         <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">

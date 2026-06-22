@@ -161,6 +161,7 @@ export default function Profile() {
             user={user}
             counties={counties}
             groupMembers={groupMembers}
+            vehicle={vehicles[0]}
             onJoined={handlePhaseComplete}
             onBack={() => setCurrentPhase(3)}
           />

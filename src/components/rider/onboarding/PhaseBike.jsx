@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import { auditLog } from '@/lib/audit';
-import { ChevronRight, ChevronLeft, Loader2, Check, MapPin, Lock } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Loader2, Check, MapPin, Lock, AlertTriangle } from 'lucide-react';
 
 export default function PhaseBike({ user, counties, vehicle, initialValues, onDraftChange, onSaved, onBack }) {
   const [form, setForm] = useState({
@@ -18,6 +18,8 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
   const [ownerFound, setOwnerFound] = useState(null);
   const [ownerFoundName, setOwnerFoundName] = useState('');
   const [ownerPhoneError, setOwnerPhoneError] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [plateError, setPlateError] = useState('');
 
   const updateForm = (partial) => {
     const next = { ...form, ...partial };
@@ -61,8 +63,25 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
     return true;
   };
 
+  async function checkPlateUniqueness() {
+    const plate = form.plate_number?.trim().toUpperCase();
+    if (!plate) { setPlateError(''); return false; }
+    if (vehicle?.plate_number?.toUpperCase() === plate) { setPlateError(''); return false; }
+    try {
+      const existing = await base44.entities.Vehicle.filter({ plate_number: plate });
+      if (existing.length > 0 && existing[0].id !== vehicle?.id) {
+        setPlateError('This plate is already registered.');
+        return true;
+      }
+      setPlateError('');
+      return false;
+    } catch (e) { setPlateError(''); return false; }
+  }
+
   async function handleSave() {
     setSaving(true);
+    setSaveError('');
+    setPlateError('');
     try {
       const isOwner = form.role === 'owner' || form.role === 'owner_rider';
       if (!isOwner) {
@@ -73,6 +92,9 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
           return;
         }
       }
+      // Check plate uniqueness
+      const plateTaken = await checkPlateUniqueness();
+      if (plateTaken) { setSaving(false); return; }
       let ownerId = isOwner ? user.id : null;
       if (!isOwner && form.owner_phone) {
         const normalized = normalizePhone(form.owner_phone);
@@ -105,7 +127,9 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
         });
       }
       await onSaved();
-    } catch (e) {}
+    } catch (e) {
+      setSaveError(e.message || 'Failed to register bike. Please try again.');
+    }
     setSaving(false);
   }
 
@@ -154,8 +178,9 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
           value={form.plate_number}
           onChange={e => updateForm({ plate_number: e.target.value })}
           placeholder="KMEA 123A"
-          className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary"
+          className={`w-full mt-1 px-3 py-2.5 rounded-xl border bg-background text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary ${plateError ? 'border-destructive' : 'border-input'}`}
         />
+        {plateError && <p className="text-xs text-destructive mt-1">{plateError}</p>}
       </div>
       <div>
         <label className="text-xs font-medium text-muted-foreground">Make</label>
@@ -234,6 +259,13 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
           </p>
         )}
       </div>
+
+      {saveError && (
+        <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-destructive">{saveError}</p>
+        </div>
+      )}
 
       <div className="flex gap-2 pt-2">
         <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">

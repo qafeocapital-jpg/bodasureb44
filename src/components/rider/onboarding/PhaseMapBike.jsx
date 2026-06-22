@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { ChevronRight, ChevronLeft, Loader2, MapPin } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Loader2, MapPin, AlertTriangle } from 'lucide-react';
 import StageSearchPicker from '@/components/rider/onboarding/StageSearchPicker';
 import MapCountyConfirmation from '@/components/rider/onboarding/MapCountyConfirmation';
 
@@ -15,6 +15,7 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
     stage_id: initialValues?.stage_id || '',
   });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const updateForm = (partial) => {
     const next = { ...form, ...partial };
@@ -27,11 +28,11 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
     async function load() {
       if (!user?.county_id) return;
       try {
-        const [cs, subs] = await Promise.all([
-          base44.entities.County.filter({}),
+        const [c, subs] = await Promise.all([
+          base44.entities.County.get(user.county_id),
           base44.entities.SubCounty.filter({ county_id: user.county_id }),
         ]);
-        setCounty(cs.find(c => c.id === user.county_id));
+        setCounty(c);
         setSubCounties(subs);
         if (vehicle?.sub_county_id) {
           const ws = await base44.entities.Ward.filter({ sub_county_id: vehicle.sub_county_id });
@@ -68,6 +69,7 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
 
   async function handleSave() {
     setSaving(true);
+    setSaveError('');
     try {
       await base44.entities.Vehicle.update(vehicle.id, {
         sub_county_id: form.sub_county_id,
@@ -75,7 +77,9 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
         stage_id: form.stage_id,
       });
       setShowConfirmation(true);
-    } catch (e) {}
+    } catch (e) {
+      setSaveError(e.message || 'Failed to save mapping. Please try again.');
+    }
     setSaving(false);
   }
 
@@ -156,6 +160,13 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
           onStagesChange={setStages}
         />
       </div>
+
+      {saveError && (
+        <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-destructive">{saveError}</p>
+        </div>
+      )}
 
       <div className="flex gap-2 pt-2">
         <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">

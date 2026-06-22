@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import GroupCard from '@/components/rider/onboarding/GroupCard';
 
-export default function PhaseSacco({ user, counties, groupMembers, onJoined, onBack }) {
+export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehicleProp, onJoined, onBack }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [riderConstituency, setRiderConstituency] = useState(null);
@@ -38,16 +38,15 @@ export default function PhaseSacco({ user, counties, groupMembers, onJoined, onB
         });
         setGroups(allGroups);
 
-        const vehicles = await base44.entities.Vehicle.filter({ rider_id: user.id }, '-created_date');
-        const vehicle = vehicles[0];
+        const vehicle = vehicleProp;
         if (!vehicle?.ward_id) {
           setHasWard(false);
         } else {
           const ward = await base44.entities.Ward.get(vehicle.ward_id);
-          if (ward?.sub_county_id) {
-            const constituencies = await base44.entities.Constituency.filter({ sub_county_id: ward.sub_county_id });
-            if (constituencies.length > 0) {
-              setRiderConstituency(constituencies[0].name);
+          if (ward?.constituency_id) {
+            const constituency = await base44.entities.Constituency.get(ward.constituency_id);
+            if (constituency?.name) {
+              setRiderConstituency(constituency.name);
             }
           }
         }

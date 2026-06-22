@@ -126,9 +126,10 @@ export default function StageMap({
         });
 
         const count = memberCounts[s.id] || 0;
+        const safeName = s.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         const popupHtml = `
           <div style="padding:4px 2px;">
-            <p style="font-weight:700;margin:0;font-size:13px;color:#1a1a1a;">${s.name}</p>
+            <p style="font-weight:700;margin:0;font-size:13px;color:#1a1a1a;">${safeName}</p>
             <p style="font-size:11px;color:#666;margin:3px 0 0;">📍 ${count} member${count !== 1 ? 's' : ''}</p>
             <p style="font-size:10px;color:#999;margin:2px 0 0;">Tap to select this stage</p>
           </div>
