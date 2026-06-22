@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { getOrCreateWallet } from '@/lib/mockPayments';
+import { hashPin } from '@/lib/pin';
+import { auditLog } from '@/lib/audit';
 import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, FileCheck, Loader2 } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import { formatPhoneDisplay } from '@/lib/phone';
 
 export default function WalletActivate() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [step, setStep] = useState(0);
   const [otp, setOtp] = useState('');
@@ -54,15 +56,35 @@ export default function WalletActivate() {
   async function handleActivate() {
     setSaving(true);
     try {
+      // Check National ID uniqueness
+      if (identity.national_id) {
+        const existing = await base44.entities.User.filter({ national_id: identity.national_id });
+        const conflict = existing.find(u => u.id !== user.id);
+        if (conflict) {
+          setPinError('This National ID is already registered to another user.');
+          setSaving(false);
+          return;
+        }
+      }
       await base44.entities.Wallet.update(wallet.id, {
         tier: 1,
         status: 'active',
-        pin_hash: btoa(pin),
+        pin_hash: hashPin(pin),
         sasapay_customer_id: `mock_${user?.id}`,
       });
-      await base44.auth.updateMe({ wallet_tier: 1 });
+      await base44.auth.updateMe({
+        wallet_tier: 1,
+        full_name: identity.full_name,
+        national_id: identity.national_id,
+        date_of_birth: identity.date_of_birth,
+        profile_complete: true,
+      });
+      await auditLog({ userId: user.id, action: 'wallet_activated', entityType: 'Wallet', entityId: wallet.id, description: `Wallet activated to Tier 1 for user ${user.id}` });
+      await refreshUser();
       setStep(3);
-    } catch (e) {}
+    } catch (e) {
+      setPinError(e.message || 'Activation failed. Try again.');
+    }
     setSaving(false);
   }
 
@@ -231,14 +253,7 @@ export default function WalletActivate() {
               Back
             </button>
             <button
-              onClick={async () => {
-                await base44.auth.updateMe({
-                  full_name: identity.full_name,
-                  national_id: identity.national_id,
-                  date_of_birth: identity.date_of_birth,
-                });
-                handleActivate();
-              }}
+              onClick={handleActivate}
               disabled={saving || !identity.full_name || !identity.national_id || !/^\d{7,8}$/.test(identity.national_id)}
               className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
             >

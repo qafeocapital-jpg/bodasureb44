@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime, formatDate } from '@/lib/format';
+import { auditLog } from '@/lib/audit';
 import { ShieldAlert, QrCode, AlertCircle, FileText, Search } from 'lucide-react';
 
 export default function CountyEnforcement() {
+  const { user } = useAuth();
   const [tab, setTab] = useState('field_check');
   const [penalties, setPenalties] = useState([]);
   const [inspections, setInspections] = useState([]);
@@ -12,15 +15,21 @@ export default function CountyEnforcement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
 
-  useEffect(() => { load(); }, []);
+  const countyId = user?.scope_entity_id || user?.county_id;
+
+  useEffect(() => { load(); }, [user]);
 
   async function load() {
+    if (!user) return;
     setLoading(true);
     try {
+      const penaltyFilter = countyId ? { county_id: countyId } : {};
+      const inspectionFilter = countyId ? { county_id: countyId } : {};
+      const vehicleFilter = countyId ? { county_id: countyId, status: 'approved' } : { status: 'approved' };
       const [p, i, v] = await Promise.all([
-        base44.entities.Penalty.filter({}, '-created_date', 20),
-        base44.entities.Inspection.filter({}, '-created_date', 20),
-        base44.entities.Vehicle.filter({ status: 'approved' }),
+        base44.entities.Penalty.filter(penaltyFilter, '-created_date', 20),
+        base44.entities.Inspection.filter(inspectionFilter, '-created_date', 20),
+        base44.entities.Vehicle.filter(vehicleFilter),
       ]);
       setPenalties(p); setInspections(i); setVehicles(v);
     } catch (e) {}
@@ -39,13 +48,14 @@ export default function CountyEnforcement() {
     await base44.entities.Penalty.create({
       rider_id: searchResult?.rider_id || '',
       vehicle_id: vehicleId,
-      county_id: searchResult?.county_id || '',
+      county_id: searchResult?.county_id || countyId || '',
       amount_cents: 50000,
       reason: 'Non-compliance — no valid permit',
       status: 'pending',
       issued_by_id: u.id,
       issued_at: new Date().toISOString(),
     });
+    await auditLog({ userId: u.id, action: 'penalty_issued', entityType: 'Vehicle', entityId: vehicleId, description: `Penalty issued for vehicle ${searchResult?.plate_number || vehicleId}` });
     load();
   }
 

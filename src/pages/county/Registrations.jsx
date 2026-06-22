@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatDate, formatDateTime } from '@/lib/format';
+import { auditLog } from '@/lib/audit';
 import { Users, Bike, BadgeCheck, FileText, MapPin, ArrowLeftRight } from 'lucide-react';
 import BikeDetailSheet from '@/components/BikeDetailSheet';
 import { formatPhoneDisplay } from '@/lib/phone';
 
 export default function CountyRegistrations() {
+  const { user } = useAuth();
   const [tab, setTab] = useState('riders');
   const [riders, setRiders] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -14,29 +17,40 @@ export default function CountyRegistrations() {
   const [loading, setLoading] = useState(true);
   const [detailVehicleId, setDetailVehicleId] = useState(null);
 
-  useEffect(() => { load(); }, []);
+  const countyId = user?.scope_entity_id || user?.county_id;
+
+  useEffect(() => { load(); }, [user]);
 
   async function load() {
+    if (!user) return;
     setLoading(true);
     try {
+      const vehicleFilter = countyId ? { county_id: countyId } : {};
+      const stageFilter = countyId ? { county_id: countyId } : {};
       const [r, v, pending, s] = await Promise.all([
         base44.entities.User.filter({ staff_type: 'none' }),
-        base44.entities.Vehicle.filter({}),
-        base44.entities.Vehicle.filter({ status: 'pending' }),
-        base44.entities.Stage.filter({}),
+        base44.entities.Vehicle.filter(vehicleFilter),
+        base44.entities.Vehicle.filter({ ...vehicleFilter, status: 'pending' }),
+        base44.entities.Stage.filter(stageFilter),
       ]);
-      setRiders(r); setVehicles(v); setPendingBikes(pending); setStages(s);
+      // Further filter riders to this county if scoped
+      const countyRiders = countyId ? r.filter(rq => rq.county_id === countyId) : r;
+      setRiders(countyRiders); setVehicles(v); setPendingBikes(pending); setStages(s);
     } catch (e) {}
     setLoading(false);
   }
 
   async function approveBike(id) {
-    await base44.entities.Vehicle.update(id, { status: 'approved', approved_at: new Date().toISOString() });
+    const u = await base44.auth.me();
+    await base44.entities.Vehicle.update(id, { status: 'approved', approved_at: new Date().toISOString(), approved_by_id: u.id });
+    await auditLog({ userId: u.id, action: 'vehicle_approved', entityType: 'Vehicle', entityId: id, description: `Vehicle approved via Registrations page` });
     load();
   }
 
   async function rejectBike(id, reason) {
+    const u = await base44.auth.me();
     await base44.entities.Vehicle.update(id, { status: 'rejected', rejection_reason: reason || 'Did not meet requirements' });
+    await auditLog({ userId: u.id, action: 'vehicle_rejected', entityType: 'Vehicle', entityId: id, description: `Vehicle rejected via Registrations page` });
     load();
   }
 

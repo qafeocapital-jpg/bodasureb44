@@ -1,24 +1,33 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
 import { Landmark, TrendingUp, FileText, Banknote } from 'lucide-react';
 
 export default function CountyRevenue() {
+  const { user } = useAuth();
   const [tab, setTab] = useState('dashboard');
   const [transactions, setTransactions] = useState([]);
   const [settlements, setSettlements] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { load(); }, []);
+  const countyId = user?.scope_entity_id || user?.county_id;
+
+  useEffect(() => { load(); }, [user]);
 
   async function load() {
+    if (!user) return;
     setLoading(true);
     try {
-      const [txns, setts] = await Promise.all([
+      // Fetch county-scoped vehicles to filter transactions
+      const vehicles = countyId ? await base44.entities.Vehicle.filter({ county_id: countyId }) : [];
+      const vehicleIds = new Set(vehicles.map(v => v.id));
+      const [allTxns, setts] = await Promise.all([
         base44.entities.Transaction.filter({ type: 'lipa_county' }, '-created_date', 50),
-        base44.entities.Settlement.filter({ entity_type: 'county' }, '-created_date', 20),
+        base44.entities.Settlement.filter(countyId ? { entity_type: 'county', entity_id: countyId } : { entity_type: 'county' }, '-created_date', 20),
       ]);
-      setTransactions(txns); setSettlements(setts);
+      const scopedTxns = countyId ? allTxns.filter(t => !t.vehicle_id || vehicleIds.has(t.vehicle_id)) : allTxns;
+      setTransactions(scopedTxns); setSettlements(setts);
     } catch (e) {}
     setLoading(false);
   }

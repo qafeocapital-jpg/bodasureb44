@@ -1,23 +1,31 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatKES, timeAgo } from '@/lib/format';
 import { Users, Bike, BadgeCheck, Landmark, TrendingUp, AlertCircle, Banknote, Clock } from 'lucide-react';
 
 export default function CountyDashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState({ riders: 0, bikes: 0, permits: 0, revenue: 0 });
   const [recentTxns, setRecentTxns] = useState([]);
   const [recentPermits, setRecentPermits] = useState([]);
 
+  const countyId = user?.scope_entity_id || user?.county_id;
+
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const [riders, bikes, permits, txns, recentPerms] = await Promise.all([
+        const vehicleFilter = countyId ? { county_id: countyId } : {};
+        const permitFilter = countyId ? { county_id: countyId, status: 'active' } : { status: 'active' };
+        const [allRiders, bikes, permits, txns, recentPerms] = await Promise.all([
           base44.entities.User.filter({ staff_type: 'none' }),
-          base44.entities.Vehicle.filter({}),
-          base44.entities.Permit.filter({ status: 'active' }),
+          base44.entities.Vehicle.filter(vehicleFilter),
+          base44.entities.Permit.filter(permitFilter),
           base44.entities.Transaction.filter({ type: 'lipa_county' }, '-created_date', 10),
-          base44.entities.Permit.filter({}, '-created_date', 5),
+          base44.entities.Permit.filter(countyId ? { county_id: countyId } : {}, '-created_date', 5),
         ]);
+        const riders = countyId ? allRiders.filter(r => r.county_id === countyId) : allRiders;
         const revenue = txns.filter(t => t.status === 'completed').reduce((sum, t) => sum + (t.amount_cents || 0), 0);
         setStats({ riders: riders.length, bikes: bikes.length, permits: permits.length, revenue });
         setRecentTxns(txns);
@@ -25,7 +33,7 @@ export default function CountyDashboard() {
       } catch (e) {}
     }
     load();
-  }, []);
+  }, [user]);
 
   const kpis = [
     { label: 'Registered Riders', value: stats.riders, icon: Users, color: 'text-blue-600 bg-blue-50' },

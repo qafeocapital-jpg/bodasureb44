@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 import { formatKES, formatDate } from '@/lib/format';
+import { auditLog } from '@/lib/audit';
 import { BadgeCheck, BarChart3, Plus, TrendingUp, Calendar, Pencil } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function CountyPermits() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [tab, setTab] = useState('register');
   const [permits, setPermits] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -18,15 +21,21 @@ export default function CountyPermits() {
   const [issueForm, setIssueForm] = useState({ vehicle_id: '', billing_cycle: 'weekly', start_date: new Date().toISOString().split('T')[0] });
   const [issuing, setIssuing] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  const countyId = user?.scope_entity_id || user?.county_id;
+
+  useEffect(() => { load(); }, [user]);
 
   async function load() {
+    if (!user) return;
     setLoading(true);
     try {
+      const permitFilter = countyId ? { county_id: countyId } : {};
+      const vehicleFilter = countyId ? { county_id: countyId, status: 'approved' } : { status: 'approved' };
+      const scheduleFilter = countyId ? { county_id: countyId, is_active: true } : { is_active: true };
       const [p, s, v] = await Promise.all([
-        base44.entities.Permit.filter({}, '-created_date', 50),
-        base44.entities.FeeSchedule.filter({ is_active: true }),
-        base44.entities.Vehicle.filter({ status: 'approved' }),
+        base44.entities.Permit.filter(permitFilter, '-created_date', 50),
+        base44.entities.FeeSchedule.filter(scheduleFilter),
+        base44.entities.Vehicle.filter(vehicleFilter),
       ]);
       setPermits(p); setSchedules(s); setVehicles(v);
     } catch (e) {}
@@ -36,14 +45,17 @@ export default function CountyPermits() {
   async function addSchedule() {
     const cents = Math.round(parseFloat(newSchedule.amount_cents) * 100);
     if (!cents) return;
-    await base44.entities.FeeSchedule.create({
-      county_id: user?.county_id || 'general',
+    const u = await base44.auth.me();
+    const created = await base44.entities.FeeSchedule.create({
+      county_id: countyId || 'general',
       permit_type: newSchedule.permit_type,
       amount_cents: cents,
       penalty_amount_cents: Math.round(parseFloat(newSchedule.penalty_amount_cents || '0') * 100),
       grace_period_days: parseInt(newSchedule.grace_period_days) || 7,
       is_active: true,
     });
+    await auditLog({ userId: u.id, action: 'fee_schedule_created', entityType: 'FeeSchedule', entityId: created.id, description: `Fee schedule created: ${newSchedule.permit_type} @ ${cents} cents` });
+    toast({ title: 'Fee Schedule Created' });
     setShowAddSchedule(false);
     setNewSchedule({ permit_type: 'weekly', amount_cents: '', penalty_amount_cents: '', grace_period_days: '7' });
     load();
@@ -61,11 +73,12 @@ export default function CountyPermits() {
 
     setIssuing(true);
     try {
+      const u = await base44.auth.me();
       const ts = Date.now().toString();
-      await base44.entities.Permit.create({
+      const permit = await base44.entities.Permit.create({
         vehicle_id: issueForm.vehicle_id,
         rider_id: vehicle.rider_id || vehicle.owner_id,
-        county_id: user?.county_id || vehicle.county_id || 'general',
+        county_id: countyId || vehicle.county_id || 'general',
         billing_cycle: issueForm.billing_cycle,
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
@@ -73,10 +86,14 @@ export default function CountyPermits() {
         issued_manually: true,
         qr_code_data: `BODASURE-${issueForm.vehicle_id}-${ts}`,
       });
+      await auditLog({ userId: u.id, action: 'permit_issued_manual', entityType: 'Permit', entityId: permit.id, description: `Manual permit issued for vehicle ${vehicle.plate_number}` });
+      toast({ title: 'Permit Issued', description: `${vehicle.plate_number} — ${issueForm.billing_cycle}` });
       setShowIssueModal(false);
       setIssueForm({ vehicle_id: '', billing_cycle: 'weekly', start_date: new Date().toISOString().split('T')[0] });
       load();
-    } catch (e) {}
+    } catch (e) {
+      toast({ title: 'Failed to issue permit', description: e.message, variant: 'destructive' });
+    }
     setIssuing(false);
   }
 

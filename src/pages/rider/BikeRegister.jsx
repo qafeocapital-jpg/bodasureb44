@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { normalizePhone } from '@/lib/phone';
+import { auditLog } from '@/lib/audit';
 import { ChevronLeft, ChevronRight, Check, Bike as BikeIcon, MapPin, Camera, FileText } from 'lucide-react';
 
 export default function BikeRegister() {
@@ -114,14 +116,28 @@ export default function BikeRegister() {
       const isOwnerRider = form.role === 'owner_rider' || form.role === 'rider';
       const isOwner = form.role === 'owner' || form.role === 'owner_rider';
 
-      await base44.entities.Vehicle.create({
+      // If rider is not the owner, try to link owner by phone
+      let ownerId = isOwner ? user.id : null;
+      if (!isOwner && form.owner_phone) {
+        const normalizedOwnerPhone = normalizePhone(form.owner_phone);
+        if (normalizedOwnerPhone) {
+          const ownerUsers = await base44.entities.User.filter({ phone: normalizedOwnerPhone });
+          if (ownerUsers.length > 0) {
+            ownerId = ownerUsers[0].id;
+          }
+        }
+      }
+
+      const vehicle = await base44.entities.Vehicle.create({
         plate_number: form.plate_number.toUpperCase(),
         make: form.make,
         color: form.color,
         year: form.year ? parseInt(form.year) : null,
-        owner_id: isOwner ? user.id : null,
+        owner_id: ownerId,
         rider_id: user.id,
         county_id: form.county_id,
+        sub_county_id: form.sub_county_id || null,
+        ward_id: form.ward_id || null,
         stage_id: form.stage_id || null,
         status: 'pending',
         bike_photo_url: bikePhotoUrl,
@@ -130,6 +146,7 @@ export default function BikeRegister() {
         owner_id_doc_url: isOwner ? null : ownerIdUrl,
         is_owner_rider: isOwner,
       });
+      await auditLog({ userId: user.id, action: 'vehicle_registered', entityType: 'Vehicle', entityId: vehicle.id, description: `Vehicle ${form.plate_number.toUpperCase()} registered` });
       setStep(5);
     } catch (e) {}
     setSaving(false);
@@ -227,6 +244,19 @@ export default function BikeRegister() {
               />
             </div>
           </div>
+          {!form.is_owner_rider && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Owner Phone (Optional)</label>
+              <input
+                type="tel"
+                value={form.owner_phone}
+                onChange={e => setForm(f => ({ ...f, owner_phone: e.target.value }))}
+                placeholder="07XX XXX XXX"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">If the owner is on BodaSure, we'll link them automatically.</p>
+            </div>
+          )}
           <div className="flex gap-2 pt-2">
             <button onClick={() => setStep(0)} className="px-5 py-3 rounded-xl border border-border text-sm font-semibold">Back</button>
             <button onClick={() => setStep(2)} disabled={!canProceed()} className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50">

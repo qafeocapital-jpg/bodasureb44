@@ -61,12 +61,22 @@ export default function Home() {
               <span className="text-xs font-medium">Wallet Active</span>
             </div>
           ) : (
-            <Link to="/app/wallet" className="flex items-center gap-1.5 bg-white text-primary rounded-full px-3 py-1.5 font-semibold text-xs hover:bg-orange-50 transition-colors">
+            <Link to="/app/wallet/activate" className="flex items-center gap-1.5 bg-white text-primary rounded-full px-3 py-1.5 font-semibold text-xs hover:bg-orange-50 transition-colors">
               <AlertCircle className="w-4 h-4" />
               Activate Wallet
             </Link>
           )}
         </div>
+        {walletActive && (
+          <div className="flex gap-2 mt-3">
+            <Link to="/app/lipisha" className="flex-1 bg-white text-primary rounded-xl py-2.5 font-semibold text-xs text-center hover:bg-orange-50 transition-colors">
+              Collect Fare
+            </Link>
+            <Link to="/app/lipa-county" className="flex-1 bg-white/15 backdrop-blur-sm text-primary-foreground rounded-xl py-2.5 font-semibold text-xs text-center hover:bg-white/25 transition-colors">
+              Pay County
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Onboarding Progress Tiles */}

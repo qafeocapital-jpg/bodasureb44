@@ -14,10 +14,14 @@ export default function Compliance() {
     async function load() {
       if (!user) return;
       try {
+          const wallets = await base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' });
+          const wallet = wallets[0];
+          const walletActive = wallet?.status === 'active';
           const checks = [
-            { label: 'Profile Complete', done: user.profile_complete, link: '/app/account' },
-            { label: 'KYC Documents Uploaded', done: user.kyc_status === 'approved' || user.kyc_status === 'pending', pending: user.kyc_status === 'pending', link: '/app/account' },
-            { label: 'KYC Approved', done: user.kyc_status === 'approved', link: '/app/account' },
+            { label: 'Profile Complete', done: user.profile_complete, link: '/app/profile' },
+            { label: 'Wallet Activated', done: walletActive, link: '/app/wallet/activate' },
+            { label: 'KYC Documents Uploaded', done: user.kyc_status === 'approved' || user.kyc_status === 'pending', pending: user.kyc_status === 'pending', link: '/app/kyc' },
+            { label: 'KYC Approved (Tier 2)', done: user.kyc_status === 'approved', link: '/app/kyc' },
           ];
           const bikes = await base44.entities.Vehicle.filter({ rider_id: user.id });
           const approvedBike = bikes.find(b => b.status === 'approved');
@@ -28,6 +32,8 @@ export default function Compliance() {
           if (approvedBike) {
             const permits = await base44.entities.Permit.filter({ vehicle_id: approvedBike.id, status: 'active' });
             checks.push({ label: 'Active Permit', done: permits.length > 0, link: '/app/lipa-county' });
+            const policies = await base44.entities.Policy.filter({ vehicle_id: approvedBike.id, status: 'active' });
+            checks.push({ label: 'Active Insurance', done: policies.length > 0, link: '/app/insurance' });
           }
           setItems(checks);
           } catch (e) {}
