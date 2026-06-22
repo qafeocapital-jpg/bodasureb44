@@ -92,7 +92,7 @@ export default function Profile() {
         plate_number: v?.plate_number || draft.plate_number || '',
         make: v?.make || draft.make || '',
         color: v?.color || draft.color || '',
-        role: draft.role || (v?.is_owner_rider ? 'owner_rider' : 'rider'),
+        role: draft.role || (v?.owner_id === user.id ? (v.rider_id === user.id ? 'owner_rider' : 'owner') : 'rider'),
         is_owner_rider: draft.is_owner_rider ?? (v?.is_owner_rider ?? true),
         owner_phone: draft.owner_phone || v?.owner_phone || '',
       };
