@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
-import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
+import { getOrCreateWallet } from '@/lib/payments';
 import { ChevronLeft, Users, UserPlus, PiggyBank, BarChart3, Loader2, CheckCircle2 } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 

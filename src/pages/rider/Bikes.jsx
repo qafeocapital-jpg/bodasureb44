@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, timeAgo } from '@/lib/format';
-import { getOrCreateWallet } from '@/lib/mockPayments';
+import { getOrCreateWallet } from '@/lib/payments';
 import { Plus, Bike as BikeIcon, BadgeCheck, Clock, UserCheck, TrendingUp } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import BikeDetailSheet from '@/components/BikeDetailSheet';

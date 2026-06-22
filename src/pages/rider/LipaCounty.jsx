@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
-import { mockPayment, getOrCreateWallet, processFeeSplit } from '@/lib/mockPayments';
+import { processWalletPayment, getOrCreateWallet, processFeeSplit } from '@/lib/payments';
 import { checkServiceAccess } from '@/lib/serviceAccess';
 import UnlockSheet from '@/components/rider/UnlockSheet';
 import { ChevronLeft, BadgeCheck, Loader2, CheckCircle2, XCircle, AlertCircle, Receipt, MapPin } from 'lucide-react';
@@ -91,7 +91,7 @@ export default function LipaCounty() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await mockPayment({
+      const res = await processWalletPayment({
         walletId: wallet.id,
         type: 'lipa_county',
         amountCents: selectedSchedule.amount_cents,

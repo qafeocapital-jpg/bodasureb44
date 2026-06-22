@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
-import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
+import { initiateStkPush, processWalletPayment, getOrCreateWallet } from '@/lib/payments';
 import { verifyPin } from '@/lib/pin';
 import { normalizePhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
@@ -69,13 +69,27 @@ export default function Wallet() {
     setResult(null);
     try {
       const phoneForSend = activeTab === 'send' ? normalizePhone(recipient) : null;
-      const res = await mockPayment({
-        walletId: wallet.id,
-        type: activeTab,
-        amountCents: cents,
-        counterpartyPhone: phoneForSend,
-        description: activeTab === 'deposit' ? 'M-Pesa top up' : activeTab === 'withdraw' ? 'Withdraw to M-Pesa' : `Send to ${recipient}`,
-      });
+
+      let res;
+      if (activeTab === 'deposit') {
+        // Deposit = STK push from user's M-Pesa to wallet
+        res = await initiateStkPush({
+          walletId: wallet.id,
+          phone: user.phone || user.full_name,
+          amountCents: cents,
+          description: 'M-Pesa top up',
+          transactionType: 'deposit',
+        });
+      } else {
+        // Send / withdraw = internal wallet operation
+        res = await processWalletPayment({
+          walletId: wallet.id,
+          type: activeTab,
+          amountCents: cents,
+          counterpartyPhone: phoneForSend,
+          description: activeTab === 'withdraw' ? 'Withdraw to M-Pesa' : `Send to ${recipient}`,
+        });
+      }
       // Re-fetch balance from server for accuracy
       const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: wallet.id });
       if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);

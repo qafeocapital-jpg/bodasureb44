@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
-import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
+import { processWalletPayment, getOrCreateWallet } from '@/lib/payments';
 import { verifyPin } from '@/lib/pin';
 import { checkServiceAccess } from '@/lib/serviceAccess';
 import { auditLog } from '@/lib/audit';
@@ -75,7 +75,7 @@ export default function LipaOwner() {
         if (ownerWallets.length > 0) ownerWallet = ownerWallets[0];
       }
 
-      const res = await mockPayment({
+      const res = await processWalletPayment({
         walletId: wallet.id,
         type: 'lipa_owner',
         amountCents: cents,

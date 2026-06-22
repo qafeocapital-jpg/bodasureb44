@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
-import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
+import { processWalletPayment, getOrCreateWallet } from '@/lib/payments';
 import { ChevronLeft, ShieldCheck, Loader2, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -47,7 +47,7 @@ export default function Insurance() {
     setResult(null);
     try {
       const product = products.find(p => p.id === selectedProduct);
-      const res = await mockPayment({
+      const res = await processWalletPayment({
         walletId: wallet.id,
         type: 'insurance',
         amountCents: product.premium_cents,

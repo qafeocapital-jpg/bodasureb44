@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { getOrCreateWallet } from '@/lib/mockPayments';
+import { getOrCreateWallet } from '@/lib/payments';
 import { hashPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
 import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, FileCheck, Loader2 } from 'lucide-react';

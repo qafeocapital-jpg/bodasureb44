@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { formatKES, formatDate, formatDateTime } from '@/lib/format';
-import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
+import { processWalletPayment, getOrCreateWallet } from '@/lib/payments';
 import { ChevronLeft, PiggyBank, Users, Loader2, CheckCircle2, Coins, ArrowUpFromLine } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -61,7 +61,7 @@ export default function Chama() {
     try {
       // If paying from wallet, debit user wallet and credit group wallet
       if (payMethod === 'wallet' && userWallet) {
-        const res = await mockPayment({
+        const res = await processWalletPayment({
           walletId: userWallet.id,
           type: 'chama',
           amountCents: cents,
@@ -93,7 +93,7 @@ export default function Chama() {
         });
       } else {
         // M-Pesa mock — just credit group wallet
-        const res = await mockPayment({
+        const res = await processWalletPayment({
           walletId: groupWallet.id,
           type: 'chama',
           amountCents: cents,
