@@ -14,6 +14,7 @@ import PhaseStage from '@/components/rider/onboarding/PhaseStage';
 import PhaseSacco from '@/components/rider/onboarding/PhaseSacco';
 import PhaseVerification from '@/components/rider/onboarding/PhaseVerification';
 import CompletionScreen from '@/components/rider/onboarding/CompletionScreen';
+import KycTierStatus from '@/components/rider/KycTierStatus';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -28,19 +29,22 @@ export default function Profile() {
   const [completedPhase, setCompletedPhase] = useState(0);
   const [draftData, setDraftData] = useState({});
   const [readOnly, setReadOnly] = useState(false);
+  const [kycDocs, setKycDocs] = useState([]);
 
   useEffect(() => {
     async function load() {
       if (!user || hasInitialized) return;
       try {
-        const [cs, vs, gms] = await Promise.all([
+        const [cs, vs, gms, kd] = await Promise.all([
           base44.entities.County.filter({}),
           base44.entities.Vehicle.filter({ rider_id: user.id }, '-created_date'),
           base44.entities.GroupMember.filter({ user_id: user.id }),
+          base44.entities.KycDocument.filter({ user_id: user.id }),
         ]);
         setCounties(cs);
         setVehicles(vs);
         setGroupMembers(gms);
+        setKycDocs(kd);
         const phase = getOnboardingPhase(user, vs, gms);
         setCompletedPhase(phase);
         const viewStep = location.state?.viewStep;
@@ -61,12 +65,14 @@ export default function Profile() {
   async function refreshData() {
     if (refreshUser) await refreshUser();
     try {
-      const [vs, gms] = await Promise.all([
+      const [vs, gms, kd] = await Promise.all([
         base44.entities.Vehicle.filter({ rider_id: user.id }, '-created_date'),
         base44.entities.GroupMember.filter({ user_id: user.id }),
+        base44.entities.KycDocument.filter({ user_id: user.id }),
       ]);
       setVehicles(vs);
       setGroupMembers(gms);
+      setKycDocs(kd);
     } catch (e) {}
   }
 
@@ -131,6 +137,18 @@ export default function Profile() {
         </button>
         <h1 className="text-xl font-heading font-bold">Set Up Your Account</h1>
       </div>
+
+      {/* KYC Tier Status */}
+      {!readOnly && (
+        <div className="mt-6">
+          <KycTierStatus
+            user={user}
+            vehicle={vehicles[0]}
+            kycDocs={kycDocs}
+            groupMember={groupMembers[0]}
+          />
+        </div>
+      )}
 
       {/* Progress Bar */}
       <ProgressBar currentPhase={currentPhase} completedPhase={completedPhase} onJumpBack={(p) => { setReadOnly(!!user?.onboarding_complete); setCurrentPhase(p); }} onboardingComplete={user?.onboarding_complete} />
