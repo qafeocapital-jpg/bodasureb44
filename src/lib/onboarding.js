@@ -1,11 +1,11 @@
 import { User, Bike, MapPin, Flag, Users } from 'lucide-react';
 
 export const ONBOARDING_PHASES = [
-  { id: 0, name: 'Personal Profile', short: 'Profile', icon: User },
+  { id: 0, name: 'Complete Profile', short: 'Profile', icon: User },
   { id: 1, name: 'Register Bike', short: 'Bike', icon: Bike },
-  { id: 2, name: 'Map Bike to County', short: 'Map Bike', icon: MapPin },
-  { id: 3, name: 'Join Stage', short: 'Stage', icon: Flag },
-  { id: 4, name: 'Join SACCO', short: 'SACCO', icon: Users },
+  { id: 2, name: 'Map County', short: 'County', icon: MapPin },
+  { id: 3, name: 'Select Stage', short: 'Stage', icon: Flag },
+  { id: 4, name: 'Select Sacco', short: 'Sacco', icon: Users },
 ];
 
 /**

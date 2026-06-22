@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { ChevronRight, ChevronLeft, Loader2, MapPin } from 'lucide-react';
-import StagePicker from '@/components/rider/onboarding/StagePicker';
+import StageSearchPicker from '@/components/rider/onboarding/StageSearchPicker';
 
 export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
   const [county, setCounty] = useState(null);
@@ -117,9 +117,9 @@ export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
       </div>
 
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Stage</label>
-        <p className="text-[10px] text-muted-foreground mb-2">The official/main stage you operate from</p>
-        <StagePicker
+        <label className="text-xs font-medium text-muted-foreground">Select Your Stage</label>
+        <p className="text-[10px] text-muted-foreground mb-2">Search for your stage or location on the map, or tap to pin a new stage</p>
+        <StageSearchPicker
           wardId={form.ward_id}
           countyId={user?.county_id}
           stages={stages}
