@@ -37,6 +37,9 @@
     "reference": {
       "type": "string"
     },
+    "checkout_request_id": {
+      "type": "string"
+    },
     "product_type": {
       "type": "string"
     },

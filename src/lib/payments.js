@@ -49,6 +49,7 @@ export async function initiateStkPush({ walletId, phone, amountCents, descriptio
         amount_cents: amountCents,
         status: 'pending',
         reference: data.reference,
+        checkout_request_id: data.checkout_request_id || null,
         product_type: transactionType,
         counterparty_phone: normalized,
         description: description || '',

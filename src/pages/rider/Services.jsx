@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES } from '@/lib/format';
-import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
+import { processWalletPayment, getOrCreateWallet } from '@/lib/payments';
+import { verifyPin } from '@/lib/pin';
 import { ChevronLeft, Phone, Wifi, Zap, Droplet, Tv, Receipt, Loader2, CheckCircle2, XCircle, Coins } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import UnlockSheet from '@/components/rider/UnlockSheet';
+import PinEntrySheet from '@/components/rider/PinEntrySheet';
 import { checkServiceAccess } from '@/lib/serviceAccess';
 
 export default function Services() {
@@ -20,6 +22,7 @@ export default function Services() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [showUnlock, setShowUnlock] = useState(false);
+  const [showPin, setShowPin] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -47,10 +50,20 @@ export default function Services() {
   async function handlePay() {
     const cents = Math.round(parseFloat(amount) * 100);
     if (!cents || !wallet) return;
+    setShowPin(true);
+  }
+
+  async function handlePinConfirm(pin) {
+    if (!verifyPin(pin, wallet.pin_hash)) {
+      throw new Error('Incorrect PIN. Try again.');
+    }
+    setShowPin(false);
+    const cents = Math.round(parseFloat(amount) * 100);
+    if (!cents || !wallet) return;
     setLoading(true);
     setResult(null);
     try {
-      const res = await mockPayment({
+      const res = await processWalletPayment({
         walletId: wallet.id,
         type: 'utility',
         amountCents: cents,
@@ -58,7 +71,9 @@ export default function Services() {
         description: `${selectedService.label} — ${accountRef}`,
         productType: selectedService.key,
       });
-      setBalance(prev => prev - cents);
+      // Re-fetch balance from server for accuracy
+      const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: wallet.id });
+      if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);
       setResult({ success: true, amount: cents, reference: res.reference });
       setAmount('');
       setAccountRef('');
@@ -182,6 +197,13 @@ export default function Services() {
         message="Complete KYC verification (Tier 2) to access bill payments and services."
         actionLabel="Verify Now"
         actionLink="/app/kyc"
+      />
+
+      <PinEntrySheet
+        open={showPin}
+        onClose={() => setShowPin(false)}
+        onConfirm={handlePinConfirm}
+        title="Enter PIN to Pay"
       />
       </div>
       );

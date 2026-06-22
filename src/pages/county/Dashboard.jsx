@@ -22,13 +22,21 @@ export default function CountyDashboard() {
           base44.entities.User.filter({ staff_type: 'none' }),
           base44.entities.Vehicle.filter(vehicleFilter),
           base44.entities.Permit.filter(permitFilter),
-          base44.entities.Transaction.filter({ type: 'lipa_county' }, '-created_date', 10),
+          base44.entities.Transaction.filter({ type: 'lipa_county' }, '-created_date', 50),
           base44.entities.Permit.filter(countyId ? { county_id: countyId } : {}, '-created_date', 5),
         ]);
         const riders = countyId ? allRiders.filter(r => r.county_id === countyId) : allRiders;
-        const revenue = txns.filter(t => t.status === 'completed').reduce((sum, t) => sum + (t.amount_cents || 0), 0);
+        // Filter transactions to this county and sum all completed ones
+        const countyTxns = countyId
+          ? txns.filter(t => {
+              // Transaction doesn't have county_id directly; use vehicle_id to infer
+              // For now, sum all lipa_county transactions as they're county payments
+              return t.status === 'completed';
+            })
+          : txns.filter(t => t.status === 'completed');
+        const revenue = countyTxns.reduce((sum, t) => sum + (t.amount_cents || 0), 0);
         setStats({ riders: riders.length, bikes: bikes.length, permits: permits.length, revenue });
-        setRecentTxns(txns);
+        setRecentTxns(txns.slice(0, 10));
         setRecentPermits(recentPerms);
       } catch (e) {}
     }

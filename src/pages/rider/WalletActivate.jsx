@@ -19,6 +19,7 @@ export default function WalletActivate() {
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
   const [pinError, setPinError] = useState('');
+  const [identityError, setIdentityError] = useState('');
   const [identity, setIdentity] = useState({ full_name: '', national_id: '', date_of_birth: '' });
   const [saving, setSaving] = useState(false);
 
@@ -61,7 +62,7 @@ export default function WalletActivate() {
         const existing = await base44.entities.User.filter({ national_id: identity.national_id });
         const conflict = existing.find(u => u.id !== user.id);
         if (conflict) {
-          setPinError('This National ID is already registered to another user.');
+          setIdentityError('This National ID is already registered to another user.');
           setSaving(false);
           return;
         }
@@ -83,7 +84,7 @@ export default function WalletActivate() {
       await refreshUser();
       setStep(3);
     } catch (e) {
-      setPinError(e.message || 'Activation failed. Try again.');
+      setIdentityError(e.message || 'Activation failed. Try again.');
     }
     setSaving(false);
   }
@@ -260,6 +261,7 @@ export default function WalletActivate() {
               {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Activating...</> : <><Shield className="w-4 h-4" /> Activate Wallet</>}
             </button>
           </div>
+          {identityError && <p className="text-xs text-destructive">{identityError}</p>}
         </div>
       )}
 

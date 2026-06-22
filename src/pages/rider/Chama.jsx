@@ -3,8 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { formatKES, formatDate, formatDateTime } from '@/lib/format';
 import { processWalletPayment, getOrCreateWallet } from '@/lib/payments';
+import { verifyPin } from '@/lib/pin';
 import { ChevronLeft, PiggyBank, Users, Loader2, CheckCircle2, Coins, ArrowUpFromLine } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
+import PinEntrySheet from '@/components/rider/PinEntrySheet';
 
 export default function Chama() {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export default function Chama() {
   const [payMethod, setPayMethod] = useState('wallet');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [showPin, setShowPin] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -56,11 +59,30 @@ export default function Chama() {
   async function handleContribute() {
     const cents = Math.round(parseFloat(amount) * 100);
     if (!cents || !groupWallet) return;
+    // Wallet contributions require PIN verification
+    if (payMethod === 'wallet' && userWallet) {
+      setShowPin(true);
+      return;
+    }
+    await processContribution(cents);
+  }
+
+  async function handlePinConfirm(pin) {
+    if (!verifyPin(pin, userWallet.pin_hash)) {
+      throw new Error('Incorrect PIN. Try again.');
+    }
+    setShowPin(false);
+    const cents = Math.round(parseFloat(amount) * 100);
+    await processContribution(cents);
+  }
+
+  async function processContribution(cents) {
     setLoading(true);
     setResult(null);
     try {
-      // If paying from wallet, debit user wallet and credit group wallet
+      let reference;
       if (payMethod === 'wallet' && userWallet) {
+        // Wallet: processWalletPayment debits user wallet and credits group wallet (via counterpartyWalletId)
         const res = await processWalletPayment({
           walletId: userWallet.id,
           type: 'chama',
@@ -69,40 +91,36 @@ export default function Chama() {
           description: `Chama contribution to ${group?.name || ''}`,
           productType: 'chama',
         });
+        reference = res.reference;
 
-        // Credit the group wallet snapshot
-        const groupSnaps = await base44.entities.WalletSnapshot.filter({ wallet_id: groupWallet.id });
-        if (groupSnaps.length > 0) {
-          await base44.entities.WalletSnapshot.update(groupSnaps[0].id, {
-            balance_cents: (groupSnaps[0].balance_cents || 0) + cents,
-            last_synced_at: new Date().toISOString(),
-          });
-        }
-
-        // Also record a transaction on the group wallet side
+        // Record a transaction on the group wallet side (for audit)
         await base44.entities.Transaction.create({
           wallet_id: groupWallet.id,
-          type: 'chama',
+          type: 'deposit',
           amount_cents: cents,
           status: 'completed',
           reference: res.reference,
           product_type: 'chama',
           counterparty_wallet_id: userWallet.id,
-          description: `Contribution received`,
+          description: `Contribution received from ${user?.full_name || 'member'}`,
           completed_at: new Date().toISOString(),
         });
       } else {
-        // M-Pesa mock — just credit group wallet
+        // M-Pesa: credit group wallet directly (type 'deposit' = credit)
         const res = await processWalletPayment({
           walletId: groupWallet.id,
-          type: 'chama',
+          type: 'deposit',
           amountCents: cents,
           description: `Chama contribution via M-Pesa to ${group?.name || ''}`,
           productType: 'chama',
         });
+        reference = res.reference;
       }
 
-      setPoolBalance(prev => prev + cents);
+      // Re-fetch pool balance from server
+      const groupSnaps = await base44.entities.WalletSnapshot.filter({ wallet_id: groupWallet.id });
+      if (groupSnaps.length > 0) setPoolBalance(groupSnaps[0].balance_cents || 0);
+
       setResult({ success: true, amount: cents });
       setAmount('');
       const txns = await base44.entities.Transaction.filter({ wallet_id: groupWallet.id, type: 'chama' }, '-created_date', 10);

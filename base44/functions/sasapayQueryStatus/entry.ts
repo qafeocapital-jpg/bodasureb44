@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             merchant_code: Deno.env.get('SASAPAY_MERCHANT_CODE'),
-            checkout_request_id: txn.reference,
+            checkout_request_id: txn.checkout_request_id || txn.reference,
           }),
         });
         const statusData = await statusRes.json();
@@ -94,6 +94,16 @@ Deno.serve(async (req) => {
               completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
               failure_reason: newStatus === 'failed' ? (statusData.message || 'Payment failed') : null,
             });
+
+            // Idempotency: check if a PaymentEvent already marked this as processed
+            const existingEvents = await base44.asServiceRole.entities.PaymentEvent.filter({ transaction_id: txn.id, event_type: 'sasapay_webhook' });
+            if (existingEvents.length > 0) {
+              return Response.json({
+                status: txn.status,
+                mode: 'live',
+                reference: txn.reference,
+              });
+            }
 
             // Credit wallet if just completed
             if (newStatus === 'completed') {

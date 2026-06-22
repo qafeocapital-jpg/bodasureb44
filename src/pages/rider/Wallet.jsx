@@ -73,9 +73,12 @@ export default function Wallet() {
       let res;
       if (activeTab === 'deposit') {
         // Deposit = STK push from user's M-Pesa to wallet
+        if (!user.phone) {
+          throw new Error('Please set your phone number in your profile before topping up.');
+        }
         res = await initiateStkPush({
           walletId: wallet.id,
-          phone: user.phone || user.full_name,
+          phone: user.phone,
           amountCents: cents,
           description: 'M-Pesa top up',
           transactionType: 'deposit',
