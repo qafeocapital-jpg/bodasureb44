@@ -22,14 +22,14 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
 
-    // Validate webhook (SasaPay doesn't use HMAC; verify via callback_url match)
-    // In production, add IP whitelist or shared secret validation
+    // Enforce mandatory webhook secret (production security)
     const webhookSecret = Deno.env.get('SASAPAY_WEBHOOK_SECRET');
-    if (webhookSecret) {
-      const providedSecret = new URL(req.url).searchParams.get('secret');
-      if (providedSecret !== webhookSecret) {
-        return Response.json({ error: 'Invalid webhook secret' }, { status: 401 });
-      }
+    if (!webhookSecret) {
+      return Response.json({ error: 'Webhook secret not configured' }, { status: 500 });
+    }
+    const providedSecret = new URL(req.url).searchParams.get('secret');
+    if (providedSecret !== webhookSecret) {
+      return Response.json({ error: 'Invalid webhook secret' }, { status: 401 });
     }
 
     const { transaction_reference, status, amount, payer_phone } = body;
@@ -49,6 +49,18 @@ Deno.serve(async (req) => {
     // Idempotency: if already completed, don't process again
     if (txn.status === 'completed') {
       return Response.json({ status: 'already_processed' });
+    }
+
+    // Amount validation: verify the webhook amount matches the transaction
+    if (amount && txn.amount_cents && Math.round(parseFloat(amount) * 100) !== txn.amount_cents) {
+      await base44.asServiceRole.entities.PaymentEvent.create({
+        transaction_id: txn.id,
+        event_type: 'sasapay_webhook',
+        reference: transaction_reference,
+        payload: { ...body, error: 'amount_mismatch', expected: txn.amount_cents, received: Math.round(parseFloat(amount) * 100) },
+        processed: false,
+      });
+      return Response.json({ error: 'Amount mismatch' }, { status: 400 });
     }
 
     // Update transaction status

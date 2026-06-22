@@ -90,6 +90,13 @@
       "type": "string",
       "format": "date"
     },
+    "otp_hash": {
+      "type": "string"
+    },
+    "otp_expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "notification_prefs": {
       "type": "object",
       "properties": {

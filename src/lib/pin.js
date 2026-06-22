@@ -1,37 +1,39 @@
+import { base44 } from '@/api/base44Client';
+
 /**
  * PIN utility for wallet transaction verification.
- * Uses a simple salted hash (suitable for mock phase; replace with proper crypto before production).
+ * All hashing happens server-side via backend functions (PBKDF2-SHA256).
+ * The client never sees the hash or the salt.
  */
-
-const SALT = 'bodasure_2024_salt';
 
 /**
- * Hash a 4-digit PIN with a salt.
- * @param {string} pin - 4-digit PIN
- * @returns {string} hashed PIN
+ * Verify a wallet PIN via backend (secure PBKDF2 hashing).
+ * @param {string} pin - 4-digit PIN entered by user
+ * @param {string} walletId - Wallet ID
+ * @returns {Promise<boolean>}
  */
-export function hashPin(pin) {
-  // Simple hash: base64 of salted PIN — replace with bcrypt/argon2 when SasaPay goes live
-  let hash = 0;
-  const str = SALT + pin;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
+export async function verifyPin(pin, walletId) {
+  if (!pin || !walletId) return false;
+  if (pin.length !== 4 || !/^\d{4}$/.test(pin)) return false;
+  try {
+    const res = await base44.functions.invoke('verifyWalletPin', { walletId, pin });
+    return res.data?.valid === true;
+  } catch (e) {
+    return false;
   }
-  return btoa(String(hash));
 }
 
 /**
- * Verify a PIN against a stored hash.
- * @param {string} pin - 4-digit PIN entered by user
- * @param {string} storedHash - stored hash from wallet record
- * @returns {boolean}
+ * Set a wallet PIN securely via backend (PBKDF2 hashing with random salt).
+ * @param {string} walletId - Wallet ID
+ * @param {string} pin - 4-digit PIN
+ * @returns {Promise<boolean>}
  */
-export function verifyPin(pin, storedHash) {
-  if (!pin || !storedHash) return false;
-  if (pin.length !== 4 || !/^\d{4}$/.test(pin)) return false;
-  return hashPin(pin) === storedHash;
+export async function setWalletPin(walletId, pin) {
+  if (!walletId || !pin) return false;
+  if (!/^\d{4}$/.test(pin)) return false;
+  const res = await base44.functions.invoke('setWalletPin', { walletId, pin });
+  return res.data?.success === true;
 }
 
 /**

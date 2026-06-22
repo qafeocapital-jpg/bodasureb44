@@ -55,7 +55,7 @@ export default function Wallet() {
   }
 
   async function handlePinConfirm(pin) {
-    if (!verifyPin(pin, wallet.pin_hash)) {
+    if (!(await verifyPin(pin, wallet.id))) {
       throw new Error('Incorrect PIN. Try again.');
     }
     setShowPin(false);

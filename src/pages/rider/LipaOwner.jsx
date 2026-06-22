@@ -61,7 +61,7 @@ export default function LipaOwner() {
   async function handleConfirm() {
     setPinError('');
     if (pin.length !== 4) { setPinError('Enter your 4-digit PIN'); return; }
-    if (wallet.pin_hash && !verifyPin(pin, wallet.pin_hash)) {
+    if (!(await verifyPin(pin, wallet.id))) {
       setPinError('Incorrect PIN. Please try again.');
       return;
     }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { getOrCreateWallet } from '@/lib/payments';
-import { hashPin } from '@/lib/pin';
+import { setWalletPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
 import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, FileCheck, Loader2 } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
@@ -22,6 +22,9 @@ export default function WalletActivate() {
   const [identityError, setIdentityError] = useState('');
   const [identity, setIdentity] = useState({ full_name: '', national_id: '', date_of_birth: '' });
   const [saving, setSaving] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError, setOtpError] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -39,12 +42,36 @@ export default function WalletActivate() {
     load();
   }, [user]);
 
-  function sendOtp() {
-    setOtpSent(true);
+  async function sendOtp() {
+    setOtpSending(true);
+    setOtpError('');
+    try {
+      const res = await base44.functions.invoke('sendOtp', {});
+      if (res.data?.success) {
+        setOtpSent(true);
+      } else {
+        setOtpError(res.data?.error || 'Failed to send OTP. Try again.');
+      }
+    } catch (e) {
+      setOtpError(e.response?.data?.error || e.message || 'Failed to send OTP. Try again.');
+    }
+    setOtpSending(false);
   }
 
-  function verifyOtp() {
-    setStep(1);
+  async function verifyOtp() {
+    setOtpVerifying(true);
+    setOtpError('');
+    try {
+      const res = await base44.functions.invoke('verifyOtpCode', { otpCode: otp });
+      if (res.data?.valid) {
+        setStep(1);
+      } else {
+        setOtpError(res.data?.error || 'Incorrect or expired code. Try again.');
+      }
+    } catch (e) {
+      setOtpError(e.response?.data?.error || e.message || 'Verification failed. Try again.');
+    }
+    setOtpVerifying(false);
   }
 
   function handlePinSet() {
@@ -67,10 +94,15 @@ export default function WalletActivate() {
           return;
         }
       }
+      // Set PIN securely via backend (PBKDF2 hashing)
+      const pinSet = await setWalletPin(wallet.id, pin);
+      if (!pinSet) {
+        throw new Error('Failed to set wallet PIN. Try again.');
+      }
+
       await base44.entities.Wallet.update(wallet.id, {
         tier: 1,
         status: 'active',
-        pin_hash: hashPin(pin),
         sasapay_customer_id: `mock_${user?.id}`,
       });
       await base44.auth.updateMe({
@@ -127,40 +159,44 @@ export default function WalletActivate() {
         <div className="space-y-4">
           <div className="bg-accent rounded-xl p-4 flex items-center gap-3">
             <Shield className="w-5 h-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">We'll send a one-time code to your phone to verify it's you.</p>
+            <p className="text-sm text-muted-foreground">We'll send a one-time code to your email to verify it's you.</p>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
-            <input
-              type="tel"
-              value={formatPhoneDisplay(user.phone) || user.phone || ''}
-              disabled
-              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-muted text-sm"
-            />
+           <label className="text-xs font-medium text-muted-foreground">Email Address</label>
+           <input
+             type="email"
+             value={user.email || ''}
+             disabled
+             className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-muted text-sm"
+           />
           </div>
+          {otpError && <p className="text-xs text-destructive">{otpError}</p>}
           {!otpSent ? (
-            <button onClick={sendOtp} className="w-full bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm">
-              Send OTP
-            </button>
+           <button onClick={sendOtp} disabled={otpSending} className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
+             {otpSending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : 'Send OTP'}
+           </button>
           ) : (
-            <>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Enter OTP Code</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={4}
-                  value={otp}
-                  onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="••••"
-                  className="w-full mt-1 px-3 py-3 rounded-xl border border-input bg-background text-2xl text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1.5">Mock mode: Enter any 4 digits to continue</p>
-              </div>
-              <button onClick={verifyOtp} disabled={otp.length !== 4} className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
-                Verify <ChevronRight className="w-4 h-4" />
-              </button>
-            </>
+           <>
+             <div>
+               <label className="text-xs font-medium text-muted-foreground">Enter OTP Code</label>
+               <input
+                 type="text"
+                 inputMode="numeric"
+                 maxLength={4}
+                 value={otp}
+                 onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                 placeholder="••••"
+                 className="w-full mt-1 px-3 py-3 rounded-xl border border-input bg-background text-2xl text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-primary"
+               />
+               <p className="text-[10px] text-muted-foreground mt-1.5">Check your email for the 4-digit code</p>
+             </div>
+             <button onClick={verifyOtp} disabled={otp.length !== 4 || otpVerifying} className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
+               {otpVerifying ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</> : <>Verify <ChevronRight className="w-4 h-4" /></>}
+             </button>
+             <button onClick={sendOtp} disabled={otpSending} className="w-full text-center text-sm text-muted-foreground py-1">
+               {otpSending ? 'Resending...' : 'Resend code'}
+             </button>
+           </>
           )}
         </div>
       )}

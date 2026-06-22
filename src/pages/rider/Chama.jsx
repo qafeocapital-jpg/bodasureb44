@@ -68,7 +68,7 @@ export default function Chama() {
   }
 
   async function handlePinConfirm(pin) {
-    if (!verifyPin(pin, userWallet.pin_hash)) {
+    if (!(await verifyPin(pin, userWallet.id))) {
       throw new Error('Incorrect PIN. Try again.');
     }
     setShowPin(false);
