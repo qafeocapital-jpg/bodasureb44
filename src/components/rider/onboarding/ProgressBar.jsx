@@ -2,10 +2,9 @@ import { Fragment } from 'react';
 import { Check } from 'lucide-react';
 import { ONBOARDING_PHASES } from '@/lib/onboarding';
 
-export default function ProgressBar({ currentPhase, onJumpBack, onboardingComplete }) {
+export default function ProgressBar({ currentPhase, completedPhase, onJumpBack, onboardingComplete }) {
   const isDone = currentPhase >= 6;
   const activePhase = isDone ? null : ONBOARDING_PHASES[currentPhase];
-  const canJumpBack = (i) => !onboardingComplete || i === 5;
 
   return (
     <div className="space-y-3">
@@ -36,17 +35,17 @@ export default function ProgressBar({ currentPhase, onJumpBack, onboardingComple
       {/* Compact Stepper */}
       <div className="flex items-center">
         {ONBOARDING_PHASES.map((phase, i) => {
-          const isCompleted = i < currentPhase;
+          const isCompleted = i < completedPhase;
           const isActive = i === currentPhase;
           const Icon = phase.icon;
           return (
             <Fragment key={phase.id}>
               <button
-                onClick={() => isCompleted && canJumpBack(i) && onJumpBack ? onJumpBack(i) : null}
-                disabled={!isCompleted || !canJumpBack(i)}
+                onClick={() => isCompleted && onJumpBack ? onJumpBack(i) : null}
+                disabled={!isCompleted}
                 className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all flex-shrink-0 ${
                   isCompleted
-                    ? 'bg-primary text-primary-foreground cursor-pointer hover:scale-110'
+                    ? `bg-primary text-primary-foreground ${isActive ? 'ring-4 ring-primary/20' : 'cursor-pointer hover:scale-110'}`
                     : isActive
                     ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
                     : 'bg-card text-muted-foreground border-2 border-border'
@@ -55,7 +54,7 @@ export default function ProgressBar({ currentPhase, onJumpBack, onboardingComple
                 {isCompleted ? <Check className="w-4 h-4" strokeWidth={3} /> : <Icon className="w-4 h-4" />}
               </button>
               {i < ONBOARDING_PHASES.length - 1 && (
-                <div className={`flex-1 h-1 mx-0.5 rounded-full transition-colors ${i < currentPhase ? 'bg-primary' : 'bg-border'}`} />
+                <div className={`flex-1 h-1 mx-0.5 rounded-full transition-colors ${i < completedPhase ? 'bg-primary' : 'bg-border'}`} />
               )}
             </Fragment>
           );
@@ -65,7 +64,7 @@ export default function ProgressBar({ currentPhase, onJumpBack, onboardingComple
       {/* Phase Labels */}
       <div className="flex justify-between px-0.5">
         {ONBOARDING_PHASES.map((phase, i) => {
-          const isCompleted = i < currentPhase;
+          const isCompleted = i < completedPhase;
           const isActive = i === currentPhase;
           return (
             <span

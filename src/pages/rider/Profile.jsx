@@ -25,6 +25,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [currentPhase, setCurrentPhase] = useState(0);
+  const [completedPhase, setCompletedPhase] = useState(0);
   const [draftData, setDraftData] = useState({});
   const [readOnly, setReadOnly] = useState(false);
 
@@ -40,12 +41,13 @@ export default function Profile() {
         setCounties(cs);
         setVehicles(vs);
         setGroupMembers(gms);
+        const phase = getOnboardingPhase(user, vs, gms);
+        setCompletedPhase(phase);
         const viewStep = location.state?.viewStep;
         if (viewStep !== undefined && viewStep !== null && user?.onboarding_complete) {
           setCurrentPhase(viewStep);
           setReadOnly(true);
         } else {
-          const phase = getOnboardingPhase(user, vs, gms);
           setCurrentPhase(Math.min(phase, 6));
           setReadOnly(false);
         }
@@ -71,6 +73,7 @@ export default function Profile() {
   async function handlePhaseComplete() {
     await refreshData();
     setCurrentPhase(p => Math.min(p + 1, 6));
+    setCompletedPhase(p => Math.min(p + 1, 6));
   }
 
   const phaseInitialValues = (phase) => {
@@ -113,6 +116,7 @@ export default function Profile() {
   const handleExitReadOnly = () => {
     setReadOnly(false);
     const phase = getOnboardingPhase(user, vehicles, groupMembers);
+    setCompletedPhase(phase);
     setCurrentPhase(Math.min(phase, 6));
     navigate('/app/profile', { replace: true, state: {} });
   };
@@ -130,7 +134,7 @@ export default function Profile() {
       </div>
 
       {/* Progress Bar */}
-      <ProgressBar currentPhase={currentPhase} onJumpBack={readOnly ? undefined : ((p) => { setReadOnly(false); setCurrentPhase(p); })} onboardingComplete={user?.onboarding_complete} />
+      <ProgressBar currentPhase={currentPhase} completedPhase={completedPhase} onJumpBack={(p) => { setReadOnly(!!user?.onboarding_complete); setCurrentPhase(p); }} onboardingComplete={user?.onboarding_complete} />
 
       {/* Phase Content */}
       <div className="mt-6">
