@@ -6,12 +6,15 @@ export default function RiderLayout() {
   return (
     <div className="min-h-screen bg-slate-950 flex items-stretch justify-center">
       {/* Left sidebar */}
-      <div className="hidden lg:flex flex-1 flex-col items-center justify-center px-8">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center mx-auto mb-3">
-            <span className="text-primary-foreground font-heading font-extrabold text-2xl">B</span>
+      <div className="hidden lg:flex flex-1 flex-col items-center justify-center px-8 bg-gradient-to-br from-slate-900 to-slate-950 border-r border-slate-800">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center mx-auto shadow-xl">
+            <span className="text-white font-heading font-black text-3xl">B</span>
           </div>
-          <p className="text-slate-400 text-xs font-medium mt-4">Ride Smart. Earn More.</p>
+          <div className="space-y-2">
+            <p className="text-slate-200 text-sm font-semibold">BodaSure</p>
+            <p className="text-slate-400 text-xs leading-relaxed">Ride Smart.<br />Earn More.</p>
+          </div>
         </div>
       </div>
 
@@ -25,12 +28,15 @@ export default function RiderLayout() {
       </div>
 
       {/* Right sidebar */}
-      <div className="hidden lg:flex flex-1 flex-col items-center justify-center px-8">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center mx-auto mb-3">
-            <span className="text-primary-foreground font-heading font-extrabold text-2xl">B</span>
+      <div className="hidden lg:flex flex-1 flex-col items-center justify-center px-8 bg-gradient-to-bl from-slate-900 to-slate-950 border-l border-slate-800">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center mx-auto shadow-xl">
+            <span className="text-white font-heading font-black text-3xl">B</span>
           </div>
-          <p className="text-slate-400 text-xs font-medium mt-4">Ride Smart. Earn More.</p>
+          <div className="space-y-2">
+            <p className="text-slate-200 text-sm font-semibold">BodaSure</p>
+            <p className="text-slate-400 text-xs leading-relaxed">Ride Smart.<br />Earn More.</p>
+          </div>
         </div>
       </div>
     </div>
