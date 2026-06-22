@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -7,62 +7,126 @@ import { formatKES, formatDate } from '@/lib/format';
 import { processWalletPayment, getWalletBalance } from '@/lib/payments';
 import { verifyPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
+import { getTaskStatuses, VERIFICATION_TASKS, isAllSubmitted } from '@/lib/verification';
+import { getOnboardingPhase } from '@/lib/onboarding';
+import { differenceInDays } from 'date-fns';
 import PinEntrySheet from '@/components/rider/PinEntrySheet';
-import { CheckCircle2, XCircle, Clock, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
+import ComplianceTierHero from '@/components/compliance/ComplianceTierHero';
+import RiderIdentitySummary from '@/components/compliance/RiderIdentitySummary';
+import PermitInsuranceCards from '@/components/compliance/PermitInsuranceCards';
+import ComplianceChecklist from '@/components/compliance/ComplianceChecklist';
+import OfficerModeOverlay from '@/components/compliance/OfficerModeOverlay';
+import {
+  CheckCircle2, XCircle, Clock, AlertTriangle, Loader2, Shield,
+} from 'lucide-react';
 
 export default function Compliance() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const [items, setItems] = useState([]);
-  const [penalties, setPenalties] = useState([]);
+
+  // Data state
+  const [vehicle, setVehicle] = useState(null);
+  const [permits, setPermits] = useState([]);
+  const [policies, setPolicies] = useState([]);
+  const [kycDocs, setKycDocs] = useState([]);
+  const [groupMember, setGroupMember] = useState(null);
+  const [group, setGroup] = useState(null);
   const [wallet, setWallet] = useState(null);
+  const [penalties, setPenalties] = useState([]);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Computed state
+  const [taskStatuses, setTaskStatuses] = useState([]);
+  const [complianceTier, setComplianceTier] = useState('Non-Compliant');
+  const [complianceScore, setComplianceScore] = useState(0);
+
+  // UI state
   const [payingPenalty, setPayingPenalty] = useState(null);
   const [paying, setPaying] = useState(false);
+  const [isOfficerMode, setIsOfficerMode] = useState(false);
 
+  // Load all data in parallel
   useEffect(() => {
     async function load() {
       if (!user) return;
       try {
-        const wallets = await base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' });
+        // Fetch main entities
+        const [vehicles, wallets, penaltiesData, kycDocsData, groupMembers] = await Promise.all([
+          base44.entities.Vehicle.filter({ rider_id: user.id }, '-created_date', 1),
+          base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' }),
+          base44.entities.Penalty.filter({ rider_id: user.id, status: 'pending' }, '-created_date', 20),
+          base44.entities.KycDocument.filter({ user_id: user.id }, '-created_date'),
+          base44.entities.GroupMember.filter({ user_id: user.id }),
+        ]);
+
+        const v = vehicles[0];
         const w = wallets[0];
+        setVehicle(v);
         setWallet(w);
+        setPenalties(penaltiesData);
+        setKycDocs(kycDocsData);
+        setGroupMember(groupMembers[0]);
+
+        // Fetch wallet balance
         if (w) {
           const bal = await getWalletBalance(w.id);
           setBalance(bal);
         }
 
-        const checks = [
-          { label: 'Profile Complete', done: user.profile_complete, link: '/app/profile' },
-          { label: 'Wallet Activated', done: w?.status === 'active', link: '/app/wallet/activate' },
-          { label: 'KYC Documents Uploaded', done: user.kyc_status === 'approved' || user.kyc_status === 'pending', pending: user.kyc_status === 'pending', link: '/app/kyc' },
-          { label: 'KYC Approved (Tier 2)', done: user.kyc_status === 'approved', link: '/app/kyc' },
-        ];
-
-        const bikes = await base44.entities.Vehicle.filter({ rider_id: user.id });
-        const approvedBike = bikes.find(b => b.status === 'approved');
-        checks.push(
-          { label: 'Bike Registered', done: bikes.length > 0, link: '/app/bikes/register' },
-          { label: 'Bike Approved', done: !!approvedBike, link: '/app/bikes' },
-        );
-        if (approvedBike) {
-          const permits = await base44.entities.Permit.filter({ vehicle_id: approvedBike.id, status: 'active' });
-          checks.push({ label: 'Active Permit', done: permits.length > 0, link: '/app/lipa-county' });
-          const policies = await base44.entities.Policy.filter({ vehicle_id: approvedBike.id, status: 'active' });
-          checks.push({ label: 'Active Insurance', done: policies.length > 0, link: '/app/insurance' });
+        // Fetch permits and policies if bike exists
+        let perms = [];
+        let pols = [];
+        if (v?.id) {
+          const results = await Promise.all([
+            base44.entities.Permit.filter({ vehicle_id: v.id, status: 'active' }, '-created_date', 1),
+            base44.entities.Policy.filter({ vehicle_id: v.id, status: 'active' }, '-created_date', 1),
+          ]);
+          perms = results[0];
+          pols = results[1];
+          setPermits(perms);
+          setPolicies(pols);
         }
-        setItems(checks);
 
-        // Load pending penalties
-        const pendingPenalties = await base44.entities.Penalty.filter({ rider_id: user.id, status: 'pending' }, '-created_date', 20);
-        setPenalties(pendingPenalties);
-      } catch (e) {}
+        // Fetch group name if member
+        if (groupMembers[0]?.group_id) {
+          const g = await base44.entities.Group.get(groupMembers[0].group_id);
+          setGroup(g);
+        }
+
+        // Compute task statuses and compliance score
+        const tasks = getTaskStatuses(kycDocsData, user, v);
+        setTaskStatuses(tasks);
+        computeCompliance(user, v, w, kycDocsData, groupMembers, perms);
+      } catch (e) {
+        console.error('Compliance load error:', e);
+      }
       setLoading(false);
     }
+
     load();
   }, [user]);
+
+  function computeCompliance(usr, vhc, wlt, docs, members, perms) {
+    const scores = {
+      bike_approved: vhc?.status === 'approved' ? 25 : 0,
+      active_permit: perms?.length > 0 ? 25 : 0,
+      kyc_approved: usr?.kyc_status === 'approved' ? 20 : 0,
+      id_verified: docs?.some(d => d.document_type === 'id_front' && d.status === 'approved') && docs?.some(d => d.document_type === 'id_back' && d.status === 'approved') ? 15 : 0,
+      insurance_active: policies?.length > 0 ? 10 : 0,
+      sacco_member: members?.length > 0 ? 5 : 0,
+    };
+
+    const score = Object.values(scores).reduce((a, b) => a + b, 0);
+    setComplianceScore(score);
+
+    if (score >= 85) setComplianceTier('Fully Verified');
+    else if (score >= 65) setComplianceTier('Road-Ready');
+    else if (score >= 40) setComplianceTier('Partial');
+    else setComplianceTier('Non-Compliant');
+  }
 
   async function handlePayPenalty(pin) {
     if (!wallet || !payingPenalty) return;
@@ -87,24 +151,34 @@ export default function Compliance() {
       });
 
       if (res) {
-        // Mark penalty as paid
         await base44.entities.Penalty.update(payingPenalty.id, {
           status: 'paid',
           transaction_id: res.transaction?.id || '',
           paid_at: new Date().toISOString(),
         });
 
-        await auditLog({ userId: user.id, action: 'penalty_paid', entityType: 'Penalty', entityId: payingPenalty.id, description: `Penalty paid: ${formatKES(cents)}` });
+        await auditLog({
+          userId: user.id,
+          action: 'penalty_paid',
+          entityType: 'Penalty',
+          entityId: payingPenalty.id,
+          description: `Penalty paid: ${formatKES(cents)}`,
+        });
 
-        // Update balance
         const newBal = await getWalletBalance(wallet.id);
         setBalance(newBal);
 
-        // Refresh penalties
-        const pendingPenalties = await base44.entities.Penalty.filter({ rider_id: user.id, status: 'pending' }, '-created_date', 20);
+        const pendingPenalties = await base44.entities.Penalty.filter(
+          { rider_id: user.id, status: 'pending' },
+          '-created_date',
+          20
+        );
         setPenalties(pendingPenalties);
 
-        toast({ title: 'Penalty paid successfully', description: formatKES(cents) + ' deducted from your wallet' });
+        toast({
+          title: 'Penalty paid successfully',
+          description: formatKES(cents) + ' deducted from your wallet',
+        });
       }
     } catch (e) {
       throw new Error(e.message || 'Payment failed. Try again.');
@@ -113,29 +187,72 @@ export default function Compliance() {
     }
   }
 
-  if (loading) return <PageSkeleton variant="hero-rows" />;
+  if (loading || !user) return <PageSkeleton variant="hero-rows" />;
 
-  const completed = items.filter(i => i.done).length;
-  const pct = items.length > 0 ? Math.round((completed / items.length) * 100) : 0;
+  const activePermit = permits[0];
+  const activePolicy = policies[0];
+  const permitDaysRemaining = activePermit ? differenceInDays(new Date(activePermit.end_date), new Date()) : null;
+  const insuranceDaysRemaining = activePolicy ? differenceInDays(new Date(activePolicy.end_date), new Date()) : null;
 
   return (
     <div className="p-5 animate-fade-in">
-      <h1 className="text-xl font-heading font-bold mb-5">Compliance</h1>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-heading font-bold">Compliance & Permits</h1>
+        <button
+          onClick={() => setIsOfficerMode(true)}
+          className={`p-2 rounded-lg transition-all ${
+            complianceScore === 100
+              ? 'bg-primary text-primary-foreground animate-pulse-glow'
+              : 'bg-muted text-muted-foreground'
+          }`}
+          title="Show Officer Mode"
+        >
+          <Shield className="w-5 h-5" />
+        </button>
+      </div>
 
-      {/* Penalty Alert */}
+      {/* Compliance Tier Hero */}
+      <ComplianceTierHero tier={complianceTier} score={complianceScore} />
+
+      {/* Rider Identity Summary */}
+      {vehicle && (
+        <RiderIdentitySummary
+          user={user}
+          vehicle={vehicle}
+          kycDocs={kycDocs}
+          group={group}
+        />
+      )}
+
+      {/* Permit & Insurance Status */}
+      <PermitInsuranceCards
+        permit={activePermit}
+        policy={activePolicy}
+        permitDaysRemaining={permitDaysRemaining}
+        insuranceDaysRemaining={insuranceDaysRemaining}
+      />
+
+      {/* Pending Penalties */}
       {penalties.length > 0 && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4 mb-5">
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle className="w-5 h-5 text-destructive" />
-            <h2 className="font-heading font-bold text-sm text-destructive">Pending Penalties ({penalties.length})</h2>
+            <h2 className="font-heading font-bold text-sm text-destructive">
+              Pending Penalties ({penalties.length})
+            </h2>
           </div>
           <div className="space-y-2">
-            {penalties.map(p => (
-              <div key={p.id} className="bg-card border border-border rounded-xl p-3 flex items-center justify-between">
+            {penalties.map((p) => (
+              <div
+                key={p.id}
+                className="bg-card border border-border rounded-xl p-3 flex items-center justify-between"
+              >
                 <div>
                   <p className="text-sm font-semibold">{formatKES(p.amount_cents)}</p>
                   <p className="text-xs text-muted-foreground">{p.reason}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Issued: {formatDate(p.issued_at)}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Issued: {formatDate(p.issued_at)}
+                  </p>
                 </div>
                 <button
                   onClick={() => setPayingPenalty(p)}
@@ -150,46 +267,35 @@ export default function Compliance() {
         </div>
       )}
 
-      {/* Compliance Score */}
-      <div className="bg-gradient-to-br from-primary to-orange-600 text-primary-foreground rounded-2xl p-5 mb-5">
-        <p className="text-xs text-orange-100 uppercase tracking-wide font-medium">Compliance Score</p>
-        <p className="text-3xl font-heading font-extrabold mt-1">{pct}%</p>
-        <div className="mt-3 h-2 bg-white/20 rounded-full overflow-hidden">
-          <div className="h-full bg-white rounded-full transition-all" style={{ width: `${pct}%` }} />
-        </div>
-        <p className="text-xs text-orange-100 mt-2">{completed} of {items.length} requirements met</p>
-      </div>
+      {/* Full Compliance Checklist */}
+      <ComplianceChecklist
+        user={user}
+        vehicle={vehicle}
+        taskStatuses={taskStatuses}
+        wallet={wallet}
+      />
 
-      <div className="space-y-2">
-        {items.map((item, i) => (
-          <Link
-            key={i}
-            to={item.link}
-            className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3 hover:bg-accent transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {item.done ? (
-                <CheckCircle2 className="w-5 h-5 text-success" />
-              ) : item.pending ? (
-                <Clock className="w-5 h-5 text-warning" />
-              ) : (
-                <XCircle className="w-5 h-5 text-muted-foreground" />
-              )}
-              <span className="text-sm font-medium">{item.label}</span>
-            </div>
-            {!item.done && !item.pending && (
-              <span className="text-xs text-primary font-semibold">Fix →</span>
-            )}
-          </Link>
-        ))}
-      </div>
+      {/* Officer Mode Overlay */}
+      <OfficerModeOverlay
+        open={isOfficerMode}
+        onClose={() => setIsOfficerMode(false)}
+        user={user}
+        vehicle={vehicle}
+        permit={activePermit}
+        group={group}
+        kycDocs={kycDocs}
+        tier={complianceTier}
+      />
 
+      {/* PIN Entry Sheet for Penalties */}
       <PinEntrySheet
         open={!!payingPenalty}
         onClose={() => setPayingPenalty(null)}
         onConfirm={handlePayPenalty}
         title="Pay Penalty"
-        message={`Enter your PIN to pay ${payingPenalty ? formatKES(payingPenalty.amount_cents) : ''} from your wallet.`}
+        message={`Enter your PIN to pay ${
+          payingPenalty ? formatKES(payingPenalty.amount_cents) : ''
+        } from your wallet.`}
       />
     </div>
   );

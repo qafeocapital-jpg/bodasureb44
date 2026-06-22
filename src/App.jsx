@@ -19,7 +19,7 @@ import Profile from './pages/rider/Profile';
 import Kyc from './pages/rider/Kyc';
 import WalletActivate from './pages/rider/WalletActivate';
 import BikeRegister from './pages/rider/BikeRegister';
-import BikeCertificate from './pages/rider/BikeCertificate';
+
 import Lipisha from './pages/rider/Lipisha';
 import LipaCounty from './pages/rider/LipaCounty';
 import LipaOwner from './pages/rider/LipaOwner';
@@ -100,7 +100,6 @@ const AuthenticatedApp = () => {
         <Route path="/app/kyc" element={<Kyc />} />
         <Route path="/app/wallet/activate" element={<WalletActivate />} />
         <Route path="/app/bikes/register" element={<BikeRegister />} />
-        <Route path="/app/bikes/:id/certificate" element={<BikeCertificate />} />
         <Route path="/app/lipisha" element={<Lipisha />} />
         <Route path="/app/lipa-county" element={<LipaCounty />} />
         <Route path="/app/lipa-owner" element={<LipaOwner />} />
