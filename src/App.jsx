@@ -28,6 +28,8 @@ import Chama from './pages/rider/Chama';
 import Stage from './pages/rider/Stage';
 import Insurance from './pages/rider/Insurance';
 import Services from './pages/rider/Services';
+import Disputes from './pages/rider/Disputes';
+import Support from './pages/rider/Support';
 import CountyDashboard from './pages/county/Dashboard';
 import SaccoDashboard from './pages/sacco/Dashboard';
 import MerchantDashboard from './pages/merchant/Dashboard';
@@ -105,6 +107,8 @@ const AuthenticatedApp = () => {
         <Route path="/app/stage" element={<Stage />} />
         <Route path="/app/insurance" element={<Insurance />} />
         <Route path="/app/services" element={<Services />} />
+        <Route path="/app/disputes" element={<Disputes />} />
+        <Route path="/app/support" element={<Support />} />
       </Route>
 
       {/* County Portal (emerald) */}

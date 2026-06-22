@@ -14,7 +14,7 @@ export default function Account() {
     { label: 'KYC Documents', icon: FileCheck, desc: 'Upload ID for verification', link: '/app/kyc' },
     { label: 'Alerts & Notifications', icon: Bell, desc: 'Manage your alert preferences', link: '/app/account' },
     { label: 'Security', icon: Lock, desc: 'PIN, password, and security', link: '/app/account' },
-    { label: 'Support', icon: Headphones, desc: 'Get help and contact us', link: '/app/account' },
+    { label: 'Support', icon: Headphones, desc: 'Get help and contact us', link: '/app/support' },
   ];
 
   return (

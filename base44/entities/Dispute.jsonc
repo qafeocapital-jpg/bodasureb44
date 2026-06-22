@@ -1,0 +1,61 @@
+{
+  "name": "Dispute",
+  "type": "object",
+  "properties": {
+    "rider_id": {
+      "type": "string"
+    },
+    "transaction_id": {
+      "type": "string"
+    },
+    "transaction_reference": {
+      "type": "string"
+    },
+    "amount_cents": {
+      "type": "integer"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "failed_transaction",
+        "wrong_amount",
+        "unauthorized",
+        "duplicate_charge",
+        "service_issue",
+        "other"
+      ],
+      "default": "other"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "under_review",
+        "resolved",
+        "rejected"
+      ],
+      "default": "open"
+    },
+    "resolution_notes": {
+      "type": "string"
+    },
+    "resolved_by_id": {
+      "type": "string"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "rider_id",
+    "category",
+    "reason"
+  ]
+}

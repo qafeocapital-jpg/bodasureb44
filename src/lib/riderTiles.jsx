@@ -55,7 +55,7 @@ export const riderTileSections = [
       { label: 'Due Dates', icon: CalendarClock, color: 'amber', path: '/app/compliance', status: 'live' },
       { label: 'My Region', icon: Globe, color: 'teal', path: '/app/account', status: 'live' },
       { label: 'Notices', icon: Bell, color: 'slate', path: null, status: 'soon' },
-      { label: 'Disputes', icon: Gavel, color: 'slate', path: null, status: 'soon' },
+      { label: 'Disputes', icon: Gavel, color: 'rose', path: '/app/disputes', status: 'live' },
       { label: 'Certificates', icon: Award, color: 'slate', path: null, status: 'soon' },
     ]
   },
@@ -106,8 +106,8 @@ export const riderTileSections = [
       { label: 'KYC', icon: FileCheck, color: 'blue', path: '/app/account', status: 'live' },
       { label: 'Alerts', icon: Bell, color: 'amber', path: '/app/account', status: 'live' },
       { label: 'Security', icon: Lock, color: 'rose', path: '/app/account', status: 'live' },
-      { label: 'Support', icon: Headphones, color: 'green', path: '/app/account', status: 'live' },
-      { label: 'Help Center', icon: CircleHelp, color: 'slate', path: null, status: 'soon' },
+      { label: 'Support', icon: Headphones, color: 'green', path: '/app/support', status: 'live' },
+      { label: 'Help Center', icon: CircleHelp, color: 'blue', path: '/app/support', status: 'live' },
     ]
   },
 ];

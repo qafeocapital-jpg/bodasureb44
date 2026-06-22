@@ -1,6 +1,8 @@
-import { X, ArrowDownLeft, ArrowUpRight, Receipt } from 'lucide-react';
+import { useState } from 'react';
+import { X, ArrowDownLeft, ArrowUpRight, Receipt, AlertCircle } from 'lucide-react';
 import { formatKES, formatDateTime } from '@/lib/format';
 import { formatPhoneDisplay } from '@/lib/phone';
+import FileDisputeSheet from './FileDisputeSheet';
 
 const typeLabels = {
   deposit: 'Deposit',
@@ -17,9 +19,11 @@ const typeLabels = {
 };
 
 export default function TransactionDetailSheet({ transaction, onClose }) {
+  const [showDispute, setShowDispute] = useState(false);
   if (!transaction) return null;
 
   const isCredit = ['deposit', 'lipisha', 'p2p_receive'].includes(transaction.type);
+  const canDispute = transaction.status === 'failed' || transaction.status === 'completed';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center">
@@ -85,11 +89,41 @@ export default function TransactionDetailSheet({ transaction, onClose }) {
           )}
         </div>
 
-        {/* Share button */}
-        <button className="w-full mt-5 flex items-center justify-center gap-2 border border-border rounded-xl py-3 text-sm font-semibold hover:bg-accent transition-colors">
-          <Receipt className="w-4 h-4" /> Share Receipt
-        </button>
+        {/* Action buttons */}
+        <div className="flex gap-2 mt-5">
+          <button className="flex-1 flex items-center justify-center gap-2 border border-border rounded-xl py-3 text-sm font-semibold hover:bg-accent transition-colors">
+            <Receipt className="w-4 h-4" /> Share Receipt
+          </button>
+          {canDispute && (
+            <button
+              onClick={() => setShowDispute(true)}
+              className="flex-1 flex items-center justify-center gap-2 border border-destructive/20 text-destructive rounded-xl py-3 text-sm font-semibold hover:bg-destructive/5 transition-colors"
+            >
+              <AlertCircle className="w-4 h-4" /> Report Problem
+            </button>
+          )}
+        </div>
       </div>
+
+      <FileDisputeSheet
+        open={showDispute}
+        onClose={() => setShowDispute(false)}
+        onSubmit={async (data) => {
+          const { base44 } = await import('@/api/base44Client');
+          const user = await base44.auth.me();
+          await base44.entities.Dispute.create({
+            rider_id: user.id,
+            transaction_id: transaction.id,
+            transaction_reference: transaction.reference,
+            amount_cents: transaction.amount_cents,
+            category: data.category,
+            reason: data.reason,
+            description: data.description,
+            status: 'open',
+          });
+        }}
+        transaction={transaction}
+      />
     </div>
   );
 }
