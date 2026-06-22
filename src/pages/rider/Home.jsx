@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
-import { ShieldCheck, AlertCircle } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Megaphone } from 'lucide-react';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -14,6 +14,7 @@ export default function Home() {
   const [walletActive, setWalletActive] = useState(false);
   const [bikes, setBikes] = useState([]);
   const [kycDocs, setKycDocs] = useState([]);
+  const [latestAnnouncement, setLatestAnnouncement] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,6 +36,17 @@ export default function Home() {
         const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
         setBikes(merged);
         setKycDocs(kyc);
+        // Fetch latest published announcement for riders
+        try {
+          const announcements = await base44.entities.Announcement.filter({ status: 'published' }, '-created_date', 10);
+          const riderCounty = user?.county_id;
+          const visible = announcements.filter(a => {
+            const audienceOk = a.audience === 'all' || a.audience === 'riders';
+            const countyOk = !a.county_id || a.county_id === riderCounty;
+            return audienceOk && countyOk;
+          });
+          if (visible.length > 0) setLatestAnnouncement(visible[0]);
+        } catch (e) {}
       } catch (e) {}
       setLoading(false);
     }
@@ -83,6 +95,19 @@ export default function Home() {
       <div className="px-4 pt-5">
         {user && <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} />}
       </div>
+
+      {/* Latest Announcement Banner */}
+      {latestAnnouncement && (
+        <div className="px-4 pt-4">
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-start gap-3">
+            <Megaphone className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-primary">{latestAnnouncement.title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{latestAnnouncement.body}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notifications Banner */}
       {!user?.profile_complete && (
