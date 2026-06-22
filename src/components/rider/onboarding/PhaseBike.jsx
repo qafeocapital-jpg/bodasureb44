@@ -13,7 +13,6 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
     plate_number: initialValues?.plate_number || '',
     make: initialValues?.make || '',
     color: initialValues?.color || '',
-    year: initialValues?.year || '',
     is_owner_rider: initialValues?.is_owner_rider ?? true,
     owner_phone: initialValues?.owner_phone || '',
   });
@@ -118,11 +117,11 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
         plate_number: form.plate_number.toUpperCase(),
         make: form.make,
         color: form.color,
-        year: form.year ? parseInt(form.year) : null,
         owner_id: ownerId,
         rider_id: user.id,
         county_id: user.county_id,
         is_owner_rider: isOwner,
+        owner_phone: isOwner ? (normalizePhone(user.phone) || user.phone || '') : normalizePhone(form.owner_phone),
       };
       let savedVehicle;
       if (vehicle?.id) {
@@ -199,27 +198,15 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
           className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
-      <div className="flex gap-3">
-        <div className="flex-1">
-          <label className="text-xs font-medium text-muted-foreground">Color</label>
-          <input
-            type="text"
-            value={form.color}
-            onChange={e => updateForm({ color: e.target.value })}
-            placeholder="Black"
-            className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-        <div className="w-24">
-          <label className="text-xs font-medium text-muted-foreground">Year <span className="text-muted-foreground/60">(Optional)</span></label>
-          <input
-            type="number"
-            value={form.year}
-            onChange={e => updateForm({ year: e.target.value })}
-            placeholder="2021"
-            className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Color</label>
+        <input
+          type="text"
+          value={form.color}
+          onChange={e => updateForm({ color: e.target.value })}
+          placeholder="Black"
+          className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        />
       </div>
 
       <div>

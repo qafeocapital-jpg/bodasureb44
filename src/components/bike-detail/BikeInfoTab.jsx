@@ -51,7 +51,6 @@ export default function BikeInfoTab({ vehicle, county, stage, isStaff, onApprove
           ['Make', vehicle.make],
           ['Model', vehicle.model],
           ['Color', vehicle.color],
-          ['Year', vehicle.year],
           ['County', county?.name],
           ['Stage', stage?.name],
         ].map(([label, value]) => (

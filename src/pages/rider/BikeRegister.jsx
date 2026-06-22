@@ -32,7 +32,6 @@ export default function BikeRegister() {
     plate_number: '',
     make: '',
     color: '',
-    year: '',
     county_id: '',
     sub_county_id: '',
     ward_id: '',
@@ -134,8 +133,8 @@ export default function BikeRegister() {
         plate_number: form.plate_number.toUpperCase(),
         make: form.make,
         color: form.color,
-        year: form.year ? parseInt(form.year) : null,
         owner_id: ownerId,
+        owner_phone: isOwner ? (normalizePhone(user.phone) || user.phone || '') : normalizePhone(form.owner_phone),
         rider_id: user.id,
         county_id: form.county_id,
         sub_county_id: form.sub_county_id || null,
@@ -224,27 +223,15 @@ export default function BikeRegister() {
               className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="text-xs font-medium text-muted-foreground">Color</label>
-              <input
-                type="text"
-                value={form.color}
-                onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
-                placeholder="Black"
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div className="w-28">
-              <label className="text-xs font-medium text-muted-foreground">Year</label>
-              <input
-                type="number"
-                value={form.year}
-                onChange={e => setForm(f => ({ ...f, year: e.target.value }))}
-                placeholder="2021"
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Color</label>
+            <input
+              type="text"
+              value={form.color}
+              onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+              placeholder="Black"
+              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
           </div>
           {!form.is_owner_rider && (
             <div>

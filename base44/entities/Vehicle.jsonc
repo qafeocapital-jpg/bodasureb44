@@ -14,9 +14,6 @@
     "color": {
       "type": "string"
     },
-    "year": {
-      "type": "integer"
-    },
     "owner_id": {
       "type": "string"
     },
