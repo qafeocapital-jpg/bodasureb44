@@ -1,24 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { formatDateTime } from '@/lib/format';
 import { History, CheckCircle2, UserPlus } from 'lucide-react';
 
 export default function AgentHistory() {
+  const { user } = useAuth();
   const [invites, setInvites] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
         const all = await base44.entities.Announcement.filter({ audience: 'all' }, '-created_date', 50);
-        const inviteRecords = all.filter(a => a.title && a.title.startsWith('Invite:'));
+        const inviteRecords = all.filter(a => a.title && a.title.startsWith('Invite:') && a.created_by_id === user.id);
         setInvites(inviteRecords);
       } catch (e) {}
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
   return (
     <div className="p-6 animate-fade-in">

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { auditLog } from '@/lib/audit';
 import { UserPlus, Loader2, CheckCircle2 } from 'lucide-react';
 import PhoneInput from '@/components/ui/PhoneInput';
 import { isValidKenyanPhone } from '@/lib/phone';
 
 export default function AgentInvite() {
+  const { user } = useAuth();
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [inviting, setInviting] = useState(false);
@@ -19,7 +22,9 @@ export default function AgentInvite() {
         body: `Field agent invited ${name} (${phone}) to join BodaSure.`,
         audience: 'all',
         status: 'published',
+        county_id: user?.county_id,
       });
+      await auditLog({ userId: user.id, action: 'rider_invited', entityType: 'Announcement', description: `Invited ${name || phone} (${phone})` });
       setResult({ success: true, phone, name });
       setPhone(''); setName('');
     } catch (e) {

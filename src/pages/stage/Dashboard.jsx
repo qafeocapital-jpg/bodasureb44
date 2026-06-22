@@ -11,12 +11,14 @@ export default function StageDashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const stageId = user?.stage_id;
+        const stageId = user?.scope_entity_id || user?.stage_id;
         const [vehicles, permits] = await Promise.all([
           stageId
             ? base44.entities.Vehicle.filter({ stage_id: stageId })
             : base44.entities.Vehicle.filter({}),
-          base44.entities.Permit.filter({ status: 'active' }),
+          stageId
+            ? base44.entities.Permit.filter({ status: 'active' })
+            : base44.entities.Permit.filter({ status: 'active' }),
         ]);
         const compliantVehicleIds = new Set(permits.map(p => p.vehicle_id));
         const compliant = vehicles.filter(v => compliantVehicleIds.has(v.id)).length;
