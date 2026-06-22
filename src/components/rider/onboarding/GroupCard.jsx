@@ -12,7 +12,7 @@ export default function GroupCard({ group, isExpanded, onToggle, onSelect, isJoi
   const badgeLabel = isIndependent ? 'Independent' : 'SACCO';
   const cardBorder = isIndependent ? 'border-orange-300 border-l-4' : 'border-border';
   const subLabel = isIndependent
-    ? 'Default — always available'
+    ? "I'm not a Member of Any Sacco / Welfare / Self Help Group"
     : (group.constituency_hint || 'Kisumu County');
 
   return (

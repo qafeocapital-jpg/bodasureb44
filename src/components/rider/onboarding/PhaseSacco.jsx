@@ -9,6 +9,7 @@ import {
   AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import GroupCard from '@/components/rider/onboarding/GroupCard';
+import MembershipValueSheet from '@/components/rider/onboarding/MembershipValueSheet';
 
 export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehicleProp, onJoined, onBack }) {
   const [groups, setGroups] = useState([]);
@@ -25,6 +26,7 @@ export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehi
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState('');
   const [completing, setCompleting] = useState(false);
+  const [pendingGroup, setPendingGroup] = useState(null);
 
   const countyName = counties?.find(c => c.id === user?.county_id)?.name || 'your county';
   const onboardingComplete = user?.onboarding_complete === true;
@@ -206,7 +208,7 @@ export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehi
         group={group}
         isExpanded={isExpanded}
         onToggle={() => handleCardToggle(group.id)}
-        onSelect={() => setConfirmGroup(group)}
+        onSelect={() => setPendingGroup(group)}
         isJoined={isJoined}
         isMuted={isMuted}
         isJoining={isJoining}
@@ -330,6 +332,13 @@ export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehi
           <ChevronLeft className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Membership Value informational sheet — fires before confirmation */}
+      <MembershipValueSheet
+        group={pendingGroup}
+        onContinue={() => { setConfirmGroup(pendingGroup); setPendingGroup(null); }}
+        onClose={() => setPendingGroup(null)}
+      />
 
       {/* Confirm dialog */}
       <AlertDialog open={!!confirmGroup} onOpenChange={(open) => !open && setConfirmGroup(null)}>

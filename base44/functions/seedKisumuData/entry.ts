@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
           kyc_status: 'unverified',
           source: 'admin_seeded',
           constituency_hint: sacco.constituency_hint,
-          member_count: Math.floor(Math.random() * 80) + 20,
+          member_count: 0,
           description: `Bodaboda SACCO serving riders in ${sacco.constituency_hint} constituency, Kisumu County`,
         });
       }
@@ -246,6 +246,14 @@ Deno.serve(async (req) => {
     }
     results.saccos = results.seeded_saccos;
     results.sacco_names = saccoData.map(s => s.name);
+
+    // 4a. Idempotent reset: ensure all seeded SACCOs have member_count: 0
+    const seededGroups = await sr.entities.Group.filter({ county_id: county.id, source: 'admin_seeded' });
+    const toReset = seededGroups.filter(g => (g.member_count || 0) > 0).map(g => ({ id: g.id, member_count: 0 }));
+    if (toReset.length > 0) {
+      await sr.entities.Group.bulkUpdate(toReset);
+    }
+    results.member_count_reset = toReset.length;
 
     // 4b. Independent Operator — system group, always available
     if (existingNames.has('Independent Operator')) {
@@ -265,17 +273,20 @@ Deno.serve(async (req) => {
       results.seeded_independent++;
     }
 
-    // 5. Sample Insurance Merchant
+    // 5. Insurance Merchant — NOT a SACCO; status inactive so it never appears in the SACCO picker
     let merchant = existingGroups.find(g => g.name === 'APA Insurance Kisumu');
     if (merchant) {
       results.skipped.push('merchant (already exists)');
+      if (merchant.status === 'active') {
+        await sr.entities.Group.update(merchant.id, { status: 'inactive' });
+      }
     } else {
       merchant = await sr.entities.Group.create({
         name: 'APA Insurance Kisumu',
         type: 'other',
         county_id: county.id,
         sasapay_account_number: 'APAINS001',
-        status: 'active',
+        status: 'inactive',
         description: 'Insurance provider for bodaboda riders in Kisumu',
       });
     }
