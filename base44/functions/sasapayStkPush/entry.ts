@@ -54,38 +54,48 @@ Deno.serve(async (req) => {
 
     // ── LIVE SASAPAY STK PUSH ──────────────────────────────────
     // 1. Get access token
-    const tokenRes = await fetch(`${SASAPAY_BASE[env]}/auth/token/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' }),
-    });
-    const tokenData = await tokenRes.json();
-    const accessToken = tokenData.access_token;
+    let tokenData, accessToken;
+    try {
+      const tokenRes = await fetch(`${SASAPAY_BASE[env]}/auth/token/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' }),
+      });
+      tokenData = await tokenRes.json();
+      accessToken = tokenData.access_token;
+    } catch (e) {
+      return Response.json({ error: 'SasaPay API unreachable: ' + e.message }, { status: 502 });
+    }
 
     if (!accessToken) {
-      return Response.json({ error: 'Failed to get SasaPay access token' }, { status: 502 });
+      return Response.json({ error: 'Failed to get SasaPay access token', details: tokenData }, { status: 502 });
     }
 
     // 2. Initiate STK Push
-    const stkRes = await fetch(`${SASAPAY_BASE[env]}/payments/stk-push/`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        merchant_code: Deno.env.get('SASAPAY_MERCHANT_CODE'),
-        network_code: '63902', // Safaricom
-        phone_number: phone,
-        amount: Math.ceil(amountCents / 100), // Convert cents to shillings
-        account_reference: accountRef || 'BodaSure',
-        transaction_desc: description || 'BodaSure payment',
-      }),
-    });
-    const stkData = await stkRes.json();
+    let stkData;
+    try {
+      const stkRes = await fetch(`${SASAPAY_BASE[env]}/payments/stk-push/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          merchant_code: Deno.env.get('SASAPAY_MERCHANT_CODE'),
+          network_code: '63902', // Safaricom
+          phone_number: phone,
+          amount: Math.ceil(amountCents / 100), // Convert cents to shillings
+          account_reference: accountRef || 'BodaSure',
+          transaction_desc: description || 'BodaSure payment',
+        }),
+      });
+      stkData = await stkRes.json();
+    } catch (e) {
+      return Response.json({ error: 'SasaPay STK push request failed: ' + e.message }, { status: 502 });
+    }
 
     if (!stkData.success) {
-      return Response.json({ error: stkData.message || 'STK push failed' }, { status: 502 });
+      return Response.json({ error: stkData.message || 'STK push failed', details: stkData }, { status: 502 });
     }
 
     return Response.json({

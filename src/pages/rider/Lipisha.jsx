@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
-import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
+import { getOrCreateWallet } from '@/lib/mockPayments';
+import { initiateStkPush } from '@/lib/payments';
 import { ChevronLeft, HandCoins, Loader2, CheckCircle2, XCircle, Receipt } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import PhoneInput from '@/components/ui/PhoneInput';
@@ -46,16 +47,19 @@ export default function Lipisha() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await mockPayment({
+      const res = await initiateStkPush({
         walletId: wallet.id,
-        type: 'lipisha',
+        phone,
         amountCents: cents,
-        counterpartyPhone: phone,
         description: `Fare collection from ${phone}`,
-        productType: 'lipisha',
+        transactionType: 'lipisha',
       });
-      setBalance(prev => prev + cents);
-      setResult({ success: true, amount: cents, phone, reference: res.reference });
+      if (res.mode === 'live' && res.status === 'pending') {
+        setResult({ success: true, pending: true, amount: cents, phone, reference: res.reference, message: res.message });
+      } else {
+        setBalance(prev => prev + cents);
+        setResult({ success: true, amount: cents, phone, reference: res.reference });
+      }
       setPhone('');
       setAmount('');
       const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipisha' }, '-created_date', 10);
@@ -82,7 +86,18 @@ export default function Lipisha() {
         <p className="text-sm text-muted-foreground">Send an M-Pesa STK push to your customer's phone. They enter their PIN and the fare lands in your wallet.</p>
       </div>
 
-      {result?.success && (
+      {result?.success && result.pending && (
+        <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 mb-5 flex items-center gap-3">
+          <Loader2 className="w-6 h-6 text-warning flex-shrink-0 animate-spin" />
+          <div>
+            <p className="text-sm font-bold text-warning">STK Push Sent!</p>
+            <p className="text-xs text-muted-foreground">{formatKES(result.amount)} from {formatPhoneDisplay(result.phone)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Ref: {result.reference} · {result.message}</p>
+          </div>
+        </div>
+      )}
+
+      {result?.success && !result.pending && (
         <div className="bg-success/10 border border-success/20 rounded-xl p-4 mb-5 flex items-center gap-3">
           <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
           <div>
