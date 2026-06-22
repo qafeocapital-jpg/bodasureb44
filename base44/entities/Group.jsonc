@@ -12,6 +12,7 @@
         "chama",
         "welfare",
         "self_help",
+        "independent",
         "other"
       ],
       "default": "sacco"
@@ -61,6 +62,32 @@
     },
     "official_email": {
       "type": "string"
+    },
+    "constituency_hint": {
+      "type": "string"
+    },
+    "kyc_status": {
+      "type": "string",
+      "enum": [
+        "unverified",
+        "pending",
+        "verified",
+        "rejected"
+      ],
+      "default": "unverified"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "admin_seeded",
+        "self_registered",
+        "official_submission",
+        "other"
+      ]
+    },
+    "is_system_group": {
+      "type": "boolean",
+      "default": false
     }
   },
   "required": [

@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
     }
 
     const sr = base44.asServiceRole;
-    const results = { county: null, subCounties: 0, constituencies: 0, wards: 0, stages: 0, saccos: 0, merchant: 0, feeSchedules: 0, feeRules: 0, users: 0, skipped: [] };
+    const results = { county: null, subCounties: 0, constituencies: 0, wards: 0, stages: 0, saccos: 0, deleted_old: 0, seeded_saccos: 0, seeded_independent: 0, sacco_names: [], merchant: 0, feeSchedules: 0, feeRules: 0, users: 0, skipped: [] };
 
     // 1. Kisumu County
     let counties = await sr.entities.County.filter({ code: '42' });
@@ -164,74 +164,113 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. Sample SACCOs
-    const saccoData = [
-      {
-        name: 'Kisumu Bodaboda SACCO',
-        account: 'KBDSAC001',
-        bank_name: 'Kenya Commercial Bank',
-        bank_account_name: 'Kisumu Bodaboda SACCO',
-        bank_account_number: '1142298871',
-        bank_branch: 'Kisumu Main',
-        mpesa_till_number: '842201',
-        official_name: 'John Owuor',
-        official_phone: '254722100100',
-        official_email: 'info@kisumubodaboda.co.ke',
-      },
-      {
-        name: 'Lake Victoria Riders SACCO',
-        account: 'LVRSAC001',
-        bank_name: 'Equity Bank',
-        bank_account_name: 'Lake Victoria Riders SACCO',
-        bank_account_number: '0410293847123',
-        bank_branch: 'Kisumu City',
-        mpesa_till_number: '842202',
-        official_name: 'Mary Anyango',
-        official_phone: '254722200200',
-        official_email: 'info@lakevictoriariders.co.ke',
-      },
-      {
-        name: 'Kisumu Central SACCO',
-        account: 'KCSAC001',
-        bank_name: 'Cooperative Bank',
-        bank_account_name: 'Kisumu Central SACCO',
-        bank_account_number: '0110923847123',
-        bank_branch: 'Kisumu',
-        mpesa_till_number: '842203',
-        official_name: 'Patrick Otieno',
-        official_phone: '254722300300',
-        official_email: 'info@kisumucentralsacco.co.ke',
-      },
-    ];
+    // 4. Delete old placeholder SACCOs and seed 35 real ward-named SACCOs
+    // Fetch all existing groups for county once to minimize API calls
+    const existingGroups = await sr.entities.Group.filter({ county_id: county.id });
+    const existingNames = new Set(existingGroups.map(g => g.name));
 
-    for (const sacco of saccoData) {
-      let existing = await sr.entities.Group.filter({ name: sacco.name, county_id: county.id });
-      if (existing.length > 0) continue;
-      await sr.entities.Group.create({
-        name: sacco.name,
-        type: 'sacco',
-        county_id: county.id,
-        sasapay_account_number: sacco.account,
-        status: 'active',
-        member_count: Math.floor(Math.random() * 80) + 20,
-        description: `Bodaboda SACCO serving riders in Kisumu County`,
-        bank_name: sacco.bank_name,
-        bank_account_name: sacco.bank_account_name,
-        bank_account_number: sacco.bank_account_number,
-        bank_branch: sacco.bank_branch,
-        mpesa_till_number: sacco.mpesa_till_number,
-        official_name: sacco.official_name,
-        official_phone: sacco.official_phone,
-        official_email: sacco.official_email,
-      });
-      results.saccos++;
+    // Delete old placeholder SACCOs (from pre-overhaul seed data)
+    const oldPlaceholderNames = [
+      'Kisumu Bodaboda SACCO',
+      'Lake Victoria Riders SACCO',
+      'Kisumu Central SACCO',
+    ];
+    for (const oldName of oldPlaceholderNames) {
+      const toDelete = existingGroups.filter(g => g.name === oldName);
+      for (const og of toDelete) {
+        await sr.entities.Group.delete(og.id);
+        results.deleted_old++;
+      }
     }
 
+    const saccoData = [
+      { name: 'Kajulu Boda Boda Sacco', constituency_hint: 'Kisumu East' },
+      { name: 'Kolwa East Boda Boda Sacco', constituency_hint: 'Kisumu East' },
+      { name: 'Manyatta B Boda Boda Sacco', constituency_hint: 'Kisumu East' },
+      { name: 'Nyalenda A Boda Boda Sacco', constituency_hint: 'Kisumu East' },
+      { name: 'Kolwa Central Boda Boda Sacco', constituency_hint: 'Kisumu East' },
+      { name: 'Railways Boda Boda Sacco', constituency_hint: 'Kisumu Central' },
+      { name: 'Migosi Boda Boda Sacco', constituency_hint: 'Kisumu Central' },
+      { name: 'Shaurimoyo Kaloleni Boda Boda Sacco', constituency_hint: 'Kisumu Central' },
+      { name: 'Market Milimani Boda Boda Sacco', constituency_hint: 'Kisumu Central' },
+      { name: 'Kondele Boda Boda Sacco', constituency_hint: 'Kisumu Central' },
+      { name: 'Nyalenda B Boda Boda Sacco', constituency_hint: 'Kisumu Central' },
+      { name: 'South West Kisumu Boda Boda Sacco', constituency_hint: 'Kisumu West' },
+      { name: 'Central Kisumu Boda Boda Sacco', constituency_hint: 'Kisumu West' },
+      { name: 'Kisumu North Boda Boda Sacco', constituency_hint: 'Kisumu West' },
+      { name: 'West Kisumu Boda Boda Sacco', constituency_hint: 'Kisumu West' },
+      { name: 'North West Kisumu Boda Boda Sacco', constituency_hint: 'Kisumu West' },
+      { name: 'West Seme Boda Boda Sacco', constituency_hint: 'Seme' },
+      { name: 'Central Seme Boda Boda Sacco', constituency_hint: 'Seme' },
+      { name: 'East Seme Boda Boda Sacco', constituency_hint: 'Seme' },
+      { name: 'North Seme Boda Boda Sacco', constituency_hint: 'Seme' },
+      { name: 'East Kano Boda Boda Sacco', constituency_hint: 'Nyando' },
+      { name: 'Awasi/Onjiko Boda Boda Sacco', constituency_hint: 'Nyando' },
+      { name: 'Ahero Boda Boda Sacco', constituency_hint: 'Nyando' },
+      { name: 'Kabonyo/Kanyagwal Boda Boda Sacco', constituency_hint: 'Nyando' },
+      { name: 'Kobura Boda Boda Sacco', constituency_hint: 'Nyando' },
+      { name: 'Miwani Boda Boda Sacco', constituency_hint: 'Muhoroni' },
+      { name: 'Ombeyi Boda Boda Sacco', constituency_hint: 'Muhoroni' },
+      { name: "Masogo/Nyang'oma Boda Boda Sacco", constituency_hint: 'Muhoroni' },
+      { name: 'Chemelil/Tamu Boda Boda Sacco', constituency_hint: 'Muhoroni' },
+      { name: 'Muhoroni/Koru Boda Boda Sacco', constituency_hint: 'Muhoroni' },
+      { name: 'South East Nyakach Boda Boda Sacco', constituency_hint: 'Nyakach' },
+      { name: 'West Nyakach Boda Boda Sacco', constituency_hint: 'Nyakach' },
+      { name: 'North Nyakach Boda Boda Sacco', constituency_hint: 'Nyakach' },
+      { name: 'Central Nyakach Boda Boda Sacco', constituency_hint: 'Nyakach' },
+      { name: 'South West Nyakach Boda Boda Sacco', constituency_hint: 'Nyakach' },
+    ];
+
+    // Build create list — skip any that already exist (idempotent)
+    const saccosToCreate = [];
+    for (const sacco of saccoData) {
+      if (existingNames.has(sacco.name)) {
+        results.skipped.push(`sacco: ${sacco.name} (already exists)`);
+      } else {
+        saccosToCreate.push({
+          name: sacco.name,
+          type: 'sacco',
+          county_id: county.id,
+          status: 'active',
+          kyc_status: 'unverified',
+          source: 'admin_seeded',
+          constituency_hint: sacco.constituency_hint,
+          member_count: Math.floor(Math.random() * 80) + 20,
+          description: `Bodaboda SACCO serving riders in ${sacco.constituency_hint} constituency, Kisumu County`,
+        });
+      }
+    }
+    if (saccosToCreate.length > 0) {
+      await sr.entities.Group.bulkCreate(saccosToCreate);
+      results.seeded_saccos = saccosToCreate.length;
+    }
+    results.saccos = results.seeded_saccos;
+    results.sacco_names = saccoData.map(s => s.name);
+
+    // 4b. Independent Operator — system group, always available
+    if (existingNames.has('Independent Operator')) {
+      results.skipped.push('Independent Operator (already exists)');
+    } else {
+      await sr.entities.Group.create({
+        name: 'Independent Operator',
+        type: 'independent',
+        county_id: county.id,
+        status: 'active',
+        kyc_status: 'verified',
+        source: 'admin_seeded',
+        is_system_group: true,
+        member_count: 0,
+        description: 'Default group for independent operators not affiliated with any SACCO',
+      });
+      results.seeded_independent++;
+    }
+
+    // Also reuse existingGroups for insurance merchant lookup (avoids extra API call)
+    const existingGroupsAll = existingGroups;
+
     // 5. Sample Insurance Merchant
-    let merchantGroups = await sr.entities.Group.filter({ name: 'APA Insurance Kisumu', county_id: county.id });
-    let merchant;
-    if (merchantGroups.length > 0) {
-      merchant = merchantGroups[0];
+    let merchant = existingGroupsAll.find(g => g.name === 'APA Insurance Kisumu');
+    if (merchant) {
       results.skipped.push('merchant (already exists)');
     } else {
       merchant = await sr.entities.Group.create({

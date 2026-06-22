@@ -69,7 +69,7 @@ export default function SeedData() {
     { icon: MapPin, label: '7 Sub-Counties', desc: 'Kisumu Central, East, West, Nyando, Muhoroni, Nyakach, Seme' },
     { icon: MapPin, label: 'Constituencies & Wards', desc: 'Full geographic hierarchy per sub-county' },
     { icon: MapPin, label: '10 Bodaboda Stages', desc: 'Kondele, Kisumu Town, Mamboleo, Migosi, etc.' },
-    { icon: Building2, label: '3 Sample SACCOs', desc: 'With Kenyan bank details and official contacts' },
+    { icon: Building2, label: '35 Real SACCOs', desc: 'Ward-named SACCOs across 7 constituencies + Independent Operator' },
     { icon: Shield, label: 'Insurance Merchant', desc: 'APA Insurance Kisumu with 2 products' },
     { icon: Database, label: 'Fee Schedules', desc: 'Weekly KES 150, Monthly 500, Quarterly 1,200, Yearly 4,000' },
     { icon: Database, label: 'Fee Rule (60/20/20)', desc: 'County / SACCO / Platform split' },
@@ -125,12 +125,24 @@ export default function SeedData() {
             {result.results?.constituencies > 0 && <div><p className="text-xs text-muted-foreground">Constituencies</p><p className="font-semibold">{result.results.constituencies}</p></div>}
             {result.results?.wards > 0 && <div><p className="text-xs text-muted-foreground">Wards</p><p className="font-semibold">{result.results.wards}</p></div>}
             {result.results?.stages > 0 && <div><p className="text-xs text-muted-foreground">Stages</p><p className="font-semibold">{result.results.stages}</p></div>}
-            {result.results?.saccos > 0 && <div><p className="text-xs text-muted-foreground">SACCOs</p><p className="font-semibold">{result.results.saccos}</p></div>}
+            {result.results?.seeded_saccos !== undefined && <div><p className="text-xs text-muted-foreground">SACCOs Seeded</p><p className="font-semibold">{result.results.seeded_saccos}</p></div>}
+            {result.results?.seeded_independent !== undefined && <div><p className="text-xs text-muted-foreground">Independent Op.</p><p className="font-semibold">{result.results.seeded_independent}</p></div>}
+            {result.results?.deleted_old > 0 && <div><p className="text-xs text-muted-foreground">Old Deleted</p><span className="inline-flex items-center text-xs font-semibold text-destructive bg-destructive/10 rounded-full px-2 py-0.5">{result.results.deleted_old}</span></div>}
             {result.results?.merchant > 0 && <div><p className="text-xs text-muted-foreground">Products</p><p className="font-semibold">{result.results.merchant}</p></div>}
             {result.results?.feeSchedules > 0 && <div><p className="text-xs text-muted-foreground">Fee Schedules</p><p className="font-semibold">{result.results.feeSchedules}</p></div>}
             {result.results?.feeRules > 0 && <div><p className="text-xs text-muted-foreground">Fee Rules</p><p className="font-semibold">{result.results.feeRules}</p></div>}
             {result.results?.users > 0 && <div><p className="text-xs text-muted-foreground">Demo Users</p><p className="font-semibold">{result.results.users}</p></div>}
           </div>
+          {result.results?.sacco_names?.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-success/20">
+              <p className="text-xs text-muted-foreground mb-1">Seeded SACCOs ({result.results.sacco_names.length}):</p>
+              <div className="max-h-[200px] overflow-y-auto bg-muted/50 rounded-lg p-2 space-y-0.5">
+                {result.results.sacco_names.map((name, i) => (
+                  <p key={i} className="text-xs font-mono text-foreground/80">{name}</p>
+                ))}
+              </div>
+            </div>
+          )}
           {result.results?.skipped?.length > 0 && (
             <div className="mt-3 pt-3 border-t border-success/20">
               <p className="text-xs text-muted-foreground mb-1">Already existed (skipped):</p>
