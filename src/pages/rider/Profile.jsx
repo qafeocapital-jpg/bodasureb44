@@ -67,10 +67,10 @@ export default function Profile() {
     const draft = draftData[phase] || {};
     if (phase === 0) {
       return {
-        full_name: user?.full_name || draft.full_name || '',
-        phone: normalizePhone(user?.phone) || user?.phone || draft.phone || '',
-        national_id: user?.national_id || draft.national_id || '',
-        county_id: user?.county_id || draft.county_id || '',
+        full_name: draft.full_name || user?.full_name || '',
+        phone: draft.phone || normalizePhone(user?.phone) || user?.phone || '',
+        national_id: draft.national_id || user?.national_id || '',
+        county_id: draft.county_id || user?.county_id || '',
       };
     }
     if (phase === 1) {
