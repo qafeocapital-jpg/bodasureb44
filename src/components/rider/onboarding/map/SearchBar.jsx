@@ -9,7 +9,7 @@ import { MapPin, Search, Loader2, X, Plus } from 'lucide-react';
  */
 export default function SearchBar({
   mapboxToken, countyName, stages, memberCounts, selectedStageId,
-  onSelectStage, onSelectPlace,
+  onSelectStage, onSelectPlace, onCreateEscape,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [placeResults, setPlaceResults] = useState([]);
@@ -31,7 +31,7 @@ export default function SearchBar({
       const center = getCountyCenter(countyNameRef.current);
       const proximity = `${center[0]},${center[1]}`;
       try {
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery.trim())}.json?access_token=${mapboxToken}&country=ke&proximity=${proximity}&limit=5`;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery.trim())}.json?access_token=${mapboxToken}&country=ke&proximity=${proximity}&types=poi,address,neighborhood,locality,place&limit=5`;
         const res = await fetch(url);
         const data = await res.json();
         const features = (data.features || []).map(f => ({
@@ -106,7 +106,13 @@ export default function SearchBar({
             </button>
           ))}
           {!searching && filteredStages.length === 0 && placeResults.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">No results. Try a different search or tap the map to pin a location.</p>
+            <button
+              onClick={() => onCreateEscape?.(searchQuery.trim())}
+              className="w-full text-left p-3 flex items-center gap-2.5 hover:bg-accent transition-colors"
+            >
+              <Plus className="w-4 h-4 text-primary flex-shrink-0" />
+              <p className="text-sm font-semibold text-primary">Create stage: "{searchQuery.trim()}"</p>
+            </button>
           )}
         </div>
       )}

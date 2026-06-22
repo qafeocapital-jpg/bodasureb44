@@ -4,16 +4,22 @@ import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
 import { ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
 
-export default function PhasePersonal({ user, counties, onSaved, onBack }) {
+export default function PhasePersonal({ user, counties, initialValues, onDraftChange, onSaved, onBack }) {
   const [form, setForm] = useState({
-    full_name: user?.full_name || '',
-    phone: normalizePhone(user?.phone) || user?.phone || '',
-    national_id: user?.national_id || '',
-    county_id: user?.county_id || '',
+    full_name: initialValues?.full_name || '',
+    phone: initialValues?.phone || '',
+    national_id: initialValues?.national_id || '',
+    county_id: initialValues?.county_id || '',
   });
   const [saving, setSaving] = useState(false);
   const [phoneError, setPhoneError] = useState('');
   const [idError, setIdError] = useState('');
+
+  const updateForm = (partial) => {
+    const next = { ...form, ...partial };
+    setForm(next);
+    onDraftChange?.(next);
+  };
 
   const isNationalIdValid = (id) => /^\d{7,8}$/.test((id || '').trim());
 
@@ -76,14 +82,14 @@ export default function PhasePersonal({ user, counties, onSaved, onBack }) {
         <input
           type="text"
           value={form.full_name}
-          onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
+          onChange={e => updateForm({ full_name: e.target.value })}
           placeholder="John Mwangi"
           className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
       <PhoneInput
         value={form.phone}
-        onChange={(e164) => setForm(f => ({ ...f, phone: e164 }))}
+        onChange={(e164) => updateForm({ phone: e164 })}
         onBlur={checkPhoneUniqueness}
         error={phoneError}
       />
@@ -93,7 +99,7 @@ export default function PhasePersonal({ user, counties, onSaved, onBack }) {
           type="text"
           inputMode="numeric"
           value={form.national_id}
-          onChange={e => setForm(f => ({ ...f, national_id: e.target.value.replace(/[^\d]/g, '') }))}
+          onChange={e => updateForm({ national_id: e.target.value.replace(/[^\d]/g, '') })}
           onBlur={checkIdUniqueness}
           placeholder="00000000"
           maxLength={8}
@@ -105,7 +111,7 @@ export default function PhasePersonal({ user, counties, onSaved, onBack }) {
         <label className="text-xs font-medium text-muted-foreground">County You Operate From</label>
         <select
           value={form.county_id}
-          onChange={e => setForm(f => ({ ...f, county_id: e.target.value }))}
+          onChange={e => updateForm({ county_id: e.target.value })}
           className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option value="">Select county</option>

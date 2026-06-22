@@ -4,17 +4,23 @@ import { ChevronRight, ChevronLeft, Loader2, MapPin } from 'lucide-react';
 import StageSearchPicker from '@/components/rider/onboarding/StageSearchPicker';
 import MapCountyConfirmation from '@/components/rider/onboarding/MapCountyConfirmation';
 
-export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
+export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChange, onSaved, onBack }) {
   const [county, setCounty] = useState(null);
   const [subCounties, setSubCounties] = useState([]);
   const [wards, setWards] = useState([]);
   const [stages, setStages] = useState([]);
   const [form, setForm] = useState({
-    sub_county_id: vehicle?.sub_county_id || '',
-    ward_id: vehicle?.ward_id || '',
-    stage_id: vehicle?.stage_id || '',
+    sub_county_id: initialValues?.sub_county_id || '',
+    ward_id: initialValues?.ward_id || '',
+    stage_id: initialValues?.stage_id || '',
   });
   const [saving, setSaving] = useState(false);
+
+  const updateForm = (partial) => {
+    const next = { ...form, ...partial };
+    setForm(next);
+    onDraftChange?.(next);
+  };
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   useEffect(() => {
@@ -41,7 +47,7 @@ export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
   }, [user, vehicle]);
 
   async function handleSubCountyChange(subCountyId) {
-    setForm(f => ({ ...f, sub_county_id: subCountyId, ward_id: '', stage_id: '' }));
+    updateForm({ sub_county_id: subCountyId, ward_id: '', stage_id: '' });
     setWards([]); setStages([]);
     if (subCountyId) {
       const ws = await base44.entities.Ward.filter({ sub_county_id: subCountyId });
@@ -50,7 +56,7 @@ export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
   }
 
   async function handleWardChange(wardId) {
-    setForm(f => ({ ...f, ward_id: wardId, stage_id: '' }));
+    updateForm({ ward_id: wardId, stage_id: '' });
     setStages([]);
     if (wardId) {
       const sts = await base44.entities.Stage.filter({ ward_id: wardId });
@@ -143,9 +149,10 @@ export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
           wardId={form.ward_id}
           countyId={user?.county_id}
           countyName={county?.name}
+          wardName={wards.find(w => w.id === form.ward_id)?.name}
           stages={stages}
           selectedStageId={form.stage_id}
-          onSelect={(id) => setForm(f => ({ ...f, stage_id: id }))}
+          onSelect={(id) => updateForm({ stage_id: id })}
           onStagesChange={setStages}
         />
       </div>

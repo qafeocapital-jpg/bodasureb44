@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { ChevronLeft } from 'lucide-react';
 import { getOnboardingPhase } from '@/lib/onboarding';
+import { normalizePhone } from '@/lib/phone';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import ProgressBar from '@/components/rider/onboarding/ProgressBar';
 import PhasePersonal from '@/components/rider/onboarding/PhasePersonal';
@@ -22,6 +23,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [currentPhase, setCurrentPhase] = useState(0);
+  const [draftData, setDraftData] = useState({});
 
   useEffect(() => {
     async function load() {
@@ -61,6 +63,43 @@ export default function Profile() {
     setCurrentPhase(p => Math.min(p + 1, 5));
   }
 
+  const phaseInitialValues = (phase) => {
+    const draft = draftData[phase] || {};
+    if (phase === 0) {
+      return {
+        full_name: user?.full_name || draft.full_name || '',
+        phone: normalizePhone(user?.phone) || user?.phone || draft.phone || '',
+        national_id: user?.national_id || draft.national_id || '',
+        county_id: user?.county_id || draft.county_id || '',
+      };
+    }
+    if (phase === 1) {
+      const v = vehicles[0];
+      return {
+        plate_number: v?.plate_number || draft.plate_number || '',
+        make: v?.make || draft.make || '',
+        color: v?.color || draft.color || '',
+        year: v?.year?.toString() || draft.year || '',
+        role: draft.role || 'rider',
+        is_owner_rider: draft.is_owner_rider ?? (v?.is_owner_rider ?? true),
+        owner_phone: draft.owner_phone || '',
+      };
+    }
+    if (phase === 2) {
+      const v = vehicles[0];
+      return {
+        sub_county_id: v?.sub_county_id || draft.sub_county_id || '',
+        ward_id: v?.ward_id || draft.ward_id || '',
+        stage_id: v?.stage_id || draft.stage_id || '',
+      };
+    }
+    return draft;
+  };
+
+  const handleDraftChange = (phase, partial) => {
+    setDraftData(prev => ({ ...prev, [phase]: { ...(prev[phase] || {}), ...partial } }));
+  };
+
   if (loading || !user) return <PageSkeleton variant="default" />;
 
   return (
@@ -82,6 +121,8 @@ export default function Profile() {
           <PhasePersonal
             user={user}
             counties={counties}
+            initialValues={phaseInitialValues(0)}
+            onDraftChange={(partial) => handleDraftChange(0, partial)}
             onSaved={handlePhaseComplete}
             onBack={() => navigate('/app')}
           />
@@ -90,6 +131,9 @@ export default function Profile() {
           <PhaseBike
             user={user}
             counties={counties}
+            vehicle={vehicles[0]}
+            initialValues={phaseInitialValues(1)}
+            onDraftChange={(partial) => handleDraftChange(1, partial)}
             onSaved={handlePhaseComplete}
             onBack={() => setCurrentPhase(0)}
           />
@@ -98,6 +142,8 @@ export default function Profile() {
           <PhaseMapBike
             user={user}
             vehicle={vehicles[0]}
+            initialValues={phaseInitialValues(2)}
+            onDraftChange={(partial) => handleDraftChange(2, partial)}
             onSaved={handlePhaseComplete}
             onBack={() => setCurrentPhase(1)}
           />

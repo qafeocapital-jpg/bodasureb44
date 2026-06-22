@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { isInCounty } from '@/lib/countyBounds';
+import { isInCounty, getCountyCenter } from '@/lib/countyBounds';
 import { Check, AlertTriangle } from 'lucide-react';
 import StageMap from '@/components/rider/onboarding/map/StageMap';
 import SearchBar from '@/components/rider/onboarding/map/SearchBar';
 import CreateStageCard from '@/components/rider/onboarding/map/CreateStageCard';
 import StageList from '@/components/rider/onboarding/map/StageList';
 
-export default function StageSearchPicker({ wardId, countyId, countyName, stages, selectedStageId, onSelect, onStagesChange }) {
+export default function StageSearchPicker({ wardId, countyId, countyName, wardName, stages, selectedStageId, onSelect, onStagesChange }) {
   const [mapboxToken, setMapboxToken] = useState('');
   const [mapCoords, setMapCoords] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -41,8 +41,8 @@ export default function StageSearchPicker({ wardId, countyId, countyName, stages
     fetchCounts();
   }, [wardId, stages]);
 
-  // Handle map tap — geo-fence check + drop pin + open create card
-  function handleMapClick(coords, geoFenceError) {
+  // Handle map tap — geo-fence check + drop pin + reverse-geocode + open create card
+  async function handleMapClick(coords, geoFenceError) {
     if (geoFenceError) {
       setGeoError(geoFenceError);
       setMapCoords(null);
@@ -60,11 +60,36 @@ export default function StageSearchPicker({ wardId, countyId, countyName, stages
     setGeoError('');
     setMapCoords(coords);
     setShowCreate(true);
+    setNewStageName('');
+
+    // Reverse-geocode to auto-populate stage name from nearest POI
+    if (mapboxToken && coords) {
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?access_token=${mapboxToken}&types=poi,address,neighborhood,locality,place&limit=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          setNewStageName(data.features[0].text || (data.features[0].place_name || '').split(',')[0] || '');
+        } else {
+          setNewStageName(wardName || '');
+        }
+      } catch (e) {
+        setNewStageName(wardName || '');
+      }
+    } else {
+      setNewStageName(wardName || '');
+    }
   }
 
-  function handleSelectPlace(feature) {
+  async function handleCreateFromSearch(query) {
+    const center = getCountyCenter(countyNameRef.current);
+    await handleMapClick(center);
+    setNewStageName(query);
+  }
+
+  async function handleSelectPlace(feature) {
     const nameHint = feature.text || (feature.place_name || '').split(',')[0] || '';
-    handleMapClick(feature.center);
+    await handleMapClick(feature.center);
     setNewStageName(nameHint);
   }
 
@@ -119,6 +144,7 @@ export default function StageSearchPicker({ wardId, countyId, countyName, stages
         selectedStageId={selectedStageId}
         onSelectStage={handleSelectExisting}
         onSelectPlace={handleSelectPlace}
+        onCreateEscape={handleCreateFromSearch}
       />
 
       <StageMap

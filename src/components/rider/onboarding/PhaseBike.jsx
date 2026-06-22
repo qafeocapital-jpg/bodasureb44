@@ -4,19 +4,25 @@ import { normalizePhone } from '@/lib/phone';
 import { auditLog } from '@/lib/audit';
 import { ChevronRight, ChevronLeft, Loader2, Check, MapPin } from 'lucide-react';
 
-export default function PhaseBike({ user, counties, onSaved, onBack }) {
+export default function PhaseBike({ user, counties, vehicle, initialValues, onDraftChange, onSaved, onBack }) {
   const [form, setForm] = useState({
-    role: 'rider',
-    plate_number: '',
-    make: '',
-    color: '',
-    year: '',
-    is_owner_rider: true,
-    owner_phone: '',
+    role: initialValues?.role || 'rider',
+    plate_number: initialValues?.plate_number || '',
+    make: initialValues?.make || '',
+    color: initialValues?.color || '',
+    year: initialValues?.year || '',
+    is_owner_rider: initialValues?.is_owner_rider ?? true,
+    owner_phone: initialValues?.owner_phone || '',
   });
   const [saving, setSaving] = useState(false);
   const [ownerFound, setOwnerFound] = useState(null);
   const [ownerFoundName, setOwnerFoundName] = useState('');
+
+  const updateForm = (partial) => {
+    const next = { ...form, ...partial };
+    setForm(next);
+    onDraftChange?.(next);
+  };
 
   const canProceed = () => form.role && form.plate_number?.trim() && form.make?.trim() && form.color?.trim();
 
@@ -32,7 +38,7 @@ export default function PhaseBike({ user, counties, onSaved, onBack }) {
           if (owners.length > 0) ownerId = owners[0].id;
         }
       }
-      const vehicle = await base44.entities.Vehicle.create({
+      const vehicleData = {
         plate_number: form.plate_number.toUpperCase(),
         make: form.make,
         color: form.color,
@@ -40,16 +46,21 @@ export default function PhaseBike({ user, counties, onSaved, onBack }) {
         owner_id: ownerId,
         rider_id: user.id,
         county_id: user.county_id,
-        status: 'pending',
         is_owner_rider: isOwner,
-      });
-      await auditLog({
-        userId: user.id,
-        action: 'vehicle_registered',
-        entityType: 'Vehicle',
-        entityId: vehicle.id,
-        description: `Vehicle ${form.plate_number.toUpperCase()} registered during onboarding`,
-      });
+      };
+      let savedVehicle;
+      if (vehicle?.id) {
+        savedVehicle = await base44.entities.Vehicle.update(vehicle.id, vehicleData);
+      } else {
+        savedVehicle = await base44.entities.Vehicle.create({ ...vehicleData, status: 'pending' });
+        await auditLog({
+          userId: user.id,
+          action: 'vehicle_registered',
+          entityType: 'Vehicle',
+          entityId: savedVehicle.id,
+          description: `Vehicle ${form.plate_number.toUpperCase()} registered during onboarding`,
+        });
+      }
       await onSaved();
     } catch (e) {}
     setSaving(false);
@@ -75,7 +86,7 @@ export default function PhaseBike({ user, counties, onSaved, onBack }) {
         ].map(opt => (
           <button
             key={opt.val}
-            onClick={() => setForm(f => ({ ...f, role: opt.val, is_owner_rider: opt.val === 'owner_rider' }))}
+            onClick={() => updateForm({ role: opt.val, is_owner_rider: opt.val === 'owner_rider' })}
             className={`w-full text-left p-3 rounded-xl border-2 transition-colors ${form.role === opt.val ? 'border-primary bg-primary/5' : 'border-border'}`}
           >
             <p className="text-sm font-semibold">{opt.label}</p>
@@ -89,7 +100,7 @@ export default function PhaseBike({ user, counties, onSaved, onBack }) {
         <input
           type="text"
           value={form.plate_number}
-          onChange={e => setForm(f => ({ ...f, plate_number: e.target.value }))}
+          onChange={e => updateForm({ plate_number: e.target.value })}
           placeholder="KMEA 123A"
           className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary"
         />
@@ -99,7 +110,7 @@ export default function PhaseBike({ user, counties, onSaved, onBack }) {
         <input
           type="text"
           value={form.make}
-          onChange={e => setForm(f => ({ ...f, make: e.target.value }))}
+          onChange={e => updateForm({ make: e.target.value })}
           placeholder="Honda, Yamaha, TVS..."
           className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
@@ -110,7 +121,7 @@ export default function PhaseBike({ user, counties, onSaved, onBack }) {
           <input
             type="text"
             value={form.color}
-            onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+            onChange={e => updateForm({ color: e.target.value })}
             placeholder="Black"
             className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
@@ -120,7 +131,7 @@ export default function PhaseBike({ user, counties, onSaved, onBack }) {
           <input
             type="number"
             value={form.year}
-            onChange={e => setForm(f => ({ ...f, year: e.target.value }))}
+            onChange={e => updateForm({ year: e.target.value })}
             placeholder="2021"
             className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
@@ -133,7 +144,7 @@ export default function PhaseBike({ user, counties, onSaved, onBack }) {
           <input
             type="tel"
             value={form.owner_phone}
-            onChange={e => { setForm(f => ({ ...f, owner_phone: e.target.value })); setOwnerFound(null); }}
+            onChange={e => { updateForm({ owner_phone: e.target.value }); setOwnerFound(null); }}
             onBlur={async () => {
               if (!form.owner_phone) return;
               const normalized = normalizePhone(form.owner_phone);
