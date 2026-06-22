@@ -72,7 +72,7 @@ export default function SubTaskPhoneOTP({ user, onDataChange, onBack }) {
       ) : !otpSent ? (
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground text-center">
-            We'll send a 4-digit verification code to your email associated with this account.
+            We'll send a 4-digit code to <span className="font-semibold">{user?.email}</span> to verify your account.
           </p>
           <button
             onClick={handleSendOtp}

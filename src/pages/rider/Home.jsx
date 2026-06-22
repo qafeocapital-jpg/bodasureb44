@@ -28,40 +28,39 @@ export default function Home() {
       if (!user) return;
       try {
         const wallets = await base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' });
-        if (wallets.length > 0) {
-          const w = wallets[0];
-          setWalletActive(w.status === 'active' || w.tier > 0);
-          const snapshots = await base44.entities.WalletSnapshot.filter({ wallet_id: w.id });
-          if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
-        }
-        const [owned, ridden, kyc, gms] = await Promise.all([
+        const snapshotPromise = wallets.length > 0
+          ? base44.entities.WalletSnapshot.filter({ wallet_id: wallets[0].id })
+          : Promise.resolve([]);
+
+        const [owned, ridden, kyc, gms, snapshots, ownerBikesRaw, announcements] = await Promise.all([
           base44.entities.Vehicle.filter({ owner_id: user.id }),
           base44.entities.Vehicle.filter({ rider_id: user.id }),
           base44.entities.KycDocument.filter({ user_id: user.id }),
           base44.entities.GroupMember.filter({ user_id: user.id }),
+          snapshotPromise,
+          user.phone
+            ? base44.entities.Vehicle.filter({ owner_phone: user.phone, owner_verified: false }).catch(() => [])
+            : Promise.resolve([]),
+          base44.entities.Announcement.filter({ status: 'published' }, '-created_date', 10).catch(() => []),
         ]);
+
+        if (wallets.length > 0) {
+          setWalletActive(wallets[0].status === 'active' || wallets[0].tier > 0);
+          if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
+        }
         const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
         setBikes(merged);
         setKycDocs(kyc);
         setGroupMembers(gms);
-        // Fetch bikes where user is the owner (by phone) but hasn't verified yet
-        if (user.phone) {
-          try {
-            const ob = await base44.entities.Vehicle.filter({ owner_phone: user.phone, owner_verified: false });
-            setOwnerBikes(ob.filter(b => !b.is_owner_rider));
-          } catch (e) {}
-        }
-        // Fetch latest published announcement for riders
-        try {
-          const announcements = await base44.entities.Announcement.filter({ status: 'published' }, '-created_date', 10);
-          const riderCounty = user?.county_id;
-          const visible = announcements.filter(a => {
-            const audienceOk = a.audience === 'all' || a.audience === 'riders';
-            const countyOk = !a.county_id || a.county_id === riderCounty;
-            return audienceOk && countyOk;
-          });
-          if (visible.length > 0) setLatestAnnouncement(visible[0]);
-        } catch (e) {}
+        setOwnerBikes(ownerBikesRaw.filter(b => !b.is_owner_rider));
+
+        const riderCounty = user?.county_id;
+        const visible = announcements.filter(a => {
+          const audienceOk = a.audience === 'all' || a.audience === 'riders';
+          const countyOk = !a.county_id || a.county_id === riderCounty;
+          return audienceOk && countyOk;
+        });
+        if (visible.length > 0) setLatestAnnouncement(visible[0]);
       } catch (e) {}
       setLoading(false);
     }

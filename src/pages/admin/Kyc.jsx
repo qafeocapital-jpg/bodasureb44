@@ -34,19 +34,13 @@ export default function AdminKyc() {
   async function loadPhase6() {
     setPhase6Loading(true);
     try {
-      const allDocs = await base44.entities.KycDocument.filter({}, '-created_date', 200);
-      // Group by user_id
-      const userIds = [...new Set(allDocs.map(d => d.user_id))];
-      const riders = await Promise.all(
-        userIds.map(async (uid) => {
-          const users = await base44.entities.User.filter({ id: uid });
-          const vehicles = await base44.entities.Vehicle.filter({ rider_id: uid }, '-created_date', 1);
-          const userDocs = allDocs.filter(d => d.user_id === uid);
-          const tasks = getTaskStatuses(userDocs, users[0], vehicles[0]);
-          return { user: users[0], vehicle: vehicles[0], kycDocs: userDocs, tasks };
-        })
-      );
-      setPhase6Riders(riders.filter(r => r.user));
+      const res = await base44.functions.invoke('getPhase6Submissions', {});
+      if (res.data?.riders) {
+        setPhase6Riders(res.data.riders.map(r => ({
+          ...r,
+          tasks: getTaskStatuses(r.kycDocs, r.user, r.vehicle),
+        })));
+      }
     } catch (e) {}
     setPhase6Loading(false);
   }
@@ -55,16 +49,24 @@ export default function AdminKyc() {
     const doc = docs.find(d => d.id === id);
     const u = await base44.auth.me();
     await base44.entities.KycDocument.update(id, { status: 'approved', reviewed_by_id: u.id, reviewed_at: new Date().toISOString() });
-    // Upgrade user to Level 2
     if (doc?.user_id) {
-      await base44.entities.User.update(doc.user_id, { kyc_status: 'approved', wallet_tier: 2 });
-      const wallets = await base44.entities.Wallet.filter({ user_id: doc.user_id, entity_type: 'personal' });
-      if (wallets.length > 0) {
-        await base44.entities.Wallet.update(wallets[0].id, { tier: 2, status: 'active' });
+      // Only upgrade user when ALL their docs are approved
+      const userDocs = await base44.entities.KycDocument.filter({ user_id: doc.user_id });
+      const allApproved = userDocs.length > 0 && userDocs.every(d => d.status === 'approved');
+      if (allApproved) {
+        await base44.entities.User.update(doc.user_id, { kyc_status: 'approved', wallet_tier: 2 });
+        const wallets = await base44.entities.Wallet.filter({ user_id: doc.user_id, entity_type: 'personal' });
+        if (wallets.length > 0) {
+          await base44.entities.Wallet.update(wallets[0].id, { tier: 2, status: 'active' });
+        }
+        await auditLog({ userId: u.id, action: 'kyc_approved', entityType: 'KycDocument', entityId: id, description: `All KYC documents approved for user ${doc.user_id} — upgraded to Level 2` });
+        toast({ title: 'KYC Approved', description: 'All documents approved. User upgraded to Level 2.' });
+      } else {
+        const approvedCount = userDocs.filter(d => d.status === 'approved').length;
+        await auditLog({ userId: u.id, action: 'kyc_doc_approved', entityType: 'KycDocument', entityId: id, description: `KYC document (${doc?.document_type}) approved for user ${doc?.user_id}` });
+        toast({ title: 'Document Approved', description: `${approvedCount}/${userDocs.length} documents approved.` });
       }
     }
-    await auditLog({ userId: u.id, action: 'kyc_approved', entityType: 'KycDocument', entityId: id, description: `KYC document (${doc?.document_type}) approved for user ${doc?.user_id}` });
-    toast({ title: 'KYC Approved', description: 'User upgraded to Level 2.' });
     load();
   }
 

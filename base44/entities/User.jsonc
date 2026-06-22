@@ -109,6 +109,10 @@
       "type": "string",
       "format": "date-time"
     },
+    "otp_attempts": {
+      "type": "integer",
+      "default": 0
+    },
     "notification_prefs": {
       "type": "object",
       "properties": {

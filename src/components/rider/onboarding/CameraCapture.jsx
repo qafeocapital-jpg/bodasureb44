@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Camera, Image as ImageIcon, Loader2, Check, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
@@ -12,6 +12,11 @@ export default function CameraCapture({ overlayType = 'rect', label, sublabel, o
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(existingUrl || null);
   const [error, setError] = useState('');
+
+  // Sync preview when existingUrl prop changes (e.g., switching bike angles)
+  useEffect(() => {
+    setPreview(existingUrl || null);
+  }, [existingUrl]);
 
   async function handleFile(file) {
     if (!file) return;

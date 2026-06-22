@@ -59,10 +59,11 @@ Deno.serve(async (req) => {
     const otpHash = `pbkdf2$${iterations}$${salt}$${hash}`;
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-    // Store hashed OTP on the user
+    // Store hashed OTP on the user (reset attempt counter)
     await base44.asServiceRole.entities.User.update(user.id, {
       otp_hash: otpHash,
       otp_expires_at: expiresAt,
+      otp_attempts: 0,
     });
 
     // Send OTP via email

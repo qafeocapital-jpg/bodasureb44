@@ -52,6 +52,11 @@ Deno.serve(async (req) => {
       return Response.json({ valid: false, error: 'No OTP requested. Please request a new code.' }, { status: 400 });
     }
 
+    // Brute-force protection: block after 5 failed attempts
+    if ((fullUser.otp_attempts || 0) >= 5) {
+      return Response.json({ valid: false, error: 'Too many attempts. Please request a new code.' }, { status: 429 });
+    }
+
     // Check expiry
     const expiresAt = new Date(fullUser.otp_expires_at);
     if (expiresAt < new Date()) {
@@ -77,7 +82,13 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.User.update(user.id, {
         otp_hash: null,
         otp_expires_at: null,
+        otp_attempts: 0,
         phone_verified: true,
+      });
+    } else {
+      // Increment failed attempt counter
+      await base44.asServiceRole.entities.User.update(user.id, {
+        otp_attempts: (fullUser.otp_attempts || 0) + 1,
       });
     }
 
