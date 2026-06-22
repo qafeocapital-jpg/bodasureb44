@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Plus, MapPin, Loader2, Check, X } from 'lucide-react';
+import { Plus, MapPin, Loader2, Check, X, Search } from 'lucide-react';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 const KISUMU_CENTER = [34.7467, -0.0917];
 
 export default function StagePicker({ wardId, countyId, stages, selectedStageId, onSelect, onStagesChange }) {
@@ -12,18 +11,48 @@ export default function StagePicker({ wardId, countyId, stages, selectedStageId,
   const [mapCoords, setMapCoords] = useState(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mapboxToken, setMapboxToken] = useState('');
+  const [memberCounts, setMemberCounts] = useState({});
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
 
+  // Fetch Mapbox token from backend
   useEffect(() => {
-    if (!showMap || !mapContainerRef.current || !MAPBOX_TOKEN) return;
+    async function fetchToken() {
+      try {
+        const res = await base44.functions.invoke('getMapboxToken', {});
+        if (res.data?.token) setMapboxToken(res.data.token);
+      } catch (e) {}
+    }
+    fetchToken();
+  }, []);
+
+  // Fetch real member counts (vehicles per stage) whenever stages change
+  useEffect(() => {
+    async function fetchCounts() {
+      if (!wardId) { setMemberCounts({}); return; }
+      try {
+        const vehicles = await base44.entities.Vehicle.filter({ ward_id: wardId });
+        const counts = {};
+        vehicles.forEach(v => {
+          if (v.stage_id) counts[v.stage_id] = (counts[v.stage_id] || 0) + 1;
+        });
+        setMemberCounts(counts);
+      } catch (e) {}
+    }
+    fetchCounts();
+  }, [wardId, stages]);
+
+  useEffect(() => {
+    if (!showMap || !mapContainerRef.current || !mapboxToken) return;
     let cancelled = false;
 
     async function initMap() {
       const mapboxgl = (await import('mapbox-gl')).default;
       await import('mapbox-gl/dist/mapbox-gl.css');
-      mapboxgl.accessToken = MAPBOX_TOKEN;
+      mapboxgl.accessToken = mapboxToken;
       if (cancelled || mapRef.current) return;
 
       const center = mapCoords || KISUMU_CENTER;
@@ -64,7 +93,7 @@ export default function StagePicker({ wardId, countyId, stages, selectedStageId,
         markerRef.current = null;
       }
     };
-  }, [showMap]);
+  }, [showMap, mapboxToken]);
 
   function resetCreateForm() {
     setNewStageName('');
@@ -112,12 +141,30 @@ export default function StagePicker({ wardId, countyId, stages, selectedStageId,
     return <p className="text-[10px] text-muted-foreground">Select a ward first to see available stages.</p>;
   }
 
+  const filteredStages = searchQuery.trim()
+    ? stages.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase().trim()))
+    : stages;
+
   return (
     <div className="space-y-2">
+      {stages.length > 3 && !showCreate && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search stages..."
+            className="w-full pl-9 pr-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+      )}
+
       {stages.length === 0 && !showCreate && (
         <p className="text-xs text-muted-foreground text-center py-2">No stages found in this ward yet. Create one below.</p>
       )}
-      {stages.map(s => (
+
+      {filteredStages.map(s => (
         <button
           key={s.id}
           onClick={() => onSelect(s.id)}
@@ -129,12 +176,16 @@ export default function StagePicker({ wardId, countyId, stages, selectedStageId,
             <MapPin className={`w-4 h-4 ${selectedStageId === s.id ? 'text-primary' : 'text-muted-foreground'}`} />
             <div>
               <p className="text-sm font-semibold">{s.name}</p>
-              <p className="text-[10px] text-muted-foreground">{s.member_count || 0} members</p>
+              <p className="text-[10px] text-muted-foreground">{memberCounts[s.id] || 0} members</p>
             </div>
           </div>
           {selectedStageId === s.id && <Check className="w-4 h-4 text-primary" />}
         </button>
       ))}
+
+      {searchQuery.trim() && filteredStages.length === 0 && !showCreate && (
+        <p className="text-xs text-muted-foreground text-center py-1">No stages match "{searchQuery}". Create one below.</p>
+      )}
 
       {!showCreate ? (
         <button
@@ -180,8 +231,8 @@ export default function StagePicker({ wardId, countyId, stages, selectedStageId,
                     Remove
                   </button>
                 </div>
-                {!MAPBOX_TOKEN ? (
-                  <p className="text-[10px] text-muted-foreground bg-muted rounded-lg p-3">Map unavailable — set VITE_MAPBOX_TOKEN to enable. You can still create the stage without a location.</p>
+                {!mapboxToken ? (
+                  <p className="text-[10px] text-muted-foreground bg-muted rounded-lg p-3">Loading map...</p>
                 ) : (
                   <div ref={mapContainerRef} className="w-full h-60 rounded-xl overflow-hidden border border-border" />
                 )}

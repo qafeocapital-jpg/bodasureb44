@@ -2,14 +2,24 @@ import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, MapPin } from 'lucide-react';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
-
 export default function StageMap({ countyId }) {
   const [stages, setStages] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [mapboxToken, setMapboxToken] = useState('');
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
+
+  // Fetch Mapbox token from backend
+  useEffect(() => {
+    async function fetchToken() {
+      try {
+        const res = await base44.functions.invoke('getMapboxToken', {});
+        if (res.data?.token) setMapboxToken(res.data.token);
+      } catch (e) {}
+    }
+    fetchToken();
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -41,7 +51,7 @@ export default function StageMap({ countyId }) {
   }, [countyId]);
 
   useEffect(() => {
-    if (loading || !MAPBOX_TOKEN || !mapContainerRef.current) return;
+    if (loading || !mapboxToken || !mapContainerRef.current) return;
     const stagesWithCoords = stages.filter(s => s.location_lat && s.location_lng);
     if (stagesWithCoords.length === 0) return;
     let cancelled = false;
@@ -49,7 +59,7 @@ export default function StageMap({ countyId }) {
     async function initMap() {
       const mapboxgl = (await import('mapbox-gl')).default;
       await import('mapbox-gl/dist/mapbox-gl.css');
-      mapboxgl.accessToken = MAPBOX_TOKEN;
+      mapboxgl.accessToken = mapboxToken;
       if (cancelled || mapRef.current) return;
 
       const center = [stagesWithCoords[0].location_lng, stagesWithCoords[0].location_lat];
@@ -108,7 +118,7 @@ export default function StageMap({ countyId }) {
         mapRef.current = null;
       }
     };
-  }, [loading, stages, stats]);
+  }, [loading, stages, stats, mapboxToken]);
 
   if (loading) {
     return (
@@ -118,7 +128,7 @@ export default function StageMap({ countyId }) {
     );
   }
 
-  if (!MAPBOX_TOKEN) {
+  if (!mapboxToken) {
     return (
       <div className="bg-accent rounded-xl p-6 text-center">
         <MapPin className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
