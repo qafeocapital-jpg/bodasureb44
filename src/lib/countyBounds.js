@@ -50,7 +50,6 @@ const COUNTY_BOUNDS = {
   'Narok': [35.0, -2.5, 36.3, -0.5],
   'Kajiado': [36.3, -3.5, 37.3, -1.3],
   'Nyamira': [34.5, -0.8, 34.9, -0.3],
-  'Vihiga': [34.5, -0.1, 34.9, 0.5],
 };
 
 // Kenya-wide fallback bounding box

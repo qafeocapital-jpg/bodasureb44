@@ -108,7 +108,7 @@ export default function StageSearchPicker({ wardId, countyId, countyName, stages
         mapboxglRef.current = null;
       }
     };
-  }, [mapboxToken]);
+  }, [mapboxToken, wardId]);
 
   // Update stage markers when stages/selection change
   useEffect(() => {
