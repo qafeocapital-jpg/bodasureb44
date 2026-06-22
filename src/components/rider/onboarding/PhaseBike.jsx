@@ -3,6 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import { auditLog } from '@/lib/audit';
 import { ChevronRight, ChevronLeft, Loader2, Check, MapPin, Lock, AlertTriangle } from 'lucide-react';
+import PlateInput from '@/components/rider/onboarding/PlateInput';
+import NtsaConfirmDialog from '@/components/rider/onboarding/NtsaConfirmDialog';
 
 export default function PhaseBike({ user, counties, vehicle, initialValues, onDraftChange, onSaved, onBack }) {
   const [form, setForm] = useState({
@@ -20,6 +22,7 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
   const [ownerPhoneError, setOwnerPhoneError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [plateError, setPlateError] = useState('');
+  const [showNtsaDialog, setShowNtsaDialog] = useState(false);
 
   const updateForm = (partial) => {
     const next = { ...form, ...partial };
@@ -58,7 +61,7 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
   }
 
   const canProceed = () => {
-    if (!form.role || !form.plate_number?.trim() || !form.make?.trim() || !form.color?.trim()) return false;
+    if (!form.role || form.plate_number?.trim().length !== 8 || !form.make?.trim() || !form.color?.trim()) return false;
     if (form.role === 'rider' && (!form.owner_phone?.trim() || ownerPhoneError)) return false;
     return true;
   };
@@ -76,6 +79,13 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
       setPlateError('');
       return false;
     } catch (e) { setPlateError(''); return false; }
+  }
+
+  async function handleRegisterClick() {
+    setPlateError('');
+    const plateTaken = await checkPlateUniqueness();
+    if (plateTaken) return;
+    setShowNtsaDialog(true);
   }
 
   async function handleSave() {
@@ -171,17 +181,11 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
         ))}
       </div>
 
-      <div>
-        <label className="text-xs font-medium text-muted-foreground">Plate Number</label>
-        <input
-          type="text"
-          value={form.plate_number}
-          onChange={e => updateForm({ plate_number: e.target.value })}
-          placeholder="KMEA 123A"
-          className={`w-full mt-1 px-3 py-2.5 rounded-xl border bg-background text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary ${plateError ? 'border-destructive' : 'border-input'}`}
-        />
-        {plateError && <p className="text-xs text-destructive mt-1">{plateError}</p>}
-      </div>
+      <PlateInput
+        value={form.plate_number}
+        onChange={(val) => updateForm({ plate_number: val })}
+        error={plateError}
+      />
       <div>
         <label className="text-xs font-medium text-muted-foreground">Make</label>
         <input
@@ -272,13 +276,20 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
           <ChevronLeft className="w-4 h-4" />
         </button>
         <button
-          onClick={handleSave}
+          onClick={handleRegisterClick}
           disabled={!canProceed() || saving}
           className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Register Bike <ChevronRight className="w-4 h-4" /></>}
         </button>
       </div>
+
+      <NtsaConfirmDialog
+        open={showNtsaDialog}
+        plate={form.plate_number}
+        onConfirm={() => { setShowNtsaDialog(false); handleSave(); }}
+        onCancel={() => setShowNtsaDialog(false)}
+      />
     </div>
   );
 }

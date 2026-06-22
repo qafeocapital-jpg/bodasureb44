@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Bike, ChevronLeft, Check, AlertTriangle, RotateCw } from 'lucide-react';
 import CameraCapture from '@/components/rider/onboarding/CameraCapture';
+import PlateInput from '@/components/rider/onboarding/PlateInput';
+import NtsaConfirmDialog from '@/components/rider/onboarding/NtsaConfirmDialog';
 
 const BIKE_ANGLES = [
   { key: 'bike_front', label: 'Front', sublabel: 'Front view of the motorcycle' },
@@ -15,6 +17,7 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
   const [savingPlate, setSavingPlate] = useState(false);
   const [error, setError] = useState('');
   const [activeAngle, setActiveAngle] = useState(0);
+  const [showNtsaDialog, setShowNtsaDialog] = useState(false);
 
   async function handleUpload(docType, fileUrl) {
     setError('');
@@ -37,7 +40,7 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
   }
 
   async function handleSavePlate() {
-    if (!plateNumber.trim() || !vehicle) return;
+    if (plateNumber.trim().length !== 8 || !vehicle) return;
     setSavingPlate(true);
     try {
       await base44.entities.Vehicle.update(vehicle.id, { plate_number: plateNumber.trim() });
@@ -70,23 +73,15 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
 
       {/* Plate number */}
       {vehicle && (
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Plate Number</label>
-          <div className="flex gap-2 mt-1">
-            <input
-              value={plateNumber}
-              onChange={e => setPlateNumber(e.target.value)}
-              placeholder="e.g. KMEA 123A"
-              className="flex-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <button
-              onClick={handleSavePlate}
-              disabled={!plateNumber.trim() || savingPlate}
-              className="px-4 bg-primary text-primary-foreground rounded-xl text-sm font-semibold disabled:opacity-50"
-            >
-              Save
-            </button>
-          </div>
+        <div className="space-y-2">
+          <PlateInput value={plateNumber} onChange={setPlateNumber} />
+          <button
+            onClick={() => setShowNtsaDialog(true)}
+            disabled={plateNumber.trim().length !== 8 || savingPlate}
+            className="w-full bg-primary text-primary-foreground rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
+          >
+            {savingPlate ? 'Saving...' : 'Save Plate'}
+          </button>
         </div>
       )}
 
@@ -145,6 +140,13 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
           <p className="text-xs text-destructive">{error}</p>
         </div>
       )}
+      <NtsaConfirmDialog
+        open={showNtsaDialog}
+        plate={plateNumber}
+        confirmLabel="Confirm & Save"
+        onConfirm={() => { setShowNtsaDialog(false); handleSavePlate(); }}
+        onCancel={() => setShowNtsaDialog(false)}
+      />
     </div>
   );
 }

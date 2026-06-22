@@ -4,7 +4,8 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
-import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCircle } from 'lucide-react';
+import { formatPlate } from '@/lib/plate';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import { getOnboardingPhase } from '@/lib/onboarding';
 import { getKycLevel } from '@/components/ui/KycLevelBadge';
@@ -79,6 +80,29 @@ export default function Home() {
         <div className="mt-4">
           <p className="text-xs text-orange-100 uppercase tracking-wide font-medium">Wallet Balance</p>
           <p className="text-3xl font-heading font-extrabold mt-0.5">{formatKES(balance)}</p>
+        </div>
+        <div className="flex items-center gap-2 mt-3">
+          <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full px-3 py-1">
+            <Bike className="w-3.5 h-3.5" />
+            <span className={`text-xs font-medium ${bikes[0] ? '' : 'text-orange-100/60'}`}>
+              {bikes[0] ? formatPlate(bikes[0].plate_number) : 'No bike yet'}
+            </span>
+          </div>
+          {(() => {
+            const bike = bikes[0];
+            let roleLabel = null;
+            if (bike?.is_owner_rider) roleLabel = 'Owner & Rider';
+            else if (bike && bike.rider_id === user.id && bike.owner_id !== user.id) roleLabel = 'Rider';
+            else if (bike && bike.owner_id === user.id && bike.rider_id !== user.id) roleLabel = 'Owner';
+            else if (!bike) roleLabel = 'Unregistered';
+            if (!roleLabel) return null;
+            return (
+              <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full px-3 py-1">
+                <UserCircle className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">{roleLabel}</span>
+              </div>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-2 mt-4">
           {walletActive ? (
