@@ -19,6 +19,7 @@ export const tileColors = {
   indigo: 'bg-indigo-50 text-indigo-600',
   sky: 'bg-sky-50 text-sky-600',
   pink: 'bg-pink-50 text-pink-600',
+  emerald: 'bg-emerald-50 text-emerald-600',
   slate: 'bg-slate-100 text-slate-400',
 };
 
@@ -27,9 +28,9 @@ export const riderTileSections = [
     title: 'My Money',
     tiles: [
       { label: 'Wallet', icon: Wallet, color: 'orange', path: '/app/wallet', status: 'live' },
-      { label: 'Lipisha Fare', icon: HandCoins, color: 'green', path: '/app/lipisha', status: 'live' },
+      { label: 'Lipisha Fare', icon: HandCoins, color: 'emerald', path: '/app/lipisha', status: 'live' },
       { label: 'Lipa County', icon: Landmark, color: 'blue', path: '/app/lipa-county', status: 'live' },
-      { label: 'Deposit', icon: ArrowDownToLine, color: 'emerald', path: '/app/wallet?tab=deposit', status: 'live' },
+      { label: 'Deposit', icon: ArrowDownToLine, color: 'sky', path: '/app/wallet?tab=deposit', status: 'live' },
       { label: 'Withdraw', icon: ArrowUpFromLine, color: 'rose', path: '/app/wallet?tab=withdraw', status: 'live' },
       { label: 'Send Money', icon: Send, color: 'violet', path: '/app/wallet?tab=send', status: 'live' },
       { label: 'Lipa Owner', icon: UserCheck, color: 'amber', path: '/app/lipa-owner', status: 'live', requiresTier2: true },
