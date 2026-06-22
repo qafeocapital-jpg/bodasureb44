@@ -15,13 +15,13 @@ export default function OfficerModeOverlay({
   const [qrUrl, setQrUrl] = useState('');
 
   useEffect(() => {
-    if (open && vehicle?.plate_number) {
+    if (open && vehicle?.plate_number && user?.id) {
       // Generate QR code URL using API (no NPM required)
       const qrData = permit?.qr_code_data || `BODASURE-${vehicle.id}-${user.id}-${Date.now()}`;
       const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
       setQrUrl(url);
     }
-  }, [open, vehicle, user, permit]);
+  }, [open, vehicle?.plate_number, vehicle?.id, user?.id, permit?.qr_code_data]);
 
   if (!open) return null;
 
@@ -82,17 +82,19 @@ export default function OfficerModeOverlay({
 
         {/* SACCO & Permit Info */}
         <div className="bg-muted/50 rounded-xl p-4 mb-6 space-y-2 text-sm">
-          {group && (
+          {group?.name && (
             <>
               <p className="text-xs text-muted-foreground font-semibold">GROUP</p>
               <p className="font-semibold">{group.name}</p>
             </>
           )}
-          {permit?.end_date && (
+          {permit && permit.end_date ? (
             <>
               <p className="text-xs text-muted-foreground font-semibold mt-3">PERMIT VALID UNTIL</p>
               <p className="font-semibold">{formatDate(permit.end_date)}</p>
             </>
+          ) : (
+            <p className="text-xs text-muted-foreground">No active permit</p>
           )}
         </div>
 

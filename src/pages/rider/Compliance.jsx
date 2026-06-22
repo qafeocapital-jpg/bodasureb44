@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -7,8 +7,7 @@ import { formatKES, formatDate } from '@/lib/format';
 import { processWalletPayment, getWalletBalance } from '@/lib/payments';
 import { verifyPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
-import { getTaskStatuses, VERIFICATION_TASKS, isAllSubmitted } from '@/lib/verification';
-import { getOnboardingPhase } from '@/lib/onboarding';
+import { getTaskStatuses } from '@/lib/verification';
 import { differenceInDays } from 'date-fns';
 import PinEntrySheet from '@/components/rider/PinEntrySheet';
 import PageSkeleton from '@/components/rider/PageSkeleton';
@@ -17,9 +16,7 @@ import RiderIdentitySummary from '@/components/compliance/RiderIdentitySummary';
 import PermitInsuranceCards from '@/components/compliance/PermitInsuranceCards';
 import ComplianceChecklist from '@/components/compliance/ComplianceChecklist';
 import OfficerModeOverlay from '@/components/compliance/OfficerModeOverlay';
-import {
-  CheckCircle2, XCircle, Clock, AlertTriangle, Loader2, Shield,
-} from 'lucide-react';
+import { AlertTriangle, Shield } from 'lucide-react';
 
 export default function Compliance() {
   const { user, refreshUser } = useAuth();
@@ -51,7 +48,7 @@ export default function Compliance() {
   // Load all data in parallel
   useEffect(() => {
     async function load() {
-      if (!user) return;
+      if (!user?.id) return;
       try {
         // Fetch main entities
         const [vehicles, wallets, penaltiesData, kycDocsData, groupMembers] = await Promise.all([
@@ -96,10 +93,32 @@ export default function Compliance() {
           setGroup(g);
         }
 
+        // Fetch county name if vehicle exists
+        let countyName = '';
+        if (v?.county_id) {
+          try {
+            const countyData = await base44.entities.County.get(v.county_id);
+            countyName = countyData?.name || '';
+          } catch (e) {
+            console.warn('County fetch failed:', e);
+          }
+        }
+
+        // Fetch stage name if vehicle has stage_id
+        let stageName = '';
+        if (v?.stage_id) {
+          try {
+            const stageData = await base44.entities.Stage.get(v.stage_id);
+            stageName = stageData?.name || '';
+          } catch (e) {
+            console.warn('Stage fetch failed:', e);
+          }
+        }
+
         // Compute task statuses and compliance score
         const tasks = getTaskStatuses(kycDocsData, user, v);
         setTaskStatuses(tasks);
-        computeCompliance(user, v, w, kycDocsData, groupMembers, perms);
+        computeCompliance(user, v, w, kycDocsData, groupMembers, perms, pols);
       } catch (e) {
         console.error('Compliance load error:', e);
       }
@@ -107,15 +126,15 @@ export default function Compliance() {
     }
 
     load();
-  }, [user]);
+  }, [user?.id]);
 
-  function computeCompliance(usr, vhc, wlt, docs, members, perms) {
+  function computeCompliance(usr, vhc, wlt, docs, members, perms, pols) {
     const scores = {
       bike_approved: vhc?.status === 'approved' ? 25 : 0,
       active_permit: perms?.length > 0 ? 25 : 0,
       kyc_approved: usr?.kyc_status === 'approved' ? 20 : 0,
       id_verified: docs?.some(d => d.document_type === 'id_front' && d.status === 'approved') && docs?.some(d => d.document_type === 'id_back' && d.status === 'approved') ? 15 : 0,
-      insurance_active: policies?.length > 0 ? 10 : 0,
+      insurance_active: pols?.length > 0 ? 10 : 0,
       sacco_member: members?.length > 0 ? 5 : 0,
     };
 
@@ -179,9 +198,15 @@ export default function Compliance() {
           title: 'Penalty paid successfully',
           description: formatKES(cents) + ' deducted from your wallet',
         });
+
+        setPayingPenalty(null);
       }
     } catch (e) {
-      throw new Error(e.message || 'Payment failed. Try again.');
+      toast({
+        title: 'Payment failed',
+        description: e.message || 'Try again.',
+        variant: 'destructive',
+      });
     } finally {
       setPaying(false);
     }
@@ -191,8 +216,10 @@ export default function Compliance() {
 
   const activePermit = permits[0];
   const activePolicy = policies[0];
-  const permitDaysRemaining = activePermit ? differenceInDays(new Date(activePermit.end_date), new Date()) : null;
-  const insuranceDaysRemaining = activePolicy ? differenceInDays(new Date(activePolicy.end_date), new Date()) : null;
+  
+  // Recalculate days remaining on each render to keep countdowns current
+  const permitDaysRemaining = activePermit ? Math.max(-1, differenceInDays(new Date(activePermit.end_date), new Date())) : null;
+  const insuranceDaysRemaining = activePolicy ? Math.max(-1, differenceInDays(new Date(activePolicy.end_date), new Date())) : null;
 
   return (
     <div className="p-5 animate-fade-in">
@@ -215,14 +242,12 @@ export default function Compliance() {
       <ComplianceTierHero tier={complianceTier} score={complianceScore} />
 
       {/* Rider Identity Summary */}
-      {vehicle && (
-        <RiderIdentitySummary
-          user={user}
-          vehicle={vehicle}
-          kycDocs={kycDocs}
-          group={group}
-        />
-      )}
+      <RiderIdentitySummary
+        user={user}
+        vehicle={vehicle}
+        kycDocs={kycDocs}
+        group={group}
+      />
 
       {/* Permit & Insurance Status */}
       <PermitInsuranceCards
@@ -273,6 +298,7 @@ export default function Compliance() {
         vehicle={vehicle}
         taskStatuses={taskStatuses}
         wallet={wallet}
+        groupMember={groupMember}
       />
 
       {/* Officer Mode Overlay */}

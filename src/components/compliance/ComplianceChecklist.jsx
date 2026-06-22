@@ -24,7 +24,7 @@ function ChecklistRow({ icon: Icon, label, status, link, subLabel }) {
   );
 }
 
-export default function ComplianceChecklist({ user, vehicle, taskStatuses, wallet }) {
+export default function ComplianceChecklist({ user, vehicle, taskStatuses, wallet, groupMember }) {
   const taskStatusMap = Object.fromEntries(taskStatuses.map(t => [t.id, t.status]));
 
   return (
@@ -53,15 +53,15 @@ export default function ComplianceChecklist({ user, vehicle, taskStatuses, walle
             link="/app/bikes"
           />
           <ChecklistRow
-            icon={vehicle?.stage_id ? CheckCircle2 : XCircle}
+            icon={vehicle?.stage_id && vehicle?.sub_county_id && vehicle?.ward_id ? CheckCircle2 : XCircle}
             label="County & Stage Mapped"
-            status={vehicle?.stage_id ? 'verified' : 'not_started'}
+            status={vehicle?.stage_id && vehicle?.sub_county_id && vehicle?.ward_id ? 'verified' : 'not_started'}
             link="/app/profile"
           />
           <ChecklistRow
-            icon={user?.group_id ? CheckCircle2 : XCircle}
+            icon={groupMember ? CheckCircle2 : XCircle}
             label="SACCO Joined"
-            status={user?.group_id ? 'verified' : 'not_started'}
+            status={groupMember ? 'verified' : 'not_started'}
             link="/app/groups"
           />
         </div>

@@ -1,7 +1,29 @@
-import { User, Phone, MapPin, Users } from 'lucide-react';
+import { User, MapPin, Users, Flag } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
 
 export default function RiderIdentitySummary({ user, vehicle, kycDocs, group }) {
   const selfiDoc = kycDocs?.find(d => d.document_type === 'selfie' && d.file_url);
+  const [countyName, setCountyName] = useState('');
+  const [stageName, setStageName] = useState('');
+
+  useEffect(() => {
+    async function loadLocationNames() {
+      try {
+        if (vehicle?.county_id) {
+          const county = await base44.entities.County.get(vehicle.county_id);
+          setCountyName(county?.name || '');
+        }
+        if (vehicle?.stage_id) {
+          const stage = await base44.entities.Stage.get(vehicle.stage_id);
+          setStageName(stage?.name || '');
+        }
+      } catch (e) {
+        console.warn('Location fetch error:', e);
+      }
+    }
+    loadLocationNames();
+  }, [vehicle?.county_id, vehicle?.stage_id]);
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 mb-6">
@@ -24,23 +46,36 @@ export default function RiderIdentitySummary({ user, vehicle, kycDocs, group }) 
         )}
 
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-heading font-bold mb-3">{user?.full_name}</h2>
+          <h2 className="text-lg font-heading font-bold mb-3">{user?.full_name || 'Unknown'}</h2>
 
           <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span className="text-xs font-medium w-20">ID:</span>
-              <span className="font-mono">{user?.national_id}</span>
-            </div>
+            {user?.national_id && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span className="text-xs font-medium w-20">ID:</span>
+                <span className="font-mono">{user.national_id}</span>
+              </div>
+            )}
 
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span className="text-xs font-medium w-20">Phone:</span>
-              <span>{user?.phone}</span>
-            </div>
+            {user?.phone && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span className="text-xs font-medium w-20">Phone:</span>
+                <span>{user.phone}</span>
+              </div>
+            )}
 
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="w-4 h-4" />
-              <span className="text-xs font-medium">{vehicle?.county_id || 'N/A'}</span>
-            </div>
+            {countyName && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <MapPin className="w-4 h-4" />
+                <span className="text-xs font-medium">{countyName}</span>
+              </div>
+            )}
+
+            {stageName && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Flag className="w-4 h-4" />
+                <span className="text-xs font-medium">{stageName}</span>
+              </div>
+            )}
 
             {group && (
               <div className="flex items-center gap-2 text-muted-foreground">
