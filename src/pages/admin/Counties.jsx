@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useToast } from '@/components/ui/use-toast';
 import { formatDate } from '@/lib/format';
-import { Building2, Plus, Power } from 'lucide-react';
+import { auditLog } from '@/lib/audit';
+import { Building2, Plus, Power, ShieldCheck } from 'lucide-react';
 
 export default function AdminCounties() {
+  const { toast } = useToast();
   const [counties, setCounties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -28,9 +31,25 @@ export default function AdminCounties() {
     load();
   }
 
+  async function approveBusinessKyc(county) {
+    const u = await base44.auth.me();
+    await base44.entities.County.update(county.id, { sasapay_business_kyc_status: 'approved' });
+    await auditLog({ userId: u.id, action: 'county_business_kyc_approved', entityType: 'County', entityId: county.id, description: `Business KYC approved for ${county.name}` });
+    toast({ title: 'Business KYC Approved', description: `${county.name} can now go live.` });
+    load();
+  }
+
   async function toggleLive(county) {
     const newStatus = county.status === 'live' ? 'draft' : 'live';
+    // Enforce business KYC gate before going LIVE
+    if (newStatus === 'live' && county.sasapay_business_kyc_status !== 'approved') {
+      toast({ title: 'Cannot Go Live', description: 'Approve the county\'s SasaPay Business KYC first.', variant: 'destructive' });
+      return;
+    }
+    const u = await base44.auth.me();
     await base44.entities.County.update(county.id, { status: newStatus, activated_date: newStatus === 'live' ? new Date().toISOString() : null });
+    await auditLog({ userId: u.id, action: 'county_status_changed', entityType: 'County', entityId: county.id, description: `${county.name} status changed to ${newStatus}`, oldValues: { status: county.status }, newValues: { status: newStatus } });
+    toast({ title: newStatus === 'live' ? 'County is Live' : 'County Deactivated', description: `${county.name} is now ${newStatus}.` });
     load();
   }
 
@@ -60,12 +79,19 @@ export default function AdminCounties() {
                 <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${c.status === 'live' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{c.status}</span>
               </div>
               <div className="text-xs text-muted-foreground mb-3">
-                <p>SasaPay KYC: <span className="font-medium">{c.sasapay_business_kyc_status || 'none'}</span></p>
+                <p>SasaPay KYC: <span className={`font-medium ${c.sasapay_business_kyc_status === 'approved' ? 'text-success' : 'text-warning'}`}>{c.sasapay_business_kyc_status || 'none'}</span></p>
                 {c.activated_date && <p>Activated: {formatDate(c.activated_date)}</p>}
               </div>
-              <button onClick={() => toggleLive(c)} className={`w-full flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold ${c.status === 'live' ? 'bg-destructive/10 text-destructive' : 'bg-success text-success-foreground'}`}>
-                <Power className="w-3.5 h-3.5" /> {c.status === 'live' ? 'Deactivate' : 'Go Live'}
-              </button>
+              <div className="flex gap-2">
+                {c.sasapay_business_kyc_status !== 'approved' && (
+                  <button onClick={() => approveBusinessKyc(c)} className="flex-1 flex items-center justify-center gap-1 bg-blue-50 text-blue-600 rounded-lg py-2 text-xs font-semibold">
+                    <ShieldCheck className="w-3.5 h-3.5" /> Approve KYC
+                  </button>
+                )}
+                <button onClick={() => toggleLive(c)} disabled={c.status !== 'live' && c.sasapay_business_kyc_status !== 'approved'} className={`flex-1 flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold ${c.status === 'live' ? 'bg-destructive/10 text-destructive' : 'bg-success text-success-foreground'} disabled:opacity-40 disabled:cursor-not-allowed`}>
+                  <Power className="w-3.5 h-3.5" /> {c.status === 'live' ? 'Deactivate' : 'Go Live'}
+                </button>
+              </div>
             </div>
           ))}
         </div>

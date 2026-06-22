@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatKES } from '@/lib/format';
+import { auditLog } from '@/lib/audit';
 import { Coins, Percent, Banknote, Scale, Plus, Pencil } from 'lucide-react';
 
 export default function AdminMoney() {
@@ -61,10 +62,13 @@ export default function AdminMoney() {
         is_active: true,
         version: editingRule?.version || 1,
       };
+      const u = await base44.auth.me();
       if (editingRule) {
         await base44.entities.FeeRule.update(editingRule.id, payload);
+        await auditLog({ userId: u.id, action: 'fee_rule_updated', entityType: 'FeeRule', entityId: editingRule.id, description: `Fee rule "${payload.name}" updated`, newValues: payload });
       } else {
-        await base44.entities.FeeRule.create(payload);
+        const created = await base44.entities.FeeRule.create(payload);
+        await auditLog({ userId: u.id, action: 'fee_rule_created', entityType: 'FeeRule', entityId: created.id, description: `Fee rule "${payload.name}" created`, newValues: payload });
       }
       setShowRuleModal(false);
       load();

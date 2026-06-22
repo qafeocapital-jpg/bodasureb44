@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
-import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
-import { ChevronLeft, BadgeCheck, Loader2, CheckCircle2, XCircle, AlertCircle, Receipt } from 'lucide-react';
+import { mockPayment, getOrCreateWallet, processFeeSplit } from '@/lib/mockPayments';
+import { checkServiceAccess } from '@/lib/serviceAccess';
+import UnlockSheet from '@/components/rider/UnlockSheet';
+import { ChevronLeft, BadgeCheck, Loader2, CheckCircle2, XCircle, AlertCircle, Receipt, MapPin } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function LipaCounty() {
@@ -13,12 +15,16 @@ export default function LipaCounty() {
   const [wallet, setWallet] = useState(null);
   const [bikes, setBikes] = useState([]);
   const [feeSchedules, setFeeSchedules] = useState([]);
+  const [feeRules, setFeeRules] = useState([]);
   const [permits, setPermits] = useState([]);
+  const [countyLive, setCountyLive] = useState(false);
+  const [countyName, setCountyName] = useState('');
   const [selectedBike, setSelectedBike] = useState('');
   const [selectedCycle, setSelectedCycle] = useState('');
   const [payMethod, setPayMethod] = useState('wallet');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -31,14 +37,24 @@ export default function LipaCounty() {
         const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
         setBikes(merged);
 
+        const rules = await base44.entities.FeeRule.filter({ product_type: 'lipa_county', is_active: true });
+        setFeeRules(rules);
+
         if (merged.length > 0) {
           const bike = merged[0];
           const schedules = await base44.entities.FeeSchedule.filter({ county_id: bike.county_id, is_active: true });
           setFeeSchedules(schedules);
           const perms = await base44.entities.Permit.filter({ rider_id: user.id }, '-created_date', 10);
           setPermits(perms);
+          // Check county LIVE status
+          const counties = await base44.entities.County.filter({ id: bike.county_id });
+          if (counties.length > 0) {
+            setCountyLive(counties[0].status === 'live');
+            setCountyName(counties[0].name);
+          }
         }
       } catch (e) {}
+      setDataLoaded(true);
     }
     load();
   }, [user]);
@@ -50,21 +66,16 @@ export default function LipaCounty() {
     if (bike) {
       const schedules = await base44.entities.FeeSchedule.filter({ county_id: bike.county_id, is_active: true });
       setFeeSchedules(schedules);
+      const counties = await base44.entities.County.filter({ id: bike.county_id });
+      if (counties.length > 0) {
+        setCountyLive(counties[0].status === 'live');
+        setCountyName(counties[0].name);
+      }
     }
   }
 
   const selectedSchedule = feeSchedules.find(s => s.permit_type === selectedCycle);
   const selectedBikeObj = bikes.find(b => b.id === selectedBike);
-
-  // Get fee rule for split
-  const [feeRules, setFeeRules] = useState([]);
-  useEffect(() => {
-    async function loadRules() {
-      const rules = await base44.entities.FeeRule.filter({ product_type: 'lipa_county', is_active: true });
-      setFeeRules(rules);
-    }
-    loadRules();
-  }, []);
 
   const feeRule = feeRules[0];
   const countyPct = feeRule?.county_percentage ?? 60;
@@ -87,8 +98,6 @@ export default function LipaCounty() {
         description: `${selectedCycle} permit for ${selectedBikeObj.plate_number}`,
         productType: 'lipa_county',
         vehicleId: selectedBike,
-        feeRuleId: feeRule?.id,
-        feeRuleVersion: feeRule?.version,
       });
 
       const now = new Date();
@@ -96,7 +105,7 @@ export default function LipaCounty() {
       const end = new Date(now);
       end.setDate(end.getDate() + (durations[selectedCycle] || 30));
 
-      await base44.entities.Permit.create({
+      const permit = await base44.entities.Permit.create({
         vehicle_id: selectedBike,
         rider_id: user?.id,
         county_id: selectedBikeObj.county_id,
@@ -110,12 +119,17 @@ export default function LipaCounty() {
         qr_code_data: `BODASURE-${selectedBike}-${Date.now()}`,
       });
 
+      // Process fee split — moves money to county, SACCO, and platform wallets
       if (feeRule) {
-        await base44.entities.TransactionLeg.bulkCreate([
-          { transaction_id: res.transaction.id, leg_type: 'county', amount_cents: countyAmount, percentage: countyPct, description: 'County revenue' },
-          { transaction_id: res.transaction.id, leg_type: 'sacco', amount_cents: saccoAmount, percentage: saccoPct, description: 'SACCO dividend pool' },
-          { transaction_id: res.transaction.id, leg_type: 'platform', amount_cents: platformAmount, percentage: platformPct, description: 'BodaSure platform' },
-        ]);
+        // Find rider's SACCO group (if any)
+        let saccoGroupId = null;
+        const groups = await base44.entities.Group.filter({ county_id: selectedBikeObj.county_id, status: 'active', type: 'sacco' });
+        if (groups.length > 0) saccoGroupId = groups[0].id;
+
+        await processFeeSplit(res.transaction.id, selectedSchedule.amount_cents, feeRule, {
+          countyId: selectedBikeObj.county_id,
+          saccoGroupId,
+        });
       }
 
       setResult({ success: true, amount: selectedSchedule.amount_cents, reference: res.reference, cycle: selectedCycle });
@@ -124,12 +138,14 @@ export default function LipaCounty() {
       setSelectedBike('');
       setSelectedCycle('');
     } catch (e) {
-      setResult({ success: false, message: 'Payment failed. Please try again.' });
+      setResult({ success: false, message: e.message || 'Payment failed. Please try again.' });
     }
     setLoading(false);
   }
 
-  if (!wallet && bikes.length === 0) return <PageSkeleton variant="hero-rows" />;
+  if (!dataLoaded) return <PageSkeleton variant="hero-rows" />;
+
+  const access = checkServiceAccess('lipa_county', { user, wallet, bikes });
 
   return (
     <div className="p-5 animate-fade-in">
@@ -141,7 +157,7 @@ export default function LipaCounty() {
       </div>
 
       {/* No bikes */}
-      {bikes.length === 0 && (
+      {bikes.length === 0 ? (
         <div className="bg-accent rounded-2xl p-8 text-center">
           <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground mb-4">You need a registered and approved bike to pay for a license.</p>
@@ -149,9 +165,16 @@ export default function LipaCounty() {
             Register Bike
           </button>
         </div>
-      )}
-
-      {bikes.length > 0 && (
+      ) : !countyLive ? (
+        /* County not LIVE */
+        <div className="bg-accent rounded-2xl p-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-warning/10 flex items-center justify-center mx-auto mb-3">
+            <MapPin className="w-7 h-7 text-warning" />
+          </div>
+          <p className="text-sm font-semibold mb-1">{countyName || 'Your County'} is Not Live Yet</p>
+          <p className="text-xs text-muted-foreground">BodaSure hasn't been activated in your county. We'll notify you when it goes live.</p>
+        </div>
+      ) : (
         <>
           {result?.success && (
             <div className="bg-success/10 border border-success/20 rounded-xl p-4 mb-5 flex items-center gap-3">
@@ -232,8 +255,9 @@ export default function LipaCounty() {
                   <button onClick={() => setPayMethod('wallet')} className={`p-3 rounded-xl border-2 text-center transition-colors ${payMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-border'}`}>
                     <p className="text-sm font-semibold">Wallet</p>
                   </button>
-                  <button onClick={() => setPayMethod('mpesa')} className={`p-3 rounded-xl border-2 text-center transition-colors ${payMethod === 'mpesa' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                  <button onClick={() => setPayMethod('mpesa')} className={`p-3 rounded-xl border-2 text-center transition-colors ${payMethod === 'mpesa' ? 'border-primary bg-primary/5' : 'border-border'} relative`}>
                     <p className="text-sm font-semibold">M-Pesa</p>
+                    <span className="text-[9px] text-muted-foreground">Coming soon</span>
                   </button>
                 </div>
               </div>
@@ -241,7 +265,7 @@ export default function LipaCounty() {
 
             <button
               onClick={handlePay}
-              disabled={loading || !selectedBike || !selectedSchedule}
+              disabled={loading || !selectedBike || !selectedSchedule || payMethod === 'mpesa'}
               className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold text-sm disabled:opacity-50"
             >
               {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</> : <><BadgeCheck className="w-5 h-5" /> Pay {selectedSchedule ? formatKES(selectedSchedule.amount_cents) : ''}</>}

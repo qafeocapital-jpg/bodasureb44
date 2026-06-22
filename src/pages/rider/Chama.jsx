@@ -108,7 +108,7 @@ export default function Chama() {
       const txns = await base44.entities.Transaction.filter({ wallet_id: groupWallet.id, type: 'chama' }, '-created_date', 10);
       setTransactions(txns);
     } catch (e) {
-      setResult({ success: false, message: 'Contribution failed. Try again.' });
+      setResult({ success: false, message: e.message || 'Contribution failed. Try again.' });
     }
     setLoading(false);
   }

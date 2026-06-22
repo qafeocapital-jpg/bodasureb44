@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useToast } from '@/components/ui/use-toast';
 import { formatDateTime } from '@/lib/format';
+import { auditLog } from '@/lib/audit';
 import { FileCheck, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
 export default function AdminKyc() {
+  const { toast } = useToast();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,12 +22,31 @@ export default function AdminKyc() {
   }
 
   async function approve(id) {
-    await base44.entities.KycDocument.update(id, { status: 'approved', reviewed_at: new Date().toISOString() });
+    const doc = docs.find(d => d.id === id);
+    const u = await base44.auth.me();
+    await base44.entities.KycDocument.update(id, { status: 'approved', reviewed_by_id: u.id, reviewed_at: new Date().toISOString() });
+    // Upgrade user to Tier 2
+    if (doc?.user_id) {
+      await base44.entities.User.update(doc.user_id, { kyc_status: 'approved', wallet_tier: 2 });
+      const wallets = await base44.entities.Wallet.filter({ user_id: doc.user_id, entity_type: 'personal' });
+      if (wallets.length > 0) {
+        await base44.entities.Wallet.update(wallets[0].id, { tier: 2, status: 'active' });
+      }
+    }
+    await auditLog({ userId: u.id, action: 'kyc_approved', entityType: 'KycDocument', entityId: id, description: `KYC document (${doc?.document_type}) approved for user ${doc?.user_id}` });
+    toast({ title: 'KYC Approved', description: 'User upgraded to Tier 2.' });
     load();
   }
 
   async function reject(id) {
-    await base44.entities.KycDocument.update(id, { status: 'rejected', rejection_reason: 'Document not clear', reviewed_at: new Date().toISOString() });
+    const doc = docs.find(d => d.id === id);
+    const u = await base44.auth.me();
+    await base44.entities.KycDocument.update(id, { status: 'rejected', rejection_reason: 'Document not clear', reviewed_by_id: u.id, reviewed_at: new Date().toISOString() });
+    if (doc?.user_id) {
+      await base44.entities.User.update(doc.user_id, { kyc_status: 'rejected' });
+    }
+    await auditLog({ userId: u.id, action: 'kyc_rejected', entityType: 'KycDocument', entityId: id, description: `KYC document (${doc?.document_type}) rejected for user ${doc?.user_id}` });
+    toast({ title: 'KYC Rejected', description: 'User has been notified.', variant: 'destructive' });
     load();
   }
 

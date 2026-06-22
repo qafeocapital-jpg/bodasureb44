@@ -7,6 +7,8 @@ import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, HandCoins, Loader2, CheckCircle2, XCircle, Receipt } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import PhoneInput from '@/components/ui/PhoneInput';
+import UnlockSheet from '@/components/rider/UnlockSheet';
+import { checkServiceAccess } from '@/lib/serviceAccess';
 import { isValidKenyanPhone, formatPhoneDisplay } from '@/lib/phone';
 
 export default function Lipisha() {
@@ -19,6 +21,7 @@ export default function Lipisha() {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [accessInfo, setAccessInfo] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -30,6 +33,8 @@ export default function Lipisha() {
         if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);
         const txns = await base44.entities.Transaction.filter({ wallet_id: w.id, type: 'lipisha' }, '-created_date', 10);
         setHistory(txns);
+        const access = checkServiceAccess('lipisha', { user, wallet: w });
+        if (!access.unlocked) setAccessInfo(access);
       } catch (e) {}
     }
     load();
@@ -56,7 +61,7 @@ export default function Lipisha() {
       const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipisha' }, '-created_date', 10);
       setHistory(txns);
     } catch (e) {
-      setResult({ success: false, message: 'Could not collect fare. Please try again.' });
+      setResult({ success: false, message: e.message || 'Could not collect fare. Please try again.' });
     }
     setLoading(false);
   }
@@ -136,6 +141,16 @@ export default function Lipisha() {
           <p className="text-xs text-muted-foreground">Waiting for M-Pesa confirmation...</p>
         </div>
       )}
+
+      <UnlockSheet
+        open={!!accessInfo}
+        onClose={() => setAccessInfo(null)}
+        title={accessInfo?.title}
+        message={accessInfo?.message}
+        actionLabel={accessInfo?.actionLabel}
+        actionLink={accessInfo?.actionLink}
+        onAction={() => { if (accessInfo?.actionLink) navigate(accessInfo.actionLink); }}
+      />
 
       {/* History */}
       <div className="mt-6">

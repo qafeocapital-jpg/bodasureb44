@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Bike as BikeIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
+import { auditLog } from '@/lib/audit';
 import BikeInfoTab from '@/components/bike-detail/BikeInfoTab';
 import RiderTab from '@/components/bike-detail/RiderTab';
 import PermitTab from '@/components/bike-detail/PermitTab';
@@ -84,7 +85,9 @@ export default function BikeDetailSheet({ vehicleId, onClose, isStaff = false, a
 
   async function handleApprove() {
     try {
-      await base44.entities.Vehicle.update(vehicleId, { status: 'approved', approved_at: new Date().toISOString() });
+      const u = await base44.auth.me();
+      await base44.entities.Vehicle.update(vehicleId, { status: 'approved', approved_at: new Date().toISOString(), approved_by_id: u.id });
+      await auditLog({ userId: u.id, action: 'vehicle_approved', entityType: 'Vehicle', entityId: vehicleId, description: `Vehicle ${vehicle?.plate_number} approved` });
       toast({ title: 'Bike approved', description: `${vehicle.plate_number} has been approved.` });
       load();
     } catch (e) {
@@ -94,7 +97,9 @@ export default function BikeDetailSheet({ vehicleId, onClose, isStaff = false, a
 
   async function handleReject() {
     try {
+      const u = await base44.auth.me();
       await base44.entities.Vehicle.update(vehicleId, { status: 'rejected', rejection_reason: 'Did not meet requirements' });
+      await auditLog({ userId: u.id, action: 'vehicle_rejected', entityType: 'Vehicle', entityId: vehicleId, description: `Vehicle ${vehicle?.plate_number} rejected` });
       toast({ title: 'Bike rejected', description: `${vehicle.plate_number} has been rejected.` });
       load();
     } catch (e) {

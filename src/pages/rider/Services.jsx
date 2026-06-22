@@ -6,6 +6,8 @@ import { formatKES } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
 import { ChevronLeft, Phone, Wifi, Zap, Droplet, Tv, Receipt, Loader2, CheckCircle2, XCircle, Coins } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
+import UnlockSheet from '@/components/rider/UnlockSheet';
+import { checkServiceAccess } from '@/lib/serviceAccess';
 
 export default function Services() {
   const navigate = useNavigate();
@@ -17,6 +19,7 @@ export default function Services() {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [showUnlock, setShowUnlock] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -60,14 +63,14 @@ export default function Services() {
       setAmount('');
       setAccountRef('');
     } catch (e) {
-      setResult({ success: false, message: 'Payment failed. Try again.' });
+      setResult({ success: false, message: e.message || 'Payment failed. Try again.' });
     }
     setLoading(false);
   }
 
   if (!wallet) return <PageSkeleton variant="hero-rows" />;
 
-  const isTier2 = user?.wallet_tier >= 2;
+  const isTier2 = (wallet?.tier || 0) >= 2 || (user?.wallet_tier || 0) >= 2;
 
   return (
     <div className="p-5 animate-fade-in">
@@ -88,6 +91,7 @@ export default function Services() {
         <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 mb-5 flex items-center gap-3">
           <Coins className="w-5 h-5 text-warning flex-shrink-0" />
           <p className="text-xs text-warning">Complete KYC to unlock Tier 2 and pay for services from your wallet.</p>
+          <button onClick={() => setShowUnlock(true)} className="ml-auto bg-warning text-warning-foreground rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap">Unlock</button>
         </div>
       )}
 
@@ -116,8 +120,11 @@ export default function Services() {
             return (
               <button
                 key={s.key}
-                onClick={() => isTier2 ? setSelectedService(s) : null}
-                className={`flex flex-col items-center gap-2 p-3 ${isTier2 ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'} bg-card border border-border rounded-2xl hover:bg-accent transition-colors`}
+                onClick={() => {
+                  if (!isTier2) { setShowUnlock(true); return; }
+                  setSelectedService(s);
+                }}
+                className="flex flex-col items-center gap-2 p-3 cursor-pointer bg-card border border-border rounded-2xl hover:bg-accent transition-colors"
               >
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${s.color}`}>
                   <Icon className="w-6 h-6" />
@@ -167,6 +174,15 @@ export default function Services() {
           </button>
         </div>
       )}
-    </div>
-  );
-}
+
+      <UnlockSheet
+        open={showUnlock}
+        onClose={() => setShowUnlock(false)}
+        title="Tier 2 Required"
+        message="Complete KYC verification (Tier 2) to access bill payments and services."
+        actionLabel="Verify Now"
+        actionLink="/app/kyc"
+      />
+      </div>
+      );
+      }

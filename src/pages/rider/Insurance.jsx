@@ -79,7 +79,7 @@ export default function Insurance() {
       const userPolicies = await base44.entities.Policy.filter({ rider_id: user?.id, status: 'active' });
       setPolicies(userPolicies);
     } catch (e) {
-      setResult({ success: false, message: 'Purchase failed. Try again.' });
+      setResult({ success: false, message: e.message || 'Purchase failed. Try again.' });
     }
     setPaying(false);
   }

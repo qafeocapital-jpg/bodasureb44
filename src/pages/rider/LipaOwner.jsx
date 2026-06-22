@@ -4,6 +4,9 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
 import { mockPayment, getOrCreateWallet } from '@/lib/mockPayments';
+import { verifyPin } from '@/lib/pin';
+import { checkServiceAccess } from '@/lib/serviceAccess';
+import UnlockSheet from '@/components/rider/UnlockSheet';
 import { ChevronLeft, UserCheck, Loader2, CheckCircle2, XCircle, Receipt } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -12,6 +15,7 @@ export default function LipaOwner() {
   const { user } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [bikes, setBikes] = useState([]);
+  const [owners, setOwners] = useState({});
   const [selectedBike, setSelectedBike] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,6 +24,7 @@ export default function LipaOwner() {
   const [showPin, setShowPin] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
+  const [accessInfo, setAccessInfo] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -31,8 +36,20 @@ export default function LipaOwner() {
         const ridden = await base44.entities.Vehicle.filter({ rider_id: user.id, status: 'approved' });
         const notOwned = ridden.filter(b => !b.is_owner_rider && b.owner_id !== user.id);
         setBikes(notOwned);
+        // Fetch owner user details
+        const ownerIds = [...new Set(notOwned.map(b => b.owner_id).filter(Boolean))];
+        const ownerMap = {};
+        await Promise.all(ownerIds.map(async oid => {
+          try {
+            const u = await base44.entities.User.filter({ id: oid });
+            if (u.length > 0) ownerMap[oid] = u[0];
+          } catch (e) {}
+        }));
+        setOwners(ownerMap);
         const txns = await base44.entities.Transaction.filter({ wallet_id: w.id, type: 'lipa_owner' }, '-created_date', 10);
         setHistory(txns);
+        const access = checkServiceAccess('lipa_owner', { user, wallet: w });
+        if (!access.unlocked) setAccessInfo(access);
       } catch (e) {}
     }
     load();
@@ -43,7 +60,7 @@ export default function LipaOwner() {
   async function handleConfirm() {
     setPinError('');
     if (pin.length !== 4) { setPinError('Enter your 4-digit PIN'); return; }
-    if (wallet.pin_hash && pin !== wallet.pin_hash) {
+    if (wallet.pin_hash && !verifyPin(pin, wallet.pin_hash)) {
       setPinError('Incorrect PIN. Please try again.');
       return;
     }
@@ -75,13 +92,18 @@ export default function LipaOwner() {
       const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipa_owner' }, '-created_date', 10);
       setHistory(txns);
     } catch (e) {
-      setResult({ success: false, message: 'Could not complete payment. Try again.' });
+      setResult({ success: false, message: e.message || 'Could not complete payment. Try again.' });
     }
     setLoading(false);
   }
 
   function handlePay() {
     if (!selectedBike || !amount) return;
+    const access = checkServiceAccess('lipa_owner', { user, wallet });
+    if (!access.unlocked) {
+      setAccessInfo(access);
+      return;
+    }
     setShowPin(true);
   }
 
@@ -135,8 +157,12 @@ export default function LipaOwner() {
 
           {selectedBikeObj && (
             <div className="bg-accent rounded-xl p-3">
-              <p className="text-xs text-muted-foreground">Owner ID</p>
-              <p className="text-sm font-semibold">{selectedBikeObj.owner_id ? 'Registered Owner' : 'Owner not linked'}</p>
+              <p className="text-xs text-muted-foreground">Owner</p>
+              <p className="text-sm font-semibold">
+                {selectedBikeObj.owner_id && owners[selectedBikeObj.owner_id]
+                  ? owners[selectedBikeObj.owner_id].full_name || 'Registered Owner'
+                  : 'Owner not linked'}
+              </p>
             </div>
           )}
 
@@ -195,6 +221,16 @@ export default function LipaOwner() {
           )}
         </div>
       )}
+
+      <UnlockSheet
+        open={!!accessInfo}
+        onClose={() => setAccessInfo(null)}
+        title={accessInfo?.title}
+        message={accessInfo?.message}
+        actionLabel={accessInfo?.actionLabel}
+        actionLink={accessInfo?.actionLink}
+        onAction={() => { if (accessInfo?.actionLink) navigate(accessInfo.actionLink); }}
+      />
 
       {/* History */}
       {history.length > 0 && (
