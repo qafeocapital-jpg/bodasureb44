@@ -220,24 +220,24 @@ export default function Compliance() {
           )}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-5 border-b border-border">
+        {/* Pill Toggle at Top */}
+        <div className="flex gap-2 mb-6 bg-[#F0F0F0] p-1 rounded-full w-full">
           <button
             onClick={() => setActiveTab('status')}
-            className={`px-4 py-3 text-sm font-semibold transition-colors ${
+            className={`flex-1 py-2 px-4 rounded-full font-bold text-sm transition-all ${
               activeTab === 'status'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground'
+                ? 'bg-[#EA580C] text-white'
+                : 'bg-transparent text-[#666]'
             }`}
           >
             My Status
           </button>
           <button
             onClick={() => setActiveTab('checklist')}
-            className={`px-4 py-3 text-sm font-semibold transition-colors ${
+            className={`flex-1 py-2 px-4 rounded-full font-bold text-sm transition-all ${
               activeTab === 'checklist'
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground'
+                ? 'bg-[#EA580C] text-white'
+                : 'bg-transparent text-[#666]'
             }`}
           >
             Checklist
@@ -332,6 +332,30 @@ export default function Compliance() {
             payingPenalty ? formatKES(payingPenalty.amount_cents) : ''
           } from your wallet.`}
         />
+      </div>
+
+      {/* Sticky Bottom Tab Bar */}
+      <div className="fixed bottom-20 left-0 right-0 bg-white border-t border-border flex gap-2 p-4 z-40">
+        <button
+          onClick={() => setActiveTab('status')}
+          className={`flex-1 py-2 px-4 rounded-full font-bold text-sm transition-all ${
+            activeTab === 'status'
+              ? 'bg-[#EA580C] text-white'
+              : 'border-2 border-[#CCC] text-[#666]'
+          }`}
+        >
+          My Status
+        </button>
+        <button
+          onClick={() => setActiveTab('checklist')}
+          className={`flex-1 py-2 px-4 rounded-full font-bold text-sm transition-all ${
+            activeTab === 'checklist'
+              ? 'bg-[#EA580C] text-white'
+              : 'border-2 border-[#CCC] text-[#666]'
+          }`}
+        >
+          Checklist
+        </button>
       </div>
     </ErrorBoundary>
   );
