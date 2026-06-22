@@ -10,11 +10,12 @@ import SubTaskBikePhotos from '@/components/rider/onboarding/verification/SubTas
 import SubTaskSelfie from '@/components/rider/onboarding/verification/SubTaskSelfie';
 import SubTaskPhoneOTP from '@/components/rider/onboarding/verification/SubTaskPhoneOTP';
 import SubTaskOwner from '@/components/rider/onboarding/verification/SubTaskOwner';
+import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 import { VERIFICATION_TASKS, getTaskStatuses, isAllSubmitted, TASK_STATUS_CONFIG } from '@/lib/verification';
 
 const TASK_ICONS = [CreditCard, Bike, UserCircle, Smartphone, UserCheck];
 
-export default function PhaseVerification({ user, vehicle, onCompleted, onBack }) {
+export default function PhaseVerification({ user, vehicle, onCompleted, onBack, readOnly, onExitReadOnly }) {
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
   const [kycDocs, setKycDocs] = useState([]);
@@ -73,12 +74,12 @@ export default function PhaseVerification({ user, vehicle, onCompleted, onBack }
   }
 
   // If verification already complete
-  if (user?.verification_complete) {
+  if (user?.verification_complete && !readOnly) {
     return <VerificationComplete onDone={() => navigate('/app')} />;
   }
 
   // If all tasks submitted, show completion card
-  if (allDone) {
+  if (allDone && !readOnly) {
     return (
       <div className="space-y-4">
         <div className="bg-success/5 border border-success/20 rounded-2xl p-6 text-center">
@@ -118,6 +119,7 @@ export default function PhaseVerification({ user, vehicle, onCompleted, onBack }
 
   return (
     <div className="space-y-4">
+      {readOnly && <ReadOnlyBanner />}
       {/* Header */}
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
         <p className="text-sm font-semibold text-primary">Verification</p>
@@ -125,7 +127,7 @@ export default function PhaseVerification({ user, vehicle, onCompleted, onBack }
       </div>
 
       {/* Mini stepper */}
-      <VerificationMiniStepper tasks={tasks} activeIndex={activeTask ?? -1} onSelect={i => setActiveTask(i)} />
+      <VerificationMiniStepper tasks={tasks} activeIndex={activeTask ?? -1} onSelect={readOnly ? undefined : (i => setActiveTask(i))} />
 
       {/* Sub-task list or detail */}
       {activeTask !== null ? (
@@ -139,7 +141,8 @@ export default function PhaseVerification({ user, vehicle, onCompleted, onBack }
             return (
               <button
                 key={task.id}
-                onClick={() => setActiveTask(i)}
+                onClick={() => !readOnly && setActiveTask(i)}
+                disabled={readOnly}
                 className="w-full flex items-center gap-3 bg-card border border-border rounded-xl p-3 text-left hover:bg-accent/50 transition-colors"
               >
                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
@@ -157,12 +160,15 @@ export default function PhaseVerification({ user, vehicle, onCompleted, onBack }
       )}
 
       {/* Go to Dashboard — always visible */}
+      {!readOnly && (
       <button
         onClick={() => navigate('/app')}
         className="w-full flex items-center justify-center gap-1 border border-border rounded-xl py-3 font-semibold text-sm"
       >
         Go to Dashboard <ArrowRight className="w-4 h-4" />
       </button>
+      )}
+      {readOnly && <ReadOnlyBackButton onExit={onExitReadOnly} />}
     </div>
   );
 }

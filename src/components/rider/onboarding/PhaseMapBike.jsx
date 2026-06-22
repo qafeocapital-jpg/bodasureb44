@@ -3,8 +3,9 @@ import { base44 } from '@/api/base44Client';
 import { ChevronRight, ChevronLeft, Loader2, MapPin, AlertTriangle } from 'lucide-react';
 import StageSearchPicker from '@/components/rider/onboarding/StageSearchPicker';
 import MapCountyConfirmation from '@/components/rider/onboarding/MapCountyConfirmation';
+import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 
-export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChange, onSaved, onBack }) {
+export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChange, onSaved, onBack, readOnly, onExitReadOnly }) {
   const [county, setCounty] = useState(null);
   const [subCounties, setSubCounties] = useState([]);
   const [wards, setWards] = useState([]);
@@ -112,6 +113,8 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
 
   return (
     <div className="space-y-4">
+      {readOnly && <ReadOnlyBanner />}
+      <div className={`space-y-4 ${readOnly ? 'opacity-60 pointer-events-none' : ''}`}>
       {/* Read-only county chip */}
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center gap-2">
         <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
@@ -168,6 +171,8 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
         </div>
       )}
 
+      </div>
+      {!readOnly && (
       <div className="flex gap-2 pt-2">
         <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">
           <ChevronLeft className="w-4 h-4" />
@@ -180,6 +185,8 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Save & Continue <ChevronRight className="w-4 h-4" /></>}
         </button>
       </div>
+      )}
+      {readOnly && <ReadOnlyBackButton onExit={onExitReadOnly} />}
     </div>
   );
 }

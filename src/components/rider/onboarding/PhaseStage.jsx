@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { ChevronRight, ChevronLeft, Loader2, MapPin, Users, AlertTriangle } from 'lucide-react';
+import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 
-export default function PhaseStage({ user, vehicle, onSaved, onBack }) {
+export default function PhaseStage({ user, vehicle, onSaved, onBack, readOnly, onExitReadOnly }) {
   const [stage, setStage] = useState(null);
   const [ward, setWard] = useState(null);
   const [subCounty, setSubCounty] = useState(null);
@@ -66,6 +67,8 @@ export default function PhaseStage({ user, vehicle, onSaved, onBack }) {
 
   return (
     <div className="space-y-4">
+      {readOnly && <ReadOnlyBanner />}
+      <div className={`space-y-4 ${readOnly ? 'opacity-60 pointer-events-none' : ''}`}>
       <p className="text-sm text-muted-foreground">Your bike has been mapped to this stage. Confirm to join.</p>
 
       {/* Blue gradient stage card */}
@@ -90,6 +93,8 @@ export default function PhaseStage({ user, vehicle, onSaved, onBack }) {
         </div>
       )}
 
+      </div>
+      {!readOnly && (
       <div className="flex gap-2 pt-2">
         <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">
           <ChevronLeft className="w-4 h-4" />
@@ -102,6 +107,8 @@ export default function PhaseStage({ user, vehicle, onSaved, onBack }) {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Confirm & Join Stage <ChevronRight className="w-4 h-4" /></>}
         </button>
       </div>
+      )}
+      {readOnly && <ReadOnlyBackButton onExit={onExitReadOnly} />}
     </div>
   );
 }

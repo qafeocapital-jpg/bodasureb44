@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
-import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCircle } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCircle, ChevronRight, ArrowRight } from 'lucide-react';
 import { formatPlate } from '@/lib/plate';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import { getOnboardingPhase } from '@/lib/onboarding';
@@ -140,17 +140,24 @@ export default function Home() {
         const doneCount = tasks.filter(t => t.status === 'submitted' || t.status === 'verified').length;
         return (
           <div className="px-4 pt-4">
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-primary">{doneCount}/5</span>
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-bold text-primary">{doneCount}/5</span>
+                </div>
+                <Link to="/app/profile" className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-primary">Complete Verification</p>
+                  <p className="text-[10px] text-muted-foreground">{doneCount} of 5 verification tasks complete</p>
+                </Link>
+                <button onClick={() => setBannerDismissed(true)} className="p-1 text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <Link to="/app/profile" className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-primary">Complete Verification</p>
-                <p className="text-[10px] text-muted-foreground">{doneCount} of 5 verification tasks complete</p>
-              </Link>
-              <button onClick={() => setBannerDismissed(true)} className="p-1 text-muted-foreground hover:text-foreground">
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex justify-end mt-3">
+                <Link to="/app/profile" className="bg-primary text-primary-foreground rounded-full px-4 py-1.5 text-xs font-semibold animate-pulse-glow flex items-center gap-1">
+                  Continue <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             </div>
           </div>
         );
@@ -214,15 +221,18 @@ export default function Home() {
       {/* Notifications Banner */}
       {getOnboardingPhase(user, bikes, groupMembers) < 5 && (
         <div className="px-4 pt-5">
-          <Link to="/app/profile" className="block bg-warning/10 border border-warning/20 rounded-xl p-4">
+          <div className="bg-warning/10 border border-warning/20 rounded-xl p-4">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-medium text-warning">Complete your profile</p>
                 <p className="text-xs text-muted-foreground">Finish your setup to unlock all features</p>
               </div>
+              <Link to="/app/profile" className="bg-primary text-primary-foreground rounded-full px-4 py-1.5 text-xs font-semibold animate-pulse-glow flex items-center gap-1 flex-shrink-0">
+                Start Now <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
-          </Link>
+          </div>
         </div>
       )}
 

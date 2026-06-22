@@ -5,8 +5,9 @@ import { auditLog } from '@/lib/audit';
 import { ChevronRight, ChevronLeft, Loader2, Check, MapPin, Lock, AlertTriangle } from 'lucide-react';
 import PlateInput from '@/components/rider/onboarding/PlateInput';
 import NtsaConfirmDialog from '@/components/rider/onboarding/NtsaConfirmDialog';
+import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 
-export default function PhaseBike({ user, counties, vehicle, initialValues, onDraftChange, onSaved, onBack }) {
+export default function PhaseBike({ user, counties, vehicle, initialValues, onDraftChange, onSaved, onBack, readOnly, onExitReadOnly }) {
   const [form, setForm] = useState({
     role: initialValues?.role || 'rider',
     plate_number: initialValues?.plate_number || '',
@@ -145,6 +146,8 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
 
   return (
     <div className="space-y-4">
+      {readOnly && <ReadOnlyBanner />}
+      <div className={`space-y-4 ${readOnly ? 'opacity-60 pointer-events-none' : ''}`}>
       {user.county_id && (
         <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center gap-2">
           <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
@@ -271,6 +274,8 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
         </div>
       )}
 
+      </div>
+      {!readOnly && (
       <div className="flex gap-2 pt-2">
         <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">
           <ChevronLeft className="w-4 h-4" />
@@ -283,6 +288,8 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Register Bike <ChevronRight className="w-4 h-4" /></>}
         </button>
       </div>
+      )}
+      {readOnly && <ReadOnlyBackButton onExit={onExitReadOnly} />}
 
       <NtsaConfirmDialog
         open={showNtsaDialog}

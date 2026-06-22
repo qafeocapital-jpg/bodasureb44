@@ -10,8 +10,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import GroupCard from '@/components/rider/onboarding/GroupCard';
 import MembershipValueSheet from '@/components/rider/onboarding/MembershipValueSheet';
+import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 
-export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehicleProp, onJoined, onBack }) {
+export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehicleProp, onJoined, onBack, readOnly, onExitReadOnly }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [riderConstituency, setRiderConstituency] = useState(null);
@@ -180,11 +181,13 @@ export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehi
   if (currentGroupId && onboardingComplete && !joinedGroup) {
     return (
       <div className="space-y-4">
-        <div className="bg-accent rounded-2xl p-6 text-center">
+        {readOnly && <ReadOnlyBanner />}
+        <div className={`bg-accent rounded-2xl p-6 text-center ${readOnly ? 'opacity-60 pointer-events-none' : ''}`}>
           <Shield className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
           <p className="text-sm font-medium mb-1">You're a member of {currentGroup?.name || 'a group'}</p>
           <p className="text-xs text-muted-foreground">Contact support to change your group.</p>
         </div>
+        {!readOnly && (
         <div className="flex gap-2 pt-2">
           <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">
             <ChevronLeft className="w-4 h-4" />
@@ -193,6 +196,8 @@ export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehi
             {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continue <ChevronRight className="w-4 h-4" /></>}
           </button>
         </div>
+        )}
+        {readOnly && <ReadOnlyBackButton onExit={onExitReadOnly} />}
       </div>
     );
   }

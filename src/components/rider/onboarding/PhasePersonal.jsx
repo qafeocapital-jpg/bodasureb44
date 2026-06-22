@@ -3,8 +3,9 @@ import { base44 } from '@/api/base44Client';
 import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
 import { ChevronRight, ChevronLeft, Loader2, AlertTriangle } from 'lucide-react';
+import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 
-export default function PhasePersonal({ user, counties, initialValues, onDraftChange, onSaved, onBack }) {
+export default function PhasePersonal({ user, counties, initialValues, onDraftChange, onSaved, onBack, readOnly, onExitReadOnly }) {
   const [form, setForm] = useState({
     full_name: initialValues?.full_name || '',
     phone: initialValues?.phone || '',
@@ -81,6 +82,8 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
 
   return (
     <div className="space-y-4">
+      {readOnly && <ReadOnlyBanner />}
+      <div className={`space-y-4 ${readOnly ? 'opacity-60 pointer-events-none' : ''}`}>
       <div>
         <label className="text-xs font-medium text-muted-foreground">Full Name</label>
         <input
@@ -130,6 +133,8 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
         </div>
       )}
 
+      </div>
+      {!readOnly && (
       <div className="flex gap-2 pt-2">
         <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">
           <ChevronLeft className="w-4 h-4" />
@@ -142,6 +147,8 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Save & Continue <ChevronRight className="w-4 h-4" /></>}
         </button>
       </div>
+      )}
+      {readOnly && <ReadOnlyBackButton onExit={onExitReadOnly} />}
     </div>
   );
 }

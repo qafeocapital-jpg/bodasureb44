@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { ChevronLeft } from 'lucide-react';
@@ -17,6 +17,7 @@ import CompletionScreen from '@/components/rider/onboarding/CompletionScreen';
 
 export default function Profile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, refreshUser } = useAuth();
   const [counties, setCounties] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -25,6 +26,7 @@ export default function Profile() {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [currentPhase, setCurrentPhase] = useState(0);
   const [draftData, setDraftData] = useState({});
+  const [readOnly, setReadOnly] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -38,8 +40,15 @@ export default function Profile() {
         setCounties(cs);
         setVehicles(vs);
         setGroupMembers(gms);
-        const phase = getOnboardingPhase(user, vs, gms);
-        setCurrentPhase(Math.min(phase, 6));
+        const viewStep = location.state?.viewStep;
+        if (viewStep !== undefined && viewStep !== null && user?.onboarding_complete) {
+          setCurrentPhase(viewStep);
+          setReadOnly(true);
+        } else {
+          const phase = getOnboardingPhase(user, vs, gms);
+          setCurrentPhase(Math.min(phase, 6));
+          setReadOnly(false);
+        }
       } catch (e) {}
       setHasInitialized(true);
       setLoading(false);
@@ -101,6 +110,13 @@ export default function Profile() {
     setDraftData(prev => ({ ...prev, [phase]: { ...(prev[phase] || {}), ...partial } }));
   };
 
+  const handleExitReadOnly = () => {
+    setReadOnly(false);
+    const phase = getOnboardingPhase(user, vehicles, groupMembers);
+    setCurrentPhase(Math.min(phase, 6));
+    navigate('/app/profile', { replace: true, state: {} });
+  };
+
   if (loading || !user) return <PageSkeleton variant="default" />;
 
   return (
@@ -114,7 +130,7 @@ export default function Profile() {
       </div>
 
       {/* Progress Bar */}
-      <ProgressBar currentPhase={currentPhase} onJumpBack={(p) => setCurrentPhase(p)} onboardingComplete={user?.onboarding_complete} />
+      <ProgressBar currentPhase={currentPhase} onJumpBack={readOnly ? undefined : ((p) => { setReadOnly(false); setCurrentPhase(p); })} onboardingComplete={user?.onboarding_complete} />
 
       {/* Phase Content */}
       <div className="mt-6">
@@ -126,6 +142,8 @@ export default function Profile() {
             onDraftChange={(partial) => handleDraftChange(0, partial)}
             onSaved={handlePhaseComplete}
             onBack={() => navigate('/app')}
+            readOnly={readOnly}
+            onExitReadOnly={handleExitReadOnly}
           />
         )}
         {currentPhase === 1 && (
@@ -137,6 +155,8 @@ export default function Profile() {
             onDraftChange={(partial) => handleDraftChange(1, partial)}
             onSaved={handlePhaseComplete}
             onBack={() => setCurrentPhase(0)}
+            readOnly={readOnly}
+            onExitReadOnly={handleExitReadOnly}
           />
         )}
         {currentPhase === 2 && (
@@ -147,6 +167,8 @@ export default function Profile() {
             onDraftChange={(partial) => handleDraftChange(2, partial)}
             onSaved={handlePhaseComplete}
             onBack={() => setCurrentPhase(1)}
+            readOnly={readOnly}
+            onExitReadOnly={handleExitReadOnly}
           />
         )}
         {currentPhase === 3 && (
@@ -155,6 +177,8 @@ export default function Profile() {
             vehicle={vehicles[0]}
             onSaved={handlePhaseComplete}
             onBack={() => setCurrentPhase(2)}
+            readOnly={readOnly}
+            onExitReadOnly={handleExitReadOnly}
           />
         )}
         {currentPhase === 4 && (
@@ -165,6 +189,8 @@ export default function Profile() {
             vehicle={vehicles[0]}
             onJoined={handlePhaseComplete}
             onBack={() => setCurrentPhase(3)}
+            readOnly={readOnly}
+            onExitReadOnly={handleExitReadOnly}
           />
         )}
         {currentPhase === 5 && (
@@ -173,6 +199,8 @@ export default function Profile() {
             vehicle={vehicles[0]}
             onCompleted={() => setCurrentPhase(6)}
             onBack={() => setCurrentPhase(4)}
+            readOnly={readOnly}
+            onExitReadOnly={handleExitReadOnly}
           />
         )}
         {currentPhase >= 6 && (
