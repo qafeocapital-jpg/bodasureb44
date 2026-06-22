@@ -22,11 +22,25 @@ export default function CountyRevenue() {
       // Fetch county-scoped vehicles to filter transactions
       const vehicles = countyId ? await base44.entities.Vehicle.filter({ county_id: countyId }) : [];
       const vehicleIds = new Set(vehicles.map(v => v.id));
-      const [allTxns, setts] = await Promise.all([
-        base44.entities.Transaction.filter({ type: 'lipa_county' }, '-created_date', 50),
+
+      // Paginate through all lipa_county transactions and filter to this county
+      const scopedTxns = [];
+      let skip = 0;
+      const batchLimit = 50;
+      while (true) {
+        const batch = await base44.entities.Transaction.filter({ type: 'lipa_county' }, '-created_date', batchLimit, skip);
+        if (batch.length === 0) break;
+        const matching = countyId
+          ? batch.filter(t => !t.vehicle_id || vehicleIds.has(t.vehicle_id))
+          : batch;
+        scopedTxns.push(...matching);
+        if (batch.length < batchLimit) break;
+        skip += batchLimit;
+      }
+
+      const [setts] = await Promise.all([
         base44.entities.Settlement.filter(countyId ? { entity_type: 'county', entity_id: countyId } : { entity_type: 'county' }, '-created_date', 20),
       ]);
-      const scopedTxns = countyId ? allTxns.filter(t => !t.vehicle_id || vehicleIds.has(t.vehicle_id)) : allTxns;
       setTransactions(scopedTxns); setSettlements(setts);
     } catch (e) {}
     setLoading(false);

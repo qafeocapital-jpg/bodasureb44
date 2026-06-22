@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Bike, FileCheck, ShieldAlert,
   Landmark, FileText, Settings, Wallet, Banknote, MessageSquare,
   UserPlus, History, Building2, Database, Coins, FileBarChart,
-  BadgeCheck, Scale, MapPin
+  BadgeCheck, Scale, MapPin, ScrollText
 } from 'lucide-react';
 
 export const countyNav = [
@@ -49,4 +49,5 @@ export const adminNav = [
   { label: 'KYC Review', path: '/admin/kyc', icon: FileCheck },
   { label: 'Money Config', path: '/admin/money', icon: Coins },
   { label: 'Reports', path: '/admin/reports', icon: FileBarChart },
+  { label: 'Audit Log', path: '/admin/audit', icon: ScrollText },
 ];

@@ -53,22 +53,39 @@ export default function AdminMoney() {
     if (!isValid) return;
     setSaving(true);
     try {
-      const payload = {
-        name: ruleForm.name.trim(),
-        product_type: ruleForm.product_type,
-        county_percentage: Number(ruleForm.county_percentage),
-        sacco_percentage: Number(ruleForm.sacco_percentage),
-        platform_percentage: Number(ruleForm.platform_percentage),
-        is_active: true,
-        version: editingRule?.version || 1,
-      };
       const u = await base44.auth.me();
       if (editingRule) {
-        await base44.entities.FeeRule.update(editingRule.id, payload);
-        await auditLog({ userId: u.id, action: 'fee_rule_updated', entityType: 'FeeRule', entityId: editingRule.id, description: `Fee rule "${payload.name}" updated`, newValues: payload });
+        // Versioning: deactivate old rule, create new version
+        await base44.entities.FeeRule.update(editingRule.id, { is_active: false });
+        const newVersion = await base44.entities.FeeRule.create({
+          name: ruleForm.name.trim(),
+          product_type: ruleForm.product_type,
+          county_percentage: Number(ruleForm.county_percentage),
+          sacco_percentage: Number(ruleForm.sacco_percentage),
+          platform_percentage: Number(ruleForm.platform_percentage),
+          is_active: true,
+          version: (editingRule.version || 1) + 1,
+        });
+        await auditLog({
+          userId: u.id,
+          action: 'fee_rule_versioned',
+          entityType: 'FeeRule',
+          entityId: newVersion.id,
+          description: `Fee rule "${ruleForm.name.trim()}" updated to v${newVersion.version} (old v${editingRule.version} deactivated)`,
+          oldValues: { id: editingRule.id, version: editingRule.version, county_pct: editingRule.county_percentage, sacco_pct: editingRule.sacco_percentage, platform_pct: editingRule.platform_percentage },
+          newValues: { id: newVersion.id, version: newVersion.version, county_pct: newVersion.county_percentage, sacco_pct: newVersion.sacco_percentage, platform_pct: newVersion.platform_percentage },
+        });
       } else {
-        const created = await base44.entities.FeeRule.create(payload);
-        await auditLog({ userId: u.id, action: 'fee_rule_created', entityType: 'FeeRule', entityId: created.id, description: `Fee rule "${payload.name}" created`, newValues: payload });
+        const created = await base44.entities.FeeRule.create({
+          name: ruleForm.name.trim(),
+          product_type: ruleForm.product_type,
+          county_percentage: Number(ruleForm.county_percentage),
+          sacco_percentage: Number(ruleForm.sacco_percentage),
+          platform_percentage: Number(ruleForm.platform_percentage),
+          is_active: true,
+          version: 1,
+        });
+        await auditLog({ userId: u.id, action: 'fee_rule_created', entityType: 'FeeRule', entityId: created.id, description: `Fee rule "${ruleForm.name.trim()}" created`, newValues: { version: 1 } });
       }
       setShowRuleModal(false);
       load();
