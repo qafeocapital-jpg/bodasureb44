@@ -12,6 +12,8 @@ import SubTaskPhoneOTP from '@/components/rider/onboarding/verification/SubTaskP
 import SubTaskOwner from '@/components/rider/onboarding/verification/SubTaskOwner';
 import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 import { VERIFICATION_TASKS, getTaskStatuses, isAllSubmitted, TASK_STATUS_CONFIG } from '@/lib/verification';
+import TierBenefitsCard from '@/components/rider/TierBenefitsCard';
+import { getKycLevel } from '@/components/ui/KycLevelBadge';
 
 const TASK_ICONS = [CreditCard, Bike, UserCircle, Smartphone, UserCheck];
 
@@ -120,6 +122,7 @@ export default function PhaseVerification({ user, vehicle, onCompleted, onBack, 
   return (
     <div className="space-y-4">
       {readOnly && <ReadOnlyBanner />}
+      {getKycLevel(user) < 2 && <TierBenefitsCard />}
       {/* Header */}
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
         <p className="text-sm font-semibold text-primary">Verification</p>

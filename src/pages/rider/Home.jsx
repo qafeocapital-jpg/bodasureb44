@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
-import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCircle, ChevronRight, ArrowRight } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCircle, ChevronRight, ArrowRight, Lock } from 'lucide-react';
 import { formatPlate } from '@/lib/plate';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import { getOnboardingPhase } from '@/lib/onboarding';
 import { getKycLevel, KYC_LEVEL_CONFIG } from '@/components/ui/KycLevelBadge';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import { getTaskStatuses } from '@/lib/verification';
+import LockedTileSheet from '@/components/rider/LockedTileSheet';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const location = useLocation();
+  const { toast } = useToast();
   const [balance, setBalance] = useState(0);
   const [walletActive, setWalletActive] = useState(false);
   const [bikes, setBikes] = useState([]);
@@ -23,6 +27,26 @@ export default function Home() {
   const [ownerBikes, setOwnerBikes] = useState([]);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [lockedTile, setLockedTile] = useState(null);
+  const [prevKycStatus, setPrevKycStatus] = useState(null);
+
+  // Check for Tier 2 celebration on mount and when kyc_status changes
+  useEffect(() => {
+    if (!user?.kyc_status) return;
+    
+    // Show toast if kyc_status just became 'verified'
+    if (user.kyc_status === 'verified' && prevKycStatus !== 'verified') {
+      const sessionKey = `tier2_celebrated_${user.id}`;
+      if (!sessionStorage.getItem(sessionKey)) {
+        toast({
+          title: "You're now Tier 2 Verified! 🎉",
+          description: 'Lipa Owner, Contributions & Insurance are now unlocked.',
+        });
+        sessionStorage.setItem(sessionKey, 'true');
+      }
+    }
+    setPrevKycStatus(user.kyc_status);
+  }, [user?.kyc_status, user?.id, prevKycStatus, toast]);
 
   useEffect(() => {
     async function loadData() {
@@ -236,6 +260,20 @@ export default function Home() {
         </div>
       )}
 
+      {/* Locked Tile Sheet */}
+      {lockedTile && (
+        <LockedTileSheet
+          open={!!lockedTile}
+          onClose={() => setLockedTile(null)}
+          tileLabel={lockedTile.label}
+          featureDescription={{
+            'Pay Owner': 'Pay bike owners directly for use and rental.',
+            'Contributions': 'Join group savings and SACCO contributions.',
+            'Insurance': 'Protect yourself with comprehensive coverage.',
+          }[lockedTile.label] || 'This feature requires Tier 2 verification.'}
+        />
+      )}
+
       {/* Icon Grid Sections */}
       <div className="px-4 py-5 space-y-7">
         {user && riderTileSections.map((section) => (
@@ -245,25 +283,40 @@ export default function Home() {
               {section.tiles.map((tile) => {
                 const Icon = tile.icon;
                 const isSoon = tile.status === 'soon';
-                const TileLink = isSoon ? 'div' : Link;
+                const isLocked = tile.requiresTier2 && getKycLevel(user) < 2;
+                const TileElement = isSoon || isLocked ? 'div' : Link;
+
+                const tileConfig = {
+                  to: isSoon || isLocked ? undefined : tile.path,
+                  onClick: isLocked ? () => setLockedTile(tile) : undefined,
+                  className: `flex flex-col items-center gap-1.5 ${(isSoon || isLocked) ? 'cursor-pointer' : 'cursor-pointer'}`,
+                };
+
+                
+
                 return (
-                  <TileLink
-                    key={tile.label}
-                    to={isSoon ? undefined : tile.path}
-                    className={`flex flex-col items-center gap-1.5 ${isSoon ? 'cursor-default' : 'cursor-pointer'}`}
-                  >
-                    <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center ${isSoon ? 'bg-slate-100' : tileColors[tile.color]} transition-transform active:scale-95`}>
+                  <TileElement key={tile.label} {...tileConfig}>
+                    <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center transition-transform ${
+                      isLocked ? 'bg-slate-100 text-slate-400 active:scale-95' : 
+                      isSoon ? 'bg-slate-100 text-slate-400 active:scale-95' : 
+                      `${tileColors[tile.color]} active:scale-95`
+                    }`}>
                       <Icon className="w-6 h-6" strokeWidth={2} />
+                      {isLocked && (
+                        <span className="absolute -top-2 -right-2 bg-orange-600 text-white rounded-full p-1">
+                          <Lock className="w-3 h-3" />
+                        </span>
+                      )}
                       {isSoon && (
                         <span className="absolute -top-1 -right-1 bg-amber-400 text-[8px] font-bold text-amber-950 rounded-full px-1.5 py-0.5 leading-none">
                           SOON
                         </span>
                       )}
                     </div>
-                    <span className={`text-[10px] text-center font-medium leading-tight ${isSoon ? 'text-slate-400' : 'text-foreground'}`}>
+                    <span className={`text-[10px] text-center font-medium leading-tight ${isLocked || isSoon ? 'text-slate-400' : 'text-foreground'}`}>
                       {tile.label}
                     </span>
-                  </TileLink>
+                  </TileElement>
                 );
               })}
             </div>
