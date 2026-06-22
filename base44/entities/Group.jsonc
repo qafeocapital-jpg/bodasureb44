@@ -37,6 +37,30 @@
     },
     "description": {
       "type": "string"
+    },
+    "bank_name": {
+      "type": "string"
+    },
+    "bank_account_name": {
+      "type": "string"
+    },
+    "bank_account_number": {
+      "type": "string"
+    },
+    "bank_branch": {
+      "type": "string"
+    },
+    "mpesa_till_number": {
+      "type": "string"
+    },
+    "official_name": {
+      "type": "string"
+    },
+    "official_phone": {
+      "type": "string"
+    },
+    "official_email": {
+      "type": "string"
     }
   },
   "required": [

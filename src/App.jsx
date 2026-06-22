@@ -58,6 +58,8 @@ import AdminMoney from './pages/admin/Money';
 import AdminReports from './pages/admin/Reports';
 import AdminAuditLog from './pages/admin/AuditLog';
 import AdminAnnouncements from './pages/admin/Announcements';
+import AdminSaccos from './pages/admin/AdminSaccos';
+import SeedData from './pages/admin/SeedData';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -163,6 +165,8 @@ const AuthenticatedApp = () => {
         <Route path="/admin/reports" element={<AdminReports />} />
         <Route path="/admin/audit" element={<AdminAuditLog />} />
         <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+        <Route path="/admin/saccos" element={<AdminSaccos />} />
+        <Route path="/admin/seed" element={<SeedData />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />

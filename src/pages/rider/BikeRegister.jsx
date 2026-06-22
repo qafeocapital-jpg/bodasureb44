@@ -39,6 +39,8 @@ export default function BikeRegister() {
     stage_id: '',
     is_owner_rider: true,
     owner_phone: '',
+    owner_found: null,
+    owner_found_name: '',
   });
 
   useEffect(() => {
@@ -103,7 +105,7 @@ export default function BikeRegister() {
     switch (step) {
       case 0: return !!form.role;
       case 1: return form.plate_number && form.make && form.color;
-      case 2: return form.county_id && form.sub_county_id && form.ward_id;
+      case 2: return form.county_id && form.sub_county_id && form.ward_id && form.stage_id;
       case 3: return bikePhotoUrl && riderPhotoUrl;
       case 4: return logbookUrl && (form.is_owner_rider || ownerIdUrl);
       default: return false;
@@ -250,11 +252,30 @@ export default function BikeRegister() {
               <input
                 type="tel"
                 value={form.owner_phone}
-                onChange={e => setForm(f => ({ ...f, owner_phone: e.target.value }))}
+                onChange={e => setForm(f => ({ ...f, owner_phone: e.target.value, owner_found: null }))}
+                onBlur={async () => {
+                  if (!form.owner_phone) return;
+                  const normalized = normalizePhone(form.owner_phone);
+                  if (!normalized) { setForm(f => ({ ...f, owner_found: false })); return; }
+                  try {
+                    const ownerUsers = await base44.entities.User.filter({ phone: normalized });
+                    setForm(f => ({ ...f, owner_found: ownerUsers.length > 0, owner_found_name: ownerUsers[0]?.full_name }));
+                  } catch (e) {
+                    setForm(f => ({ ...f, owner_found: false }));
+                  }
+                }}
                 placeholder="07XX XXX XXX"
                 className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">If the owner is on BodaSure, we'll link them automatically.</p>
+              {form.owner_found === true && (
+                <p className="text-[10px] text-success mt-1 font-medium flex items-center gap-1">
+                  <Check className="w-3 h-3" /> Owner found: {form.owner_found_name} — they'll be linked automatically.
+                </p>
+              )}
+              {form.owner_found === false && form.owner_phone && (
+                <p className="text-[10px] text-muted-foreground mt-1">Owner not found on BodaSure yet. They'll be linked when they register.</p>
+              )}
+              {form.owner_found === null && <p className="text-[10px] text-muted-foreground mt-1">If the owner is on BodaSure, we'll link them automatically.</p>}
             </div>
           )}
           <div className="flex gap-2 pt-2">
@@ -291,7 +312,7 @@ export default function BikeRegister() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Stage (Optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">Stage *</label>
             <select value={form.stage_id} onChange={e => setForm(f => ({ ...f, stage_id: e.target.value }))} disabled={!form.ward_id} className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50">
               <option value="">Select stage</option>
               {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}

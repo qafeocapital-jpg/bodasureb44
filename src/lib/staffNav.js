@@ -44,6 +44,7 @@ export const stageNav = [
 export const adminNav = [
   { label: 'Overview', path: '/admin/overview', icon: LayoutDashboard },
   { label: 'Counties', path: '/admin/counties', icon: Building2 },
+  { label: 'SACCOs', path: '/admin/saccos', icon: Building2 },
   { label: 'SasaPay', path: '/admin/sasapay', icon: Database },
   { label: 'Users', path: '/admin/users', icon: Users },
   { label: 'KYC Review', path: '/admin/kyc', icon: FileCheck },
@@ -51,4 +52,5 @@ export const adminNav = [
   { label: 'Announcements', path: '/admin/announcements', icon: Megaphone },
   { label: 'Reports', path: '/admin/reports', icon: FileBarChart },
   { label: 'Audit Log', path: '/admin/audit', icon: ScrollText },
+  { label: 'Seed Data', path: '/admin/seed', icon: Database },
 ];
