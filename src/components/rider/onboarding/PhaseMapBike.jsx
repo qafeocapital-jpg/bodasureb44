@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { ChevronRight, ChevronLeft, Loader2, MapPin } from 'lucide-react';
 import StageSearchPicker from '@/components/rider/onboarding/StageSearchPicker';
+import MapCountyConfirmation from '@/components/rider/onboarding/MapCountyConfirmation';
 
 export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
   const [county, setCounty] = useState(null);
@@ -14,6 +15,7 @@ export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
     stage_id: vehicle?.stage_id || '',
   });
   const [saving, setSaving] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -66,7 +68,7 @@ export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
         ward_id: form.ward_id,
         stage_id: form.stage_id,
       });
-      await onSaved();
+      setShowConfirmation(true);
     } catch (e) {}
     setSaving(false);
   }
@@ -77,6 +79,24 @@ export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
         <p className="text-sm text-muted-foreground mb-4">No bike registered yet. Go back and register one first.</p>
         <button onClick={onBack} className="bg-primary text-primary-foreground rounded-xl px-5 py-2.5 text-sm font-semibold">Register Bike</button>
       </div>
+    );
+  }
+
+  if (showConfirmation) {
+    const subCounty = subCounties.find(s => s.id === form.sub_county_id);
+    const ward = wards.find(w => w.id === form.ward_id);
+    const stage = stages.find(s => s.id === form.stage_id);
+    return (
+      <MapCountyConfirmation
+        user={user}
+        vehicle={vehicle}
+        county={county}
+        subCounty={subCounty}
+        ward={ward}
+        stage={stage}
+        onContinue={onSaved}
+        onBack={() => setShowConfirmation(false)}
+      />
     );
   }
 
@@ -122,6 +142,7 @@ export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
         <StageSearchPicker
           wardId={form.ward_id}
           countyId={user?.county_id}
+          countyName={county?.name}
           stages={stages}
           selectedStageId={form.stage_id}
           onSelect={(id) => setForm(f => ({ ...f, stage_id: id }))}

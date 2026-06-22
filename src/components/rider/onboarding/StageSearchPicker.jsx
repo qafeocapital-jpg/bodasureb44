@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { MapPin, Search, Loader2, Check, X, Plus } from 'lucide-react';
+import { getCountyCenter, isInCounty } from '@/lib/countyBounds';
+import { MapPin, Search, Loader2, Check, X, Plus, AlertTriangle } from 'lucide-react';
 
-const KISUMU_CENTER = [34.7467, -0.0917];
-
-export default function StageSearchPicker({ wardId, countyId, stages, selectedStageId, onSelect, onStagesChange }) {
+export default function StageSearchPicker({ wardId, countyId, countyName, stages, selectedStageId, onSelect, onStagesChange }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [mapboxToken, setMapboxToken] = useState('');
   const [mapCoords, setMapCoords] = useState(null);
@@ -14,6 +13,7 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
   const [newStageName, setNewStageName] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [geoError, setGeoError] = useState('');
   const [memberCounts, setMemberCounts] = useState({});
 
   const mapContainerRef = useRef(null);
@@ -22,28 +22,25 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
   const pinMarkerRef = useRef(null);
   const stageMarkersRef = useRef([]);
   const debounceRef = useRef(null);
+  const countyNameRef = useRef(countyName);
 
-  // Fetch Mapbox token from backend
+  countyNameRef.current = countyName;
+
+  // Fetch Mapbox token immediately on mount
   useEffect(() => {
-    async function fetchToken() {
-      try {
-        const res = await base44.functions.invoke('getMapboxToken', {});
-        if (res.data?.token) setMapboxToken(res.data.token);
-      } catch (e) {}
-    }
-    fetchToken();
+    base44.functions.invoke('getMapboxToken', {}).then(res => {
+      if (res.data?.token) setMapboxToken(res.data.token);
+    }).catch(() => {});
   }, []);
 
-  // Fetch real member counts (vehicles per stage in this ward)
+  // Fetch real member counts
   useEffect(() => {
     async function fetchCounts() {
       if (!wardId) { setMemberCounts({}); return; }
       try {
         const vehicles = await base44.entities.Vehicle.filter({ ward_id: wardId });
         const counts = {};
-        vehicles.forEach(v => {
-          if (v.stage_id) counts[v.stage_id] = (counts[v.stage_id] || 0) + 1;
-        });
+        vehicles.forEach(v => { if (v.stage_id) counts[v.stage_id] = (counts[v.stage_id] || 0) + 1; });
         setMemberCounts(counts);
       } catch (e) {}
     }
@@ -60,21 +57,20 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
     setSearching(true);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      const center = getCountyCenter(countyNameRef.current);
+      const proximity = `${center[0]},${center[1]}`;
       try {
-        const proximity = mapCoords ? `${mapCoords[0]},${mapCoords[1]}` : `${KISUMU_CENTER[0]},${KISUMU_CENTER[1]}`;
         const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery.trim())}.json?access_token=${mapboxToken}&country=ke&proximity=${proximity}&limit=5`;
         const res = await fetch(url);
         const data = await res.json();
         setPlaceResults(data.features || []);
-      } catch (e) {
-        setPlaceResults([]);
-      }
+      } catch (e) { setPlaceResults([]); }
       setSearching(false);
     }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [searchQuery, mapboxToken]);
 
-  // Map init — runs once when token is available
+  // Map init — mounts immediately when token arrives, centered on county
   useEffect(() => {
     if (!mapboxToken || !mapContainerRef.current) return;
     let cancelled = false;
@@ -86,19 +82,18 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
       mapboxglRef.current = mapboxgl;
       if (cancelled || mapRef.current) return;
 
+      const center = getCountyCenter(countyNameRef.current);
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
         style: 'mapbox://styles/mapbox/streets-v12',
-        center: KISUMU_CENTER,
-        zoom: 12,
+        center,
+        zoom: 11,
       });
       mapRef.current = map;
 
       map.on('click', (e) => {
         const coords = [e.lngLat.lng, e.lngLat.lat];
-        setMapCoords(coords);
-        setNewStageName('');
-        setShowCreate(true);
+        tryPlacePin(coords, '');
       });
     }
     initMap();
@@ -115,11 +110,11 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
     };
   }, [mapboxToken]);
 
-  // Update stage markers when stages or selection change
+  // Update stage markers when stages/selection change
   useEffect(() => {
     const map = mapRef.current;
     const mapboxgl = mapboxglRef.current;
-    if (!map || !mapboxgl) return;
+    if (!map || !mapboxgl || !wardId) return;
 
     stageMarkersRef.current.forEach(m => m.remove());
     stageMarkersRef.current = [];
@@ -137,10 +132,7 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
         el.style.border = '2px solid white';
         el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
         el.style.cursor = 'pointer';
-        el.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          handleSelectExisting(s);
-        });
+        el.addEventListener('click', (ev) => { ev.stopPropagation(); handleSelectExisting(s); });
 
         const popup = new mapboxgl.Popup({ offset: 20 }).setHTML(
           `<p style="font-weight:600;margin:0;">${s.name}</p><p style="font-size:11px;color:#666;margin:2px 0 0;">${memberCounts[s.id] || 0} members</p>`
@@ -167,7 +159,7 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
 
     if (map.loaded()) addMarkers();
     else map.once('load', addMarkers);
-  }, [stages, selectedStageId, memberCounts]);
+  }, [stages, selectedStageId, memberCounts, wardId]);
 
   // Update pin marker when coords change
   useEffect(() => {
@@ -184,7 +176,7 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
           .addTo(map);
         marker.on('dragend', () => {
           const lngLat = marker.getLngLat();
-          setMapCoords([lngLat.lng, lngLat.lat]);
+          tryPlacePin([lngLat.lng, lngLat.lat], newStageName);
         });
         pinMarkerRef.current = marker;
       }
@@ -194,16 +186,30 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
     else map.once('load', updatePin);
   }, [mapCoords]);
 
+  function tryPlacePin(coords, nameHint) {
+    if (!isInCounty(coords[0], coords[1], countyNameRef.current)) {
+      setGeoError(`This location is outside your county — please pin within ${countyNameRef.current}.`);
+      setMapCoords(null);
+      setShowCreate(false);
+      if (pinMarkerRef.current) { pinMarkerRef.current.remove(); pinMarkerRef.current = null; }
+      setTimeout(() => setGeoError(''), 4000);
+      return;
+    }
+    setGeoError('');
+    setMapCoords(coords);
+    setNewStageName(nameHint || '');
+    setShowCreate(true);
+    const map = mapRef.current;
+    if (map) map.flyTo({ center: coords, zoom: 15 });
+  }
+
   function handleSelectExisting(stage) {
     onSelect(stage.id);
     setSearchQuery('');
     setPlaceResults([]);
     setShowCreate(false);
     setMapCoords(null);
-    if (pinMarkerRef.current) {
-      pinMarkerRef.current.remove();
-      pinMarkerRef.current = null;
-    }
+    if (pinMarkerRef.current) { pinMarkerRef.current.remove(); pinMarkerRef.current = null; }
     const map = mapRef.current;
     if (map && stage.location_lat && stage.location_lng) {
       map.flyTo({ center: [stage.location_lng, stage.location_lat], zoom: 15 });
@@ -211,14 +217,9 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
   }
 
   function handleSelectPlace(feature) {
-    const coords = feature.center;
-    setMapCoords(coords);
-    setNewStageName(feature.text || (feature.place_name || '').split(',')[0] || '');
-    setShowCreate(true);
+    tryPlacePin(feature.center, feature.text || (feature.place_name || '').split(',')[0] || '');
     setSearchQuery('');
     setPlaceResults([]);
-    const map = mapRef.current;
-    if (map) map.flyTo({ center: coords, zoom: 15 });
   }
 
   async function handleCreateStage() {
@@ -228,17 +229,10 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
     try {
       const name = newStageName.trim();
       const existing = stages.find(s => s.name.toLowerCase() === name.toLowerCase());
-      if (existing) {
-        onSelect(existing.id);
-        resetCreate();
-        return;
-      }
+      if (existing) { onSelect(existing.id); resetCreate(); return; }
 
       const stageData = { name, ward_id: wardId, county_id: countyId };
-      if (mapCoords) {
-        stageData.location_lng = mapCoords[0];
-        stageData.location_lat = mapCoords[1];
-      }
+      if (mapCoords) { stageData.location_lng = mapCoords[0]; stageData.location_lat = mapCoords[1]; }
 
       const created = await base44.entities.Stage.create(stageData);
       onStagesChange([...stages, created]);
@@ -255,10 +249,7 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
     setNewStageName('');
     setMapCoords(null);
     setError('');
-    if (pinMarkerRef.current) {
-      pinMarkerRef.current.remove();
-      pinMarkerRef.current = null;
-    }
+    if (pinMarkerRef.current) { pinMarkerRef.current.remove(); pinMarkerRef.current = null; }
   }
 
   if (!wardId) {
@@ -291,13 +282,15 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
         )}
       </div>
 
-      {/* Always-visible Map */}
-      {!mapboxToken ? (
-        <div className="w-full h-[220px] rounded-xl bg-muted flex items-center justify-center">
-          <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+      {/* Always-visible Map — container always rendered, map tiles load on their own */}
+      <div ref={mapContainerRef} className="w-full h-[260px] rounded-xl overflow-hidden border border-border bg-slate-100" />
+
+      {/* Geo-fence error */}
+      {geoError && (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2 animate-fade-in">
+          <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-destructive font-medium">{geoError}</p>
         </div>
-      ) : (
-        <div ref={mapContainerRef} className="w-full h-[220px] rounded-xl overflow-hidden border border-border" />
       )}
 
       {/* Selected stage indicator */}
@@ -315,11 +308,7 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
       {showSuggestions && !showCreate && (
         <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden shadow-sm">
           {filteredStages.map(s => (
-            <button
-              key={s.id}
-              onClick={() => handleSelectExisting(s)}
-              className="w-full text-left p-3 flex items-center gap-2.5 hover:bg-accent transition-colors"
-            >
+            <button key={s.id} onClick={() => handleSelectExisting(s)} className="w-full text-left p-3 flex items-center gap-2.5 hover:bg-accent transition-colors">
               <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0" />
               <div>
                 <p className="text-sm font-semibold">{s.name}</p>
@@ -328,11 +317,7 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
             </button>
           ))}
           {placeResults.map(f => (
-            <button
-              key={f.id}
-              onClick={() => handleSelectPlace(f)}
-              className="w-full text-left p-3 flex items-start gap-2.5 hover:bg-accent transition-colors"
-            >
+            <button key={f.id} onClick={() => handleSelectPlace(f)} className="w-full text-left p-3 flex items-start gap-2.5 hover:bg-accent transition-colors">
               <Plus className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold">{f.text}</p>
@@ -346,19 +331,13 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
         </div>
       )}
 
-      {/* Existing stages list (when not searching) */}
+      {/* Existing stages list */}
       {!showSuggestions && !showCreate && stages.length > 0 && (
         <div>
           <p className="text-xs font-medium text-muted-foreground mb-2">Stages in this ward</p>
           <div className="space-y-1.5">
             {stages.map(s => (
-              <button
-                key={s.id}
-                onClick={() => handleSelectExisting(s)}
-                className={`w-full text-left p-3 rounded-xl border-2 transition-colors flex items-center justify-between ${
-                  selectedStageId === s.id ? 'border-primary bg-primary/5' : 'border-border'
-                }`}
-              >
+              <button key={s.id} onClick={() => handleSelectExisting(s)} className={`w-full text-left p-3 rounded-xl border-2 transition-colors flex items-center justify-between ${selectedStageId === s.id ? 'border-primary bg-primary/5' : 'border-border'}`}>
                 <div className="flex items-center gap-2">
                   <MapPin className={`w-4 h-4 ${selectedStageId === s.id ? 'text-primary' : 'text-muted-foreground'}`} />
                   <div>
@@ -373,16 +352,15 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
         </div>
       )}
 
-      {/* Create new stage form */}
+      {/* Inline create-stage card */}
       {showCreate && (
-        <div className="bg-accent rounded-xl p-4 space-y-3">
+        <div className="bg-accent rounded-xl p-4 space-y-3 animate-fade-in">
           <div className="flex items-center justify-between">
             <p className="text-sm font-heading font-bold">Create New Stage</p>
             <button onClick={resetCreate} className="p-1 rounded-lg hover:bg-muted">
               <X className="w-4 h-4 text-muted-foreground" />
             </button>
           </div>
-
           <div>
             <label className="text-xs font-medium text-muted-foreground">Stage Name</label>
             <input
@@ -393,21 +371,18 @@ export default function StageSearchPicker({ wardId, countyId, stages, selectedSt
               className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-
           {mapCoords && (
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <MapPin className="w-3 h-3 text-primary" /> Pinned at {mapCoords[1].toFixed(4)}, {mapCoords[0].toFixed(4)}
             </p>
           )}
-
           {error && <p className="text-[10px] text-destructive">{error}</p>}
-
           <button
             onClick={handleCreateStage}
             disabled={!newStageName.trim() || creating}
             className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-2.5 font-semibold text-sm disabled:opacity-50"
           >
-            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4" /> Add Stage</>}
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4" /> Create stage here</>}
           </button>
         </div>
       )}
