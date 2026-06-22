@@ -9,7 +9,7 @@ export default function MembershipValueSheet({ group, onContinue, onClose }) {
 
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent className="max-w-[512px] mx-auto max-h-[85vh] overflow-y-auto pb-24">
+      <DrawerContent className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[512px] max-h-[85vh] overflow-y-auto pb-24">
         {isIndependent ? (
           <>
             <DrawerHeader>

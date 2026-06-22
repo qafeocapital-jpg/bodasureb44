@@ -20,7 +20,7 @@ export default function LockedTileSheet({ open, onClose, tileLabel, featureDescr
       />
 
       {/* Sheet */}
-      <div className="fixed bottom-0 left-0 right-0 bg-card rounded-t-3xl shadow-lg z-50 animate-slide-up">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[512px] bg-card rounded-t-3xl shadow-lg z-50 animate-slide-up">
         {/* Handle bar */}
         <div className="flex justify-center pt-3 pb-2">
           <div className="h-1 w-10 bg-muted rounded-full" />

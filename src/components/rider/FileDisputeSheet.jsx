@@ -56,9 +56,9 @@ export default function FileDisputeSheet({ open, onClose, onSubmit, transaction,
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
-      <div className="relative w-full max-w-[512px] bg-card rounded-t-3xl p-6 pb-24 animate-slide-up max-h-[85vh] overflow-y-auto">
+    <>
+      <div className="fixed inset-0 bg-black/40 z-[70]" onClick={handleClose} />
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[512px] bg-card rounded-t-3xl p-6 pb-24 animate-slide-up max-h-[85vh] overflow-y-auto z-[71]">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -140,6 +140,6 @@ export default function FileDisputeSheet({ open, onClose, onSubmit, transaction,
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
