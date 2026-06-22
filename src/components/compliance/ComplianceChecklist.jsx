@@ -1,26 +1,43 @@
-import { Link } from 'react-router-dom';
-import { CheckCircle2, Clock, XCircle } from 'lucide-react';
-import { VERIFICATION_TASKS, TASK_STATUS_CONFIG } from '@/lib/verification';
+import { useNavigate } from 'react-router-dom';
+import { CheckCircle2 } from 'lucide-react';
 
-function ChecklistRow({ icon: Icon, label, status, link, subLabel }) {
-  const config = TASK_STATUS_CONFIG[status] || TASK_STATUS_CONFIG.not_started;
+function ChecklistRow({ label, status, link, subLabel }) {
+  const navigate = useNavigate();
+  const isComplete = status === 'verified';
+
+  const badgeConfig = {
+    verified: { bg: 'bg-success/10', border: 'border-success/30', text: 'text-success', label: 'Complete' },
+    submitted: { bg: 'bg-warning/10', border: 'border-warning/30', text: 'text-warning', label: 'Incomplete' },
+    in_progress: { bg: 'bg-warning/10', border: 'border-warning/30', text: 'text-warning', label: 'Incomplete' },
+    rejected: { bg: 'bg-destructive/10', border: 'border-destructive/30', text: 'text-destructive', label: 'Rejected' },
+    not_started: { bg: 'bg-warning/10', border: 'border-warning/30', text: 'text-warning', label: 'Incomplete' },
+  };
+
+  const badge = badgeConfig[status] || badgeConfig.not_started;
 
   return (
-    <Link
-      to={link}
-      className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3 hover:bg-accent transition-colors"
-    >
+    <div className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3">
       <div className="flex items-center gap-3 flex-1">
-        {Icon && <Icon className={`w-5 h-5 ${config.className}`} />}
+        {isComplete && <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />}
         <div>
           <p className="text-sm font-medium">{label}</p>
           {subLabel && <p className="text-xs text-muted-foreground">{subLabel}</p>}
         </div>
       </div>
-      {status !== 'verified' && status !== 'not_started' && (
-        <span className="text-xs text-primary font-semibold">Fix →</span>
-      )}
-    </Link>
+      <div className="flex items-center gap-2">
+        <span className={`px-2.5 py-1 rounded-full border text-xs font-semibold ${badge.bg} ${badge.border} ${badge.text}`}>
+          {badge.label}
+        </span>
+        {!isComplete && link && (
+          <button
+            onClick={() => navigate(link)}
+            className="text-warning hover:text-warning/80 font-semibold text-xs ml-2"
+          >
+            Fix →
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -60,6 +60,7 @@ import AdminAuditLog from './pages/admin/AuditLog';
 import AdminAnnouncements from './pages/admin/Announcements';
 import AdminSaccos from './pages/admin/AdminSaccos';
 import SeedData from './pages/admin/SeedData';
+import RiderVerify from './pages/public/RiderVerify';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -181,7 +182,13 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
-          <AuthenticatedApp />
+          <Routes>
+            {/* Public routes */}
+            <Route path="/verify/:riderId" element={<RiderVerify />} />
+            
+            {/* Protected app routes */}
+            <Route path="*" element={<AuthenticatedApp />} />
+          </Routes>
         </Router>
         <Toaster />
       </QueryClientProvider>

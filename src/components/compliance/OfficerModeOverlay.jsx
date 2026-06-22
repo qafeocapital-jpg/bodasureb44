@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Shield, X, CheckCircle2, AlertTriangle, User } from 'lucide-react';
+import { useMemo } from 'react';
+import { X, CheckCircle2, AlertTriangle, User } from 'lucide-react';
+import QRCode from 'qrcode.react';
 import { formatDate } from '@/lib/format';
 
 export default function OfficerModeOverlay({
@@ -12,16 +13,10 @@ export default function OfficerModeOverlay({
   kycDocs,
   tier,
 }) {
-  const [qrUrl, setQrUrl] = useState('');
-
-  useEffect(() => {
-    if (open && vehicle?.plate_number && user?.id) {
-      // Generate QR code URL using API (no NPM required)
-      const qrData = permit?.qr_code_data || `BODASURE-${vehicle.id}-${user.id}-${Date.now()}`;
-      const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-      setQrUrl(url);
-    }
-  }, [open, vehicle?.plate_number, vehicle?.id, user?.id, permit?.qr_code_data]);
+  const qrValue = useMemo(() => {
+    if (!user?.id) return '';
+    return `${window.location.origin}/verify/${user.id}`;
+  }, [user?.id]);
 
   if (!open) return null;
 
@@ -120,13 +115,9 @@ export default function OfficerModeOverlay({
         </div>
 
         {/* QR Code */}
-        {qrUrl && (
+        {qrValue && (
           <div className="flex justify-center mb-6 bg-white p-4 rounded-xl border-2 border-border">
-            <img
-              src={qrUrl}
-              alt="Verification QR Code"
-              className="w-40 h-40"
-            />
+            <QRCode value={qrValue} size={160} level="H" includeMargin={true} />
           </div>
         )}
 

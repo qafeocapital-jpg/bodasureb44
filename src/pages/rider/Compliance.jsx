@@ -44,6 +44,7 @@ export default function Compliance() {
   const [payingPenalty, setPayingPenalty] = useState(null);
   const [paying, setPaying] = useState(false);
   const [isOfficerMode, setIsOfficerMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('status');
 
   // Load all data in parallel
   useEffect(() => {
@@ -238,68 +239,99 @@ export default function Compliance() {
         </button>
       </div>
 
-      {/* Compliance Tier Hero */}
-      <ComplianceTierHero tier={complianceTier} score={complianceScore} />
+      {/* Tabs */}
+      <div className="flex gap-2 mb-5 border-b border-border">
+        <button
+          onClick={() => setActiveTab('status')}
+          className={`px-4 py-3 text-sm font-semibold transition-colors ${
+            activeTab === 'status'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-muted-foreground'
+          }`}
+        >
+          My Status
+        </button>
+        <button
+          onClick={() => setActiveTab('checklist')}
+          className={`px-4 py-3 text-sm font-semibold transition-colors ${
+            activeTab === 'checklist'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-muted-foreground'
+          }`}
+        >
+          Checklist
+        </button>
+      </div>
 
-      {/* Rider Identity Summary */}
-      <RiderIdentitySummary
-        user={user}
-        vehicle={vehicle}
-        kycDocs={kycDocs}
-        group={group}
-      />
+      {/* Tab 1: My Status */}
+      {activeTab === 'status' && (
+        <div className="space-y-5">
+          {/* Compliance Tier Hero */}
+          <ComplianceTierHero tier={complianceTier} score={complianceScore} />
 
-      {/* Permit & Insurance Status */}
-      <PermitInsuranceCards
-        permit={activePermit}
-        policy={activePolicy}
-        permitDaysRemaining={permitDaysRemaining}
-        insuranceDaysRemaining={insuranceDaysRemaining}
-      />
+          {/* Rider Identity Summary */}
+          <RiderIdentitySummary
+            user={user}
+            vehicle={vehicle}
+            kycDocs={kycDocs}
+            group={group}
+          />
 
-      {/* Pending Penalties */}
-      {penalties.length > 0 && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4 mb-5">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-5 h-5 text-destructive" />
-            <h2 className="font-heading font-bold text-sm text-destructive">
-              Pending Penalties ({penalties.length})
-            </h2>
-          </div>
-          <div className="space-y-2">
-            {penalties.map((p) => (
-              <div
-                key={p.id}
-                className="bg-card border border-border rounded-xl p-3 flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-sm font-semibold">{formatKES(p.amount_cents)}</p>
-                  <p className="text-xs text-muted-foreground">{p.reason}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Issued: {formatDate(p.issued_at)}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setPayingPenalty(p)}
-                  disabled={!wallet || wallet.status !== 'active'}
-                  className="bg-destructive text-destructive-foreground rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                >
-                  Pay Now
-                </button>
+          {/* Permit & Insurance Status */}
+          <PermitInsuranceCards
+            permit={activePermit}
+            policy={activePolicy}
+            permitDaysRemaining={permitDaysRemaining}
+            insuranceDaysRemaining={insuranceDaysRemaining}
+          />
+
+          {/* Pending Penalties */}
+          {penalties.length > 0 && (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <h2 className="font-heading font-bold text-sm text-destructive">
+                  Pending Penalties ({penalties.length})
+                </h2>
               </div>
-            ))}
-          </div>
+              <div className="space-y-2">
+                {penalties.map((p) => (
+                  <div
+                    key={p.id}
+                    className="bg-card border border-border rounded-xl p-3 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold">{formatKES(p.amount_cents)}</p>
+                      <p className="text-xs text-muted-foreground">{p.reason}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Issued: {formatDate(p.issued_at)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setPayingPenalty(p)}
+                      disabled={!wallet || wallet.status !== 'active'}
+                      className="bg-destructive text-destructive-foreground rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                    >
+                      Pay Now
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Full Compliance Checklist */}
-      <ComplianceChecklist
-        user={user}
-        vehicle={vehicle}
-        taskStatuses={taskStatuses}
-        wallet={wallet}
-        groupMember={groupMember}
-      />
+      {/* Tab 2: Checklist */}
+      {activeTab === 'checklist' && (
+        <ComplianceChecklist
+          user={user}
+          vehicle={vehicle}
+          taskStatuses={taskStatuses}
+          wallet={wallet}
+          groupMember={groupMember}
+        />
+      )}
 
       {/* Officer Mode Overlay */}
       <OfficerModeOverlay
