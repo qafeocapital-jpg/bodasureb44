@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, timeAgo } from '@/lib/format';
-import { Users, Bike, BadgeCheck, Landmark, TrendingUp, AlertCircle, Banknote, Clock } from 'lucide-react';
+import { Users, Bike, BadgeCheck, Landmark, TrendingUp, AlertCircle, Banknote, Clock, MapPin } from 'lucide-react';
+import StageMap from '@/components/admin/StageMap';
 
 export default function CountyDashboard() {
   const { user } = useAuth();
@@ -142,6 +143,15 @@ export default function CountyDashboard() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Stage Map */}
+      <div className="bg-card border border-border rounded-xl p-5 mt-4">
+        <div className="flex items-center gap-2 mb-4">
+          <MapPin className="w-5 h-5 text-emerald-600" />
+          <h2 className="font-heading font-bold">Stage Map</h2>
+        </div>
+        <StageMap countyId={countyId} />
       </div>
     </div>
   );

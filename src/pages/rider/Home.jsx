@@ -7,6 +7,7 @@ import { formatKES, getGreeting } from '@/lib/format';
 import { ShieldCheck, AlertCircle, Megaphone } from 'lucide-react';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import { getOnboardingPhase } from '@/lib/onboarding';
+import { getKycLevel } from '@/components/ui/KycLevelBadge';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Home() {
@@ -74,7 +75,7 @@ export default function Home() {
           {walletActive ? (
             <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full px-3 py-1">
               <ShieldCheck className="w-4 h-4" />
-              <span className="text-xs font-medium">Wallet Active</span>
+              <span className="text-xs font-medium">Wallet Active · Level {getKycLevel(user)}</span>
             </div>
           ) : (
             <Link to="/app/wallet/activate" className="flex items-center gap-1.5 bg-white text-primary rounded-full px-3 py-1.5 font-semibold text-xs hover:bg-orange-50 transition-colors">

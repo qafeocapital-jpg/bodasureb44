@@ -116,7 +116,7 @@ export default function PhaseBike({ user, counties, onSaved, onBack }) {
           />
         </div>
         <div className="w-24">
-          <label className="text-xs font-medium text-muted-foreground">Year</label>
+          <label className="text-xs font-medium text-muted-foreground">Year <span className="text-muted-foreground/60">(Optional)</span></label>
           <input
             type="number"
             value={form.year}

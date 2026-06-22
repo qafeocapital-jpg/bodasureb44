@@ -28,7 +28,7 @@ export default function AdminKyc() {
     const doc = docs.find(d => d.id === id);
     const u = await base44.auth.me();
     await base44.entities.KycDocument.update(id, { status: 'approved', reviewed_by_id: u.id, reviewed_at: new Date().toISOString() });
-    // Upgrade user to Tier 2
+    // Upgrade user to Level 2
     if (doc?.user_id) {
       await base44.entities.User.update(doc.user_id, { kyc_status: 'approved', wallet_tier: 2 });
       const wallets = await base44.entities.Wallet.filter({ user_id: doc.user_id, entity_type: 'personal' });
@@ -37,7 +37,7 @@ export default function AdminKyc() {
       }
     }
     await auditLog({ userId: u.id, action: 'kyc_approved', entityType: 'KycDocument', entityId: id, description: `KYC document (${doc?.document_type}) approved for user ${doc?.user_id}` });
-    toast({ title: 'KYC Approved', description: 'User upgraded to Tier 2.' });
+    toast({ title: 'KYC Approved', description: 'User upgraded to Level 2.' });
     load();
   }
 

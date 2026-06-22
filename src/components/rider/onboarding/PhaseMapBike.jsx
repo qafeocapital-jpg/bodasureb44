@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { ChevronRight, ChevronLeft, Loader2, MapPin } from 'lucide-react';
+import StagePicker from '@/components/rider/onboarding/StagePicker';
 
 export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
   const [county, setCounty] = useState(null);
@@ -117,20 +118,15 @@ export default function PhaseMapBike({ user, vehicle, onSaved, onBack }) {
 
       <div>
         <label className="text-xs font-medium text-muted-foreground">Stage</label>
-        <select
-          value={form.stage_id}
-          onChange={e => setForm(f => ({ ...f, stage_id: e.target.value }))}
-          disabled={!form.ward_id}
-          className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-        >
-          <option value="">Select stage</option>
-          {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        {form.ward_id && (
-          <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
-            <MapPin className="w-3 h-3" /> Your stage is where you pick up passengers.
-          </p>
-        )}
+        <p className="text-[10px] text-muted-foreground mb-2">The official/main stage you operate from</p>
+        <StagePicker
+          wardId={form.ward_id}
+          countyId={user?.county_id}
+          stages={stages}
+          selectedStageId={form.stage_id}
+          onSelect={(id) => setForm(f => ({ ...f, stage_id: id }))}
+          onStagesChange={setStages}
+        />
       </div>
 
       <div className="flex gap-2 pt-2">

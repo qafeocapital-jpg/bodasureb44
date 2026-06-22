@@ -93,11 +93,11 @@ export default function Kyc() {
       <div className={`rounded-xl p-4 mb-5 ${user?.kyc_status === 'approved' ? 'bg-success/10' : user?.kyc_status === 'pending' ? 'bg-warning/10' : 'bg-accent'}`}>
         <div className="flex items-center gap-2">
           {user?.kyc_status === 'approved' ? (
-            <><CheckCircle2 className="w-5 h-5 text-success" /><p className="text-sm font-medium text-success">KYC Approved — Tier 2 unlocked!</p></>
+            <><CheckCircle2 className="w-5 h-5 text-success" /><p className="text-sm font-medium text-success">Verified ✓ — Level 2 unlocked! Full access enabled.</p></>
           ) : user?.kyc_status === 'pending' ? (
-            <><Clock className="w-5 h-5 text-warning" /><p className="text-sm font-medium text-warning">Under Review — We're checking your documents</p></>
+            <><Clock className="w-5 h-5 text-warning" /><p className="text-sm font-medium text-warning">Level 1 — ID submitted, we're checking your documents</p></>
           ) : (
-            <><Upload className="w-5 h-5 text-muted-foreground" /><p className="text-sm font-medium text-muted-foreground">Upload your documents to get verified</p></>
+            <><Upload className="w-5 h-5 text-muted-foreground" /><p className="text-sm font-medium text-muted-foreground">Level 0 — Upload your documents to get verified</p></>
           )}
         </div>
       </div>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Phone, Mail, ShieldCheck, Bike, BadgeCheck, Wallet as WalletIcon, Loader2 } from 'lucide-react';
+import { X, Phone, Mail, ShieldCheck, Bike, BadgeCheck, Loader2 } from 'lucide-react';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { formatDate } from '@/lib/format';
+import KycLevelBadge from '@/components/ui/KycLevelBadge';
 
 export default function RiderDetailSheet({ riderId, onClose }) {
   const [rider, setRider] = useState(null);
@@ -84,22 +85,10 @@ export default function RiderDetailSheet({ riderId, onClose }) {
             </div>
 
             {/* Badges */}
-            <div className="flex flex-wrap gap-2">
-              <div className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-2">
-                <ShieldCheck className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-[10px] text-muted-foreground">KYC Status</p>
-                  <span className={`text-xs font-semibold ${rider.kyc_status === 'approved' ? 'text-success' : rider.kyc_status === 'pending' ? 'text-warning' : 'text-muted-foreground'}`}>
-                    {rider.kyc_status || 'none'}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-2">
-                <WalletIcon className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-[10px] text-muted-foreground">Wallet Tier</p>
-                  <span className="text-xs font-semibold">Tier {wallet?.tier ?? rider.wallet_tier ?? 0}</span>
-                </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              <div className="bg-card border border-border rounded-lg px-3 py-2">
+                <p className="text-[10px] text-muted-foreground mb-1">Verification</p>
+                <KycLevelBadge user={rider} wallet={wallet} size="lg" />
               </div>
               <div className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-2">
                 <BadgeCheck className="w-4 h-4 text-muted-foreground" />

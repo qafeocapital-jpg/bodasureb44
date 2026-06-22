@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Link } from 'react-router-dom';
 import { formatKES } from '@/lib/format';
-import { Building2, Users, Bike, BadgeCheck, Database, Activity, ChevronRight, TrendingUp, Banknote, ScrollText } from 'lucide-react';
+import { Building2, Users, Bike, BadgeCheck, Database, Activity, ChevronRight, TrendingUp, Banknote, ScrollText, MapPin } from 'lucide-react';
+import StageMap from '@/components/admin/StageMap';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function AdminOverview() {
@@ -167,6 +168,15 @@ export default function AdminOverview() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Stage Map */}
+      <div className="bg-card border border-border rounded-xl p-5 mt-4">
+        <div className="flex items-center gap-2 mb-4">
+          <MapPin className="w-5 h-5 text-orange-600" />
+          <h2 className="font-heading font-bold">Stage Map — All Counties</h2>
+        </div>
+        <StageMap countyId={null} />
       </div>
     </div>
   );

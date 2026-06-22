@@ -112,7 +112,7 @@ export default function WalletActivate() {
         date_of_birth: identity.date_of_birth,
         profile_complete: true,
       });
-      await auditLog({ userId: user.id, action: 'wallet_activated', entityType: 'Wallet', entityId: wallet.id, description: `Wallet activated to Tier 1 for user ${user.id}` });
+      await auditLog({ userId: user.id, action: 'wallet_activated', entityType: 'Wallet', entityId: wallet.id, description: `Wallet activated to Level 1 for user ${user.id}` });
       await refreshUser();
       setStep(3);
     } catch (e) {
@@ -249,7 +249,7 @@ export default function WalletActivate() {
         <div className="space-y-4">
           <div className="bg-accent rounded-xl p-4 flex items-center gap-3">
             <FileCheck className="w-5 h-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">Confirm your identity details. You'll need to upload KYC documents later to unlock Tier 2 (withdrawals).</p>
+            <p className="text-sm text-muted-foreground">Confirm your identity details. You'll need to upload KYC documents later to unlock Level 2 (withdrawals).</p>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Full Name</label>
@@ -308,11 +308,11 @@ export default function WalletActivate() {
             <Check className="w-10 h-10 text-success" />
           </div>
           <h2 className="font-heading font-bold text-xl mb-2">Wallet Activated!</h2>
-          <p className="text-sm text-muted-foreground mb-6">Your wallet is now Tier 1. You can deposit and receive money. Upload KYC documents to unlock withdrawals and sending.</p>
+          <p className="text-sm text-muted-foreground mb-6">Your wallet is now Level 1. You can deposit and receive money. Upload KYC documents to unlock withdrawals and sending.</p>
           <div className="bg-card border border-border rounded-2xl p-4 mb-6 text-left">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground">Wallet Tier</span>
-              <span className="text-sm font-bold text-primary">Tier 1</span>
+              <span className="text-xs text-muted-foreground">Verification Level</span>
+              <span className="text-sm font-bold text-primary">Level 1</span>
             </div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-muted-foreground">Balance Limit</span>

@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { getAccessiblePortals } from '@/lib/portals';
 import { User, FileCheck, Bell, Lock, Headphones, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
 import { formatPhoneDisplay } from '@/lib/phone';
+import KycLevelBadge from '@/components/ui/KycLevelBadge';
 
 export default function Account() {
   const { user } = useAuth();
@@ -37,9 +38,9 @@ export default function Account() {
               )}
             </div>
             <p className="text-sm text-muted-foreground">{user?.phone ? formatPhoneDisplay(user.phone) : user?.email || 'Not set'}</p>
-            <span className="inline-block mt-1 text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">
-              Tier {user?.wallet_tier || 0}
-            </span>
+            <div className="mt-1">
+              <KycLevelBadge user={user} />
+            </div>
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
         </div>
