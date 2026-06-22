@@ -8,12 +8,11 @@ import { processWalletPayment, getWalletBalance } from '@/lib/payments';
 import { verifyPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
 import { getTaskStatuses } from '@/lib/verification';
-import { differenceInDays } from 'date-fns';
 import PinEntrySheet from '@/components/rider/PinEntrySheet';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import ComplianceTierHero from '@/components/compliance/ComplianceTierHero';
 import RiderIdentitySummary from '@/components/compliance/RiderIdentitySummary';
-import PermitInsuranceCards from '@/components/compliance/PermitInsuranceCards';
+
 import ComplianceChecklist from '@/components/compliance/ComplianceChecklist';
 import OfficerModeOverlay from '@/components/compliance/OfficerModeOverlay';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -26,8 +25,6 @@ export default function Compliance() {
 
   // Data state
   const [vehicle, setVehicle] = useState(null);
-  const [permits, setPermits] = useState([]);
-  const [policies, setPolicies] = useState([]);
   const [kycDocs, setKycDocs] = useState([]);
   const [groupMember, setGroupMember] = useState(null);
   const [group, setGroup] = useState(null);
@@ -75,19 +72,7 @@ export default function Compliance() {
           setBalance(bal);
         }
 
-        // Fetch permits and policies if bike exists
-        let perms = [];
-        let pols = [];
-        if (v?.id) {
-          const results = await Promise.all([
-            base44.entities.Permit.filter({ vehicle_id: v.id, status: 'active' }, '-created_date', 1),
-            base44.entities.Policy.filter({ vehicle_id: v.id, status: 'active' }, '-created_date', 1),
-          ]);
-          perms = results[0];
-          pols = results[1];
-          setPermits(perms);
-          setPolicies(pols);
-        }
+
 
         // Fetch group name if member
         if (groupMembers[0]?.group_id) {
@@ -98,7 +83,7 @@ export default function Compliance() {
         // Compute task statuses and compliance score
         const tasks = getTaskStatuses(kycDocsData, user, v);
         setTaskStatuses(tasks);
-        const score = computeCompliance(user, v, w, kycDocsData, groupMembers, perms, pols);
+        const score = computeCompliance(user, v, w, kycDocsData, groupMembers);
       } catch (e) {
         console.error('Compliance load error:', e);
       }
@@ -108,14 +93,12 @@ export default function Compliance() {
     load();
   }, [user?.id]);
 
-  function computeCompliance(usr, vhc, wlt, docs, members, perms, pols) {
+  function computeCompliance(usr, vhc, wlt, docs, members) {
     const scores = {
-      bike_approved: vhc?.status === 'approved' ? 20 : 0,
-      active_permit: perms?.length > 0 ? 25 : 0,
-      kyc_approved: usr?.kyc_status === 'approved' ? 20 : 0,
-      id_verified: docs?.some(d => d.document_type === 'id_front' && d.status === 'approved') && docs?.some(d => d.document_type === 'id_back' && d.status === 'approved') ? 15 : 0,
-      insurance_active: pols?.length > 0 ? 15 : 0,
-      sacco_member: members?.length > 0 ? 5 : 0,
+      bike_approved: vhc?.status === 'approved' ? 25 : 0,
+      kyc_approved: usr?.kyc_status === 'approved' ? 25 : 0,
+      id_verified: docs?.some(d => d.document_type === 'id_front' && d.status === 'approved') && docs?.some(d => d.document_type === 'id_back' && d.status === 'approved') ? 25 : 0,
+      sacco_member: members?.length > 0 ? 25 : 0,
     };
 
     const score = Object.values(scores).reduce((a, b) => a + b, 0);
@@ -275,13 +258,7 @@ export default function Compliance() {
               group={group}
             />
 
-            {/* Permit & Insurance Status */}
-            <PermitInsuranceCards
-              permit={activePermit}
-              policy={activePolicy}
-              permitDaysRemaining={permitDaysRemaining}
-              insuranceDaysRemaining={insuranceDaysRemaining}
-            />
+
 
             {/* Pending Penalties */}
             {penalties.length > 0 && (
@@ -339,7 +316,7 @@ export default function Compliance() {
           onClose={() => setIsOfficerMode(false)}
           user={user}
           vehicle={vehicle}
-          permit={activePermit}
+          permit={null}
           group={group}
           kycDocs={kycDocs}
           tier={complianceTier}
