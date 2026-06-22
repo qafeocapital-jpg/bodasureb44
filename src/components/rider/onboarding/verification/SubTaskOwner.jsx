@@ -69,7 +69,7 @@ export default function SubTaskOwner({ user, vehicle, onDataChange, onBack }) {
   if (isVerified) {
     return (
       <div className="space-y-4">
-        <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <button onClick={onBack} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
           <ChevronLeft className="w-4 h-4" /> Back to tasks
         </button>
         <div className="flex items-center gap-2 mb-2">
@@ -93,7 +93,7 @@ export default function SubTaskOwner({ user, vehicle, onDataChange, onBack }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <button onClick={onBack} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
         <ChevronLeft className="w-4 h-4" /> Back to tasks
       </button>
 
