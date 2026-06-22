@@ -24,9 +24,7 @@ export default function AdminReports() {
     setError('');
     setData([]);
     try {
-      const result = config.filter
-        ? await base44.entities[config.entity].filter(config.filter, config.sort, config.limit)
-        : await base44.entities[config.entity].list(config.sort, config.limit);
+      const result = await base44.entities[config.entity].filter(config.filter || {}, config.sort, config.limit);
       setData(result);
     } catch (e) {
       setError(e.message || 'Failed to load report data');

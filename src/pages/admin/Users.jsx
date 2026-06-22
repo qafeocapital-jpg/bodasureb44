@@ -29,7 +29,7 @@ export default function AdminUsers() {
   async function load() {
     setLoading(true);
     try {
-      const u = await base44.entities.User.list();
+      const u = await base44.entities.User.filter({});
       setUsers(u);
     } catch (e) {}
     setLoading(false);
@@ -50,7 +50,7 @@ export default function AdminUsers() {
   async function handleRoleChange(userId, newRole) {
     setChangingRole(userId);
     try {
-      await base44.asServiceRole.entities.User.update(userId, { role: newRole });
+      await base44.entities.User.update(userId, { role: newRole });
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (e) {}
     setChangingRole(null);

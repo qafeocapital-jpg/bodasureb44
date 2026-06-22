@@ -66,6 +66,9 @@ export default function Compliance() {
 
   async function handlePayPenalty(pin) {
     if (!wallet || !payingPenalty) return;
+    if (!(await verifyPin(pin, wallet.id))) {
+      throw new Error('Incorrect PIN. Try again.');
+    }
     setPaying(true);
     try {
       const cents = payingPenalty.amount_cents;

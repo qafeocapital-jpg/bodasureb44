@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatKES } from '@/lib/format';
 import { auditLog } from '@/lib/audit';
-import { Coins, Percent, Banknote, Scale, Plus, Pencil } from 'lucide-react';
+import { Coins, Percent, Banknote, Scale, Plus, Pencil, Calendar } from 'lucide-react';
+import FeeScheduleTab from '@/components/admin/FeeScheduleTab';
+import DisputesTab from '@/components/admin/DisputesTab';
 
 export default function AdminMoney() {
   const [tab, setTab] = useState('fees');
@@ -95,6 +97,7 @@ export default function AdminMoney() {
 
   const tabs = [
     { id: 'fees', label: 'Fee Rules', icon: Percent },
+    { id: 'schedules', label: 'Fee Schedules', icon: Calendar },
     { id: 'settlements', label: 'Settlements', icon: Banknote },
     { id: 'disputes', label: 'Disputes', icon: Scale },
   ];
@@ -164,6 +167,8 @@ export default function AdminMoney() {
             ))
           )}
         </div>
+      ) : tab === 'schedules' ? (
+        <FeeScheduleTab />
       ) : tab === 'settlements' ? (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
@@ -187,10 +192,7 @@ export default function AdminMoney() {
           {settlements.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No settlements</p>}
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-xl p-8 text-center">
-          <Scale className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground">No payment disputes</p>
-        </div>
+        <DisputesTab />
       )}
 
       {showRuleModal && (

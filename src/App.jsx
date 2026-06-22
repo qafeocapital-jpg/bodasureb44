@@ -55,6 +55,7 @@ import AdminKyc from './pages/admin/Kyc';
 import AdminMoney from './pages/admin/Money';
 import AdminReports from './pages/admin/Reports';
 import AdminAuditLog from './pages/admin/AuditLog';
+import AdminAnnouncements from './pages/admin/Announcements';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -157,6 +158,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/money" element={<AdminMoney />} />
         <Route path="/admin/reports" element={<AdminReports />} />
         <Route path="/admin/audit" element={<AdminAuditLog />} />
+        <Route path="/admin/announcements" element={<AdminAnnouncements />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />
