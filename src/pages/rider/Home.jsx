@@ -4,11 +4,12 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
-import { ShieldCheck, AlertCircle, Megaphone } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle } from 'lucide-react';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import { getOnboardingPhase } from '@/lib/onboarding';
 import { getKycLevel } from '@/components/ui/KycLevelBadge';
 import PageSkeleton from '@/components/rider/PageSkeleton';
+import { getTaskStatuses } from '@/lib/verification';
 
 export default function Home() {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ export default function Home() {
   const [kycDocs, setKycDocs] = useState([]);
   const [groupMembers, setGroupMembers] = useState([]);
   const [latestAnnouncement, setLatestAnnouncement] = useState(null);
+  const [ownerBikes, setOwnerBikes] = useState([]);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +44,13 @@ export default function Home() {
         setBikes(merged);
         setKycDocs(kyc);
         setGroupMembers(gms);
+        // Fetch bikes where user is the owner (by phone) but hasn't verified yet
+        if (user.phone) {
+          try {
+            const ob = await base44.entities.Vehicle.filter({ owner_phone: user.phone, owner_verified: false });
+            setOwnerBikes(ob.filter(b => !b.is_owner_rider));
+          } catch (e) {}
+        }
         // Fetch latest published announcement for riders
         try {
           const announcements = await base44.entities.Announcement.filter({ status: 'published' }, '-created_date', 10);
@@ -100,6 +110,70 @@ export default function Home() {
       <div className="px-4 pt-5">
         {user && <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} groupMembers={groupMembers} />}
       </div>
+
+      {/* Verification Nudge Banner */}
+      {user?.onboarding_complete && !user?.verification_complete && !bannerDismissed && (() => {
+        const tasks = getTaskStatuses(kycDocs, user, bikes[0]);
+        const doneCount = tasks.filter(t => t.status === 'submitted' || t.status === 'verified').length;
+        return (
+          <div className="px-4 pt-4">
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-bold text-primary">{doneCount}/5</span>
+              </div>
+              <Link to="/app/profile" className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-primary">Complete Verification</p>
+                <p className="text-[10px] text-muted-foreground">{doneCount} of 5 verification tasks complete</p>
+              </Link>
+              <button onClick={() => setBannerDismissed(true)} className="p-1 text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Owner Verify My Bike Section */}
+      {ownerBikes.length > 0 && (
+        <div className="px-4 pt-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <HelpCircle className="w-5 h-5 text-amber-600" />
+              <p className="text-sm font-semibold text-amber-700">Verify Your Bike</p>
+            </div>
+            <p className="text-[10px] text-amber-600 mb-3">
+              A rider has registered {ownerBikes.length === 1 ? 'a bike' : `${ownerBikes.length} bikes`} with you as the owner. Please confirm ownership.
+            </p>
+            <div className="space-y-2">
+              {ownerBikes.map(bike => (
+                <div key={bike.id} className="bg-white rounded-lg p-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">{bike.plate_number}</p>
+                    <p className="text-[10px] text-muted-foreground">{bike.make} · {bike.color}</p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={async () => {
+                        await base44.entities.Vehicle.update(bike.id, { owner_verified: true });
+                        setOwnerBikes(prev => prev.filter(b => b.id !== bike.id));
+                      }}
+                      className="flex items-center gap-1 bg-success text-white rounded-lg px-3 py-1.5 text-xs font-semibold"
+                    >
+                      <Check className="w-3 h-3" /> Confirm
+                    </button>
+                    <a
+                      href="mailto:support@bodasure.com"
+                      className="flex items-center gap-1 bg-destructive/10 text-destructive border border-destructive/20 rounded-lg px-3 py-1.5 text-xs font-semibold"
+                    >
+                      Dispute
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Latest Announcement Banner */}
       {latestAnnouncement && (

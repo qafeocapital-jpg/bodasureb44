@@ -50,6 +50,14 @@
       "type": "boolean",
       "default": false
     },
+    "phone_verified": {
+      "type": "boolean",
+      "default": false
+    },
+    "verification_complete": {
+      "type": "boolean",
+      "default": false
+    },
     "staff_type": {
       "type": "string",
       "enum": [

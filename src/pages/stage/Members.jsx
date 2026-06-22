@@ -4,12 +4,15 @@ import { formatDate } from '@/lib/format';
 import { Users } from 'lucide-react';
 import BikeDetailSheet from '@/components/BikeDetailSheet';
 import { formatPhoneDisplay } from '@/lib/phone';
+import VerificationBadge from '@/components/admin/VerificationBadge';
+import VerificationDetailSheet from '@/components/admin/VerificationDetailSheet';
 
 export default function StageMembers() {
   const [members, setMembers] = useState([]);
   const [bikeByRider, setBikeByRider] = useState({});
   const [loading, setLoading] = useState(true);
   const [detailVehicleId, setDetailVehicleId] = useState(null);
+  const [verifyRiderId, setVerifyRiderId] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -54,7 +57,8 @@ export default function StageMembers() {
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Phone</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Joined</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Bike</th>
-              </tr>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Verification</th>
+                </tr>
             </thead>
             <tbody>
               {members.map(m => (
@@ -69,6 +73,9 @@ export default function StageMembers() {
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    <VerificationBadge user={m} onClick={() => setVerifyRiderId(m.id)} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -78,6 +85,10 @@ export default function StageMembers() {
 
       {detailVehicleId && (
         <BikeDetailSheet vehicleId={detailVehicleId} onClose={() => setDetailVehicleId(null)} isStaff accent="blue" />
+      )}
+
+      {verifyRiderId && (
+        <VerificationDetailSheet riderId={verifyRiderId} onClose={() => setVerifyRiderId(null)} canApprove={false} />
       )}
     </div>
   );

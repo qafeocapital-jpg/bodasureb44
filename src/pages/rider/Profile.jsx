@@ -12,6 +12,7 @@ import PhaseBike from '@/components/rider/onboarding/PhaseBike';
 import PhaseMapBike from '@/components/rider/onboarding/PhaseMapBike';
 import PhaseStage from '@/components/rider/onboarding/PhaseStage';
 import PhaseSacco from '@/components/rider/onboarding/PhaseSacco';
+import PhaseVerification from '@/components/rider/onboarding/PhaseVerification';
 import CompletionScreen from '@/components/rider/onboarding/CompletionScreen';
 
 export default function Profile() {
@@ -38,7 +39,7 @@ export default function Profile() {
         setVehicles(vs);
         setGroupMembers(gms);
         const phase = getOnboardingPhase(user, vs, gms);
-        setCurrentPhase(Math.min(phase, 5));
+        setCurrentPhase(Math.min(phase, 6));
       } catch (e) {}
       setHasInitialized(true);
       setLoading(false);
@@ -60,7 +61,7 @@ export default function Profile() {
 
   async function handlePhaseComplete() {
     await refreshData();
-    setCurrentPhase(p => Math.min(p + 1, 5));
+    setCurrentPhase(p => Math.min(p + 1, 6));
   }
 
   const phaseInitialValues = (phase) => {
@@ -166,8 +167,16 @@ export default function Profile() {
             onBack={() => setCurrentPhase(3)}
           />
         )}
-        {currentPhase >= 5 && (
-          <CompletionScreen onDone={() => navigate('/app')} />
+        {currentPhase === 5 && (
+          <PhaseVerification
+            user={user}
+            vehicle={vehicles[0]}
+            onCompleted={() => setCurrentPhase(6)}
+            onBack={() => setCurrentPhase(4)}
+          />
+        )}
+        {currentPhase >= 6 && (
+          <CompletionScreen onDone={() => navigate('/app')} verificationComplete={user?.verification_complete} />
         )}
       </div>
     </div>

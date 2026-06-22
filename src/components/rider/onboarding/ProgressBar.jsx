@@ -3,9 +3,9 @@ import { Check } from 'lucide-react';
 import { ONBOARDING_PHASES } from '@/lib/onboarding';
 
 export default function ProgressBar({ currentPhase, onJumpBack, onboardingComplete }) {
-  const isDone = currentPhase >= 5;
+  const isDone = currentPhase >= 6;
   const activePhase = isDone ? null : ONBOARDING_PHASES[currentPhase];
-  const canJumpBack = !onboardingComplete;
+  const canJumpBack = (i) => !onboardingComplete || i === 5;
 
   return (
     <div className="space-y-3">
@@ -23,12 +23,12 @@ export default function ProgressBar({ currentPhase, onJumpBack, onboardingComple
                 {isDone ? 'Setup Complete!' : activePhase.name}
               </p>
               <p className="text-[10px] text-muted-foreground font-medium">
-                {isDone ? 'You can now access all features' : `Step ${currentPhase + 1} of 5`}
+                {isDone ? 'You can now access all features' : `Step ${currentPhase + 1} of 6`}
               </p>
             </div>
           </div>
           <span className="text-xs font-bold text-muted-foreground">
-            {isDone ? '5/5' : `${currentPhase + 1}/5`}
+            {isDone ? '6/6' : `${currentPhase + 1}/6`}
           </span>
         </div>
       </div>
@@ -42,8 +42,8 @@ export default function ProgressBar({ currentPhase, onJumpBack, onboardingComple
           return (
             <Fragment key={phase.id}>
               <button
-                onClick={() => isCompleted && canJumpBack && onJumpBack ? onJumpBack(i) : null}
-                disabled={!isCompleted || !canJumpBack}
+                onClick={() => isCompleted && canJumpBack(i) && onJumpBack ? onJumpBack(i) : null}
+                disabled={!isCompleted || !canJumpBack(i)}
                 className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all flex-shrink-0 ${
                   isCompleted
                     ? 'bg-primary text-primary-foreground cursor-pointer hover:scale-110'

@@ -7,6 +7,8 @@ import { Users, Bike, BadgeCheck, FileText, MapPin, ArrowLeftRight, Plus, Pencil
 import BikeDetailSheet from '@/components/BikeDetailSheet';
 import RiderDetailSheet from '@/components/county/RiderDetailSheet';
 import StageModal from '@/components/county/StageModal';
+import VerificationBadge from '@/components/admin/VerificationBadge';
+import VerificationDetailSheet from '@/components/admin/VerificationDetailSheet';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -22,6 +24,7 @@ export default function CountyRegistrations() {
   const [selectedRiderId, setSelectedRiderId] = useState(null);
   const [showStageModal, setShowStageModal] = useState(false);
   const [editingStage, setEditingStage] = useState(null);
+  const [verifyRiderId, setVerifyRiderId] = useState(null);
   const { toast } = useToast();
 
   const countyId = user?.scope_entity_id || user?.county_id;
@@ -118,6 +121,7 @@ export default function CountyRegistrations() {
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Phone</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">KYC</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Verification</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Joined</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -129,6 +133,9 @@ export default function CountyRegistrations() {
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{r.phone ? formatPhoneDisplay(r.phone) : r.email || '—'}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${r.kyc_status === 'approved' ? 'bg-success/10 text-success' : r.kyc_status === 'pending' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground'}`}>{r.kyc_status || 'none'}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <VerificationBadge user={r} onClick={() => setVerifyRiderId(r.id)} />
                   </td>
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(r.created_date)}</td>
                   <td className="px-4 py-3 text-right">
@@ -236,6 +243,10 @@ export default function CountyRegistrations() {
         editingStage={editingStage}
         countyId={countyId}
       />
+
+      {verifyRiderId && (
+        <VerificationDetailSheet riderId={verifyRiderId} onClose={() => setVerifyRiderId(null)} canApprove={false} />
+      )}
     </div>
   );
 }

@@ -12,7 +12,11 @@
         "id_back",
         "selfie",
         "logbook",
-        "owner_id"
+        "owner_id",
+        "bike_front",
+        "bike_left",
+        "bike_rear",
+        "bike_right"
       ]
     },
     "file_url": {

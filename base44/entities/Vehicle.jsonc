@@ -69,6 +69,20 @@
     "approved_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "owner_phone": {
+      "type": "string"
+    },
+    "owner_verified": {
+      "type": "boolean",
+      "default": false
+    },
+    "owner_name": {
+      "type": "string"
+    },
+    "owner_invite_sent_at": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [

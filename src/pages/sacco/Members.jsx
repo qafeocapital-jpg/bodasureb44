@@ -5,6 +5,8 @@ import { Users, UserPlus, Check, X, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { useToast } from '@/components/ui/use-toast';
+import VerificationBadge from '@/components/admin/VerificationBadge';
+import VerificationDetailSheet from '@/components/admin/VerificationDetailSheet';
 
 export default function SaccoMembers() {
   const { user } = useAuth();
@@ -12,6 +14,7 @@ export default function SaccoMembers() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState(null);
+  const [verifyRiderId, setVerifyRiderId] = useState(null);
 
   const groupId = user?.scope_entity_id;
 
@@ -100,6 +103,7 @@ export default function SaccoMembers() {
               <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Phone</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Role</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Verification</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Joined</th>
               <th className="px-4 py-3"></th>
             </tr>
@@ -116,6 +120,9 @@ export default function SaccoMembers() {
                     : m.status === 'pending' ? 'bg-warning/10 text-warning'
                     : 'bg-destructive/10 text-destructive'
                   }`}>{m.status}</span>
+                </td>
+                <td className="px-4 py-3">
+                  {m.user && <VerificationBadge user={m.user} onClick={() => setVerifyRiderId(m.user.id)} />}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{m.joined_date ? formatDate(m.joined_date) : '—'}</td>
                 <td className="px-4 py-3 text-right">
@@ -145,6 +152,10 @@ export default function SaccoMembers() {
         </table>
         {members.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No members yet</p>}
       </div>
+
+      {verifyRiderId && (
+        <VerificationDetailSheet riderId={verifyRiderId} onClose={() => setVerifyRiderId(null)} canApprove={false} />
+      )}
     </div>
   );
 }

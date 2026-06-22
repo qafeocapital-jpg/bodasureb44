@@ -73,9 +73,11 @@ Deno.serve(async (req) => {
 
     if (valid) {
       // Clear OTP after successful verification (prevents replay)
+      // Also mark phone as verified for Phase 6 verification
       await base44.asServiceRole.entities.User.update(user.id, {
         otp_hash: null,
         otp_expires_at: null,
+        phone_verified: true,
       });
     }
 
