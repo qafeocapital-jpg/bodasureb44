@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatDate, formatKES } from '@/lib/format';
-import { Building2, Plus, Pencil, Trash2, Loader2, X, Banknote, Users } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Loader2, X, Banknote, Users, Clock } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import SaccoPendingMembers from '@/components/admin/SaccoPendingMembers';
 
 const KENYAN_BANKS = [
   'Kenya Commercial Bank (KCB)', 'Equity Bank', 'Cooperative Bank', 'Standard Chartered',
@@ -19,6 +20,7 @@ export default function AdminSaccos() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [tab, setTab] = useState('saccos');
 
   const [form, setForm] = useState({
     name: '', type: 'sacco', county_id: '', status: 'active', description: '',
@@ -107,12 +109,38 @@ export default function AdminSaccos() {
           <h1 className="text-2xl font-heading font-bold">SACCOs</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage SACCOs and their bank details</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-1 bg-orange-500 text-white rounded-lg px-4 py-2 text-sm font-semibold">
-          <Plus className="w-4 h-4" /> Create SACCO
+        {tab === 'saccos' && (
+          <button onClick={openCreate} className="flex items-center gap-1 bg-orange-500 text-white rounded-lg px-4 py-2 text-sm font-semibold">
+            <Plus className="w-4 h-4" /> Create SACCO
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-5">
+        <button
+          onClick={() => setTab('saccos')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'saccos' ? 'bg-orange-500 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
+        >
+          <Building2 className="w-4 h-4" /> SACCOs
+        </button>
+        <button
+          onClick={() => setTab('pending')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'pending' ? 'bg-orange-500 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
+        >
+          <Clock className="w-4 h-4" /> Pending Members
         </button>
       </div>
 
-      {loading ? (
+      {tab === 'pending' ? (
+        loading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+          </div>
+        ) : (
+          <SaccoPendingMembers saccos={groups} counties={counties} />
+        )
+      ) : loading ? (
         <div className="flex items-center justify-center py-10">
           <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
         </div>
