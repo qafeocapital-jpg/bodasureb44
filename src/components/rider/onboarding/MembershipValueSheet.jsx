@@ -9,7 +9,7 @@ export default function MembershipValueSheet({ group, onContinue, onClose }) {
 
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent className="max-w-[512px] mx-auto max-h-[85vh] overflow-y-auto">
+      <DrawerContent className="max-w-[512px] mx-auto max-h-[85vh] overflow-y-auto pb-24">
         {isIndependent ? (
           <>
             <DrawerHeader>
@@ -35,7 +35,7 @@ export default function MembershipValueSheet({ group, onContinue, onClose }) {
                 </p>
               </div>
             </div>
-            <DrawerFooter>
+            <DrawerFooter className="pb-6">
               <button
                 onClick={onContinue}
                 className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm"
@@ -78,7 +78,7 @@ export default function MembershipValueSheet({ group, onContinue, onClose }) {
                 </p>
               </div>
             </div>
-            <DrawerFooter>
+            <DrawerFooter className="pb-6">
               <button
                 onClick={onContinue}
                 className="w-full flex items-center justify-center gap-1 bg-success text-success-foreground rounded-xl py-3 font-semibold text-sm"

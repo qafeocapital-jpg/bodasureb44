@@ -27,7 +27,7 @@ export default function LockedTileSheet({ open, onClose, tileLabel, featureDescr
         </div>
 
         {/* Content */}
-        <div className="px-5 pb-6">
+        <div className="px-5 pb-24 overflow-y-auto max-h-[calc(85vh-64px)]">
           {/* Close button */}
           <div className="flex justify-end mb-4">
             <button

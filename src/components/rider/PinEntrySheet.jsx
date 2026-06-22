@@ -36,7 +36,7 @@ export default function PinEntrySheet({ open, onClose, onConfirm, title = 'Enter
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
-      <div className="relative w-full max-w-[512px] bg-card rounded-t-3xl p-6 pb-8 animate-slide-up">
+      <div className="relative w-full max-w-[512px] bg-card rounded-t-3xl p-6 pb-24 animate-slide-up max-h-[85vh] overflow-y-auto">
         <div className="flex items-start justify-between mb-4">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
             <Lock className="w-6 h-6 text-primary" />
