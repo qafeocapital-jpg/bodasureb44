@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { X, CheckCircle2, AlertTriangle, User } from 'lucide-react';
-import QRCode from 'qrcode.react';
+import { X, CheckCircle2, AlertTriangle, User, QrCode } from 'lucide-react';
 import { formatDate } from '@/lib/format';
 
 export default function OfficerModeOverlay({
@@ -13,7 +12,7 @@ export default function OfficerModeOverlay({
   kycDocs,
   tier,
 }) {
-  const qrValue = useMemo(() => {
+  const verifyUrl = useMemo(() => {
     if (!user?.id) return '';
     return `${window.location.origin}/verify/${user.id}`;
   }, [user?.id]);
@@ -114,10 +113,16 @@ export default function OfficerModeOverlay({
           )}
         </div>
 
-        {/* QR Code */}
-        {qrValue && (
-          <div className="flex justify-center mb-6 bg-white p-4 rounded-xl border-2 border-border">
-            <QRCode value={qrValue} size={160} level="H" includeMargin={true} />
+        {/* Verification Link */}
+        {verifyUrl && (
+          <div className="flex justify-center mb-6 bg-muted/50 p-4 rounded-xl border border-border">
+            <div className="flex items-center gap-2 text-center">
+              <QrCode className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground font-semibold mb-1">Scan to Verify</p>
+                <p className="text-xs text-primary font-mono break-all">{verifyUrl}</p>
+              </div>
+            </div>
           </div>
         )}
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -94,32 +94,10 @@ export default function Compliance() {
           setGroup(g);
         }
 
-        // Fetch county name if vehicle exists
-        let countyName = '';
-        if (v?.county_id) {
-          try {
-            const countyData = await base44.entities.County.get(v.county_id);
-            countyName = countyData?.name || '';
-          } catch (e) {
-            console.warn('County fetch failed:', e);
-          }
-        }
-
-        // Fetch stage name if vehicle has stage_id
-        let stageName = '';
-        if (v?.stage_id) {
-          try {
-            const stageData = await base44.entities.Stage.get(v.stage_id);
-            stageName = stageData?.name || '';
-          } catch (e) {
-            console.warn('Stage fetch failed:', e);
-          }
-        }
-
         // Compute task statuses and compliance score
         const tasks = getTaskStatuses(kycDocsData, user, v);
         setTaskStatuses(tasks);
-        computeCompliance(user, v, w, kycDocsData, groupMembers, perms, pols);
+        const score = computeCompliance(user, v, w, kycDocsData, groupMembers, perms, pols);
       } catch (e) {
         console.error('Compliance load error:', e);
       }
@@ -146,6 +124,8 @@ export default function Compliance() {
     else if (score >= 65) setComplianceTier('Road-Ready');
     else if (score >= 40) setComplianceTier('Partial');
     else setComplianceTier('Non-Compliant');
+  
+    return score;
   }
 
   async function handlePayPenalty(pin) {
@@ -218,9 +198,31 @@ export default function Compliance() {
   const activePermit = permits[0];
   const activePolicy = policies[0];
   
-  // Recalculate days remaining on each render to keep countdowns current
-  const permitDaysRemaining = activePermit ? Math.max(-1, differenceInDays(new Date(activePermit.end_date), new Date())) : null;
-  const insuranceDaysRemaining = activePolicy ? Math.max(-1, differenceInDays(new Date(activePolicy.end_date), new Date())) : null;
+  // Memoize days remaining calculations (before early returns to comply with hooks rules)
+  const permitDaysRemaining = useMemo(() => {
+    return activePermit ? Math.max(-1, differenceInDays(new Date(activePermit.end_date), new Date())) : null;
+  }, [activePermit?.id, activePermit?.end_date]);
+  
+  const insuranceDaysRemaining = useMemo(() => {
+    return activePolicy ? Math.max(-1, differenceInDays(new Date(activePolicy.end_date), new Date())) : null;
+  }, [activePolicy?.id, activePolicy?.end_date]);
+
+  if (!vehicle) {
+    return (
+      <div className="p-5 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-foreground mb-2">No Vehicle Registered</h2>
+          <p className="text-sm text-muted-foreground mb-4">Register a bike to view compliance status.</p>
+          <button
+            onClick={() => navigate('/app/bikes/register')}
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold"
+          >
+            Register Bike
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-5 animate-fade-in">
@@ -229,7 +231,7 @@ export default function Compliance() {
         <button
           onClick={() => setIsOfficerMode(true)}
           className={`p-2 rounded-lg transition-all ${
-            complianceScore === 100
+            complianceTier === 'Fully Verified'
               ? 'bg-primary text-primary-foreground animate-pulse-glow'
               : 'bg-muted text-muted-foreground'
           }`}
@@ -303,9 +305,11 @@ export default function Compliance() {
                     <div>
                       <p className="text-sm font-semibold">{formatKES(p.amount_cents)}</p>
                       <p className="text-xs text-muted-foreground">{p.reason}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        Issued: {formatDate(p.issued_at)}
-                      </p>
+                      {p.created_date && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Issued: {formatDate(p.created_date)}
+                        </p>
+                      )}
                     </div>
                     <button
                       onClick={() => setPayingPenalty(p)}

@@ -30,12 +30,10 @@ export default function RiderVerify() {
   const [stage, setStage] = useState(null);
   const [verifyTime] = useState(new Date().toLocaleString('en-KE'));
 
-  // Wait for auth to finish loading before attempting to fetch data
-  if (isLoadingAuth) {
-    return <PageSkeleton variant="hero-rows" />;
-  }
-
   useEffect(() => {
+    // Wait for auth to finish loading before attempting to fetch data
+    if (isLoadingAuth) return;
+
     async function load() {
       try {
         // Fetch rider
