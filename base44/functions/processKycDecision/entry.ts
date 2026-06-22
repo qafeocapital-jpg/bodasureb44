@@ -86,13 +86,22 @@ async function processManualReview(base44, docId, userId, action, reason, adminI
       }
     }
 
-    // Audit log
-    const auditMsg = allApproved
-      ? `All KYC documents approved for user ${userId} — upgraded to Verified (Tier 2)`
-      : `KYC document (${doc.document_type}) approved for user ${userId}`;
-    await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: `Log: ${auditMsg}`,
-    }).catch(() => {});
+    // Create compliance audit log entry
+    await base44.asServiceRole.entities.AuditLog.create({
+      user_id: adminId,
+      action: 'kyc_document_approved',
+      entity_type: 'KycDocument',
+      entity_id: docId,
+      description: allApproved
+        ? `All KYC documents approved. User ${userId} upgraded to Verified (Tier 2).`
+        : `KYC document (${doc.document_type}) approved for user ${userId}. Awaiting remaining documents.`,
+      new_values: {
+        status: 'approved',
+        reviewed_by_id: adminId,
+        reviewed_at: now,
+        rider_id: userId,
+      },
+    });
 
     return {
       success: true,
@@ -117,11 +126,21 @@ async function processManualReview(base44, docId, userId, action, reason, adminI
       kyc_status: 'rejected',
     });
 
-    // Audit log
-    const auditMsg = `KYC document (${doc.document_type}) rejected for user ${userId}. Reason: ${reason.trim()}`;
-    await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: `Log: ${auditMsg}`,
-    }).catch(() => {});
+    // Create compliance audit log entry for rejection
+    await base44.asServiceRole.entities.AuditLog.create({
+      user_id: adminId,
+      action: 'kyc_document_rejected',
+      entity_type: 'KycDocument',
+      entity_id: docId,
+      description: `KYC document (${doc.document_type}) rejected for user ${userId}. Reason: ${reason.trim()}`,
+      new_values: {
+        status: 'rejected',
+        rejection_reason: reason.trim(),
+        reviewed_by_id: adminId,
+        reviewed_at: now,
+        rider_id: userId,
+      },
+    });
 
     return {
       success: true,
