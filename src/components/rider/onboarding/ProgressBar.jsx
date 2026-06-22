@@ -2,9 +2,10 @@ import { Fragment } from 'react';
 import { Check } from 'lucide-react';
 import { ONBOARDING_PHASES } from '@/lib/onboarding';
 
-export default function ProgressBar({ currentPhase, onJumpBack }) {
+export default function ProgressBar({ currentPhase, onJumpBack, onboardingComplete }) {
   const isDone = currentPhase >= 5;
   const activePhase = isDone ? null : ONBOARDING_PHASES[currentPhase];
+  const canJumpBack = !onboardingComplete;
 
   return (
     <div className="space-y-3">
@@ -41,8 +42,8 @@ export default function ProgressBar({ currentPhase, onJumpBack }) {
           return (
             <Fragment key={phase.id}>
               <button
-                onClick={() => isCompleted && onJumpBack ? onJumpBack(i) : null}
-                disabled={!isCompleted}
+                onClick={() => isCompleted && canJumpBack && onJumpBack ? onJumpBack(i) : null}
+                disabled={!isCompleted || !canJumpBack}
                 className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all flex-shrink-0 ${
                   isCompleted
                     ? 'bg-primary text-primary-foreground cursor-pointer hover:scale-110'

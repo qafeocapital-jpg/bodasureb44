@@ -27,18 +27,12 @@ export default function StageSearchPicker({ wardId, countyId, countyName, wardNa
     }).catch(() => {});
   }, []);
 
-  // Fetch real member counts
+  // Use stage.member_count from entity records (avoids fetching all vehicles in ward)
   useEffect(() => {
-    async function fetchCounts() {
-      if (!wardId) { setMemberCounts({}); return; }
-      try {
-        const vehicles = await base44.entities.Vehicle.filter({ ward_id: wardId });
-        const counts = {};
-        vehicles.forEach(v => { if (v.stage_id) counts[v.stage_id] = (counts[v.stage_id] || 0) + 1; });
-        setMemberCounts(counts);
-      } catch (e) {}
-    }
-    fetchCounts();
+    if (!wardId) { setMemberCounts({}); return; }
+    const counts = {};
+    stages.forEach(s => { if (s.id) counts[s.id] = s.member_count || 0; });
+    setMemberCounts(counts);
   }, [wardId, stages]);
 
   // Handle map tap — geo-fence check + drop pin + reverse-geocode + open create card

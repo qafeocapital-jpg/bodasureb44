@@ -184,6 +184,14 @@ export default function StageMap({
     else map.once('load', updatePin);
   }, [mapCoords]);
 
+  if (!mapboxToken) {
+    return (
+      <div className="w-full h-[260px] rounded-xl border border-border bg-slate-100 flex items-center justify-center">
+        <div className="w-6 h-6 border-4 border-slate-300 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="relative">
       <div ref={mapContainerRef} className="w-full h-[260px] rounded-xl overflow-hidden border border-border bg-slate-100" />

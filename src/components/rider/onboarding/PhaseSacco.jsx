@@ -24,6 +24,7 @@ export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehi
   const [localMembership, setLocalMembership] = useState(groupMembers?.[0] || null);
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState('');
+  const [completing, setCompleting] = useState(false);
 
   const countyName = counties?.find(c => c.id === user?.county_id)?.name || 'your county';
   const onboardingComplete = user?.onboarding_complete === true;
@@ -138,16 +139,38 @@ export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehi
   }
 
   async function handleContinue() {
+    setError('');
+    setCompleting(true);
     try {
-      await base44.auth.updateMe({ onboarding_complete: true });
-    } catch (e) {}
-    onJoined();
+      await base44.functions.invoke('completeOnboarding', {});
+      await onJoined();
+    } catch (e) {
+      setError(e?.response?.data?.error || e.message || 'Failed to complete onboarding. Please ensure all steps are done.');
+    }
+    setCompleting(false);
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-10">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user?.county_id) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-accent rounded-2xl p-6 text-center">
+          <MapPin className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm font-medium mb-1">No county set</p>
+          <p className="text-xs text-muted-foreground">Go back to Phase 1 and select your county to see available SACCOs.</p>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     );
   }
@@ -164,8 +187,8 @@ export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehi
           <button onClick={onBack} className="flex items-center justify-center px-5 py-3 rounded-xl border border-border text-sm font-semibold">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button onClick={handleContinue} className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm">
-            Continue <ChevronRight className="w-4 h-4" />
+          <button onClick={handleContinue} disabled={completing} className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
+            {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continue <ChevronRight className="w-4 h-4" /></>}
           </button>
         </div>
       </div>
@@ -231,8 +254,8 @@ export default function PhaseSacco({ user, counties, groupMembers, vehicle: vehi
       {joinedGroup && (
         <div className="bg-success/5 border border-success/20 rounded-xl p-4">
           <p className="text-sm font-semibold text-success mb-2">You've joined {joinedGroup.name}!</p>
-          <button onClick={handleContinue} className="w-full flex items-center justify-center gap-1 bg-success text-success-foreground rounded-xl py-3 font-semibold text-sm">
-            Continue to Complete Setup <ArrowRight className="w-4 h-4" />
+          <button onClick={handleContinue} disabled={completing} className="w-full flex items-center justify-center gap-1 bg-success text-success-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
+            {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continue to Complete Setup <ArrowRight className="w-4 h-4" /></>}
           </button>
         </div>
       )}

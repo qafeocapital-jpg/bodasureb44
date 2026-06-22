@@ -265,11 +265,8 @@ Deno.serve(async (req) => {
       results.seeded_independent++;
     }
 
-    // Also reuse existingGroups for insurance merchant lookup (avoids extra API call)
-    const existingGroupsAll = existingGroups;
-
     // 5. Sample Insurance Merchant
-    let merchant = existingGroupsAll.find(g => g.name === 'APA Insurance Kisumu');
+    let merchant = existingGroups.find(g => g.name === 'APA Insurance Kisumu');
     if (merchant) {
       results.skipped.push('merchant (already exists)');
     } else {

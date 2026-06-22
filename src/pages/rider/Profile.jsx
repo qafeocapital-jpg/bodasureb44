@@ -113,7 +113,7 @@ export default function Profile() {
       </div>
 
       {/* Progress Bar */}
-      <ProgressBar currentPhase={currentPhase} onJumpBack={(p) => setCurrentPhase(p)} />
+      <ProgressBar currentPhase={currentPhase} onJumpBack={(p) => setCurrentPhase(p)} onboardingComplete={user?.onboarding_complete} />
 
       {/* Phase Content */}
       <div className="mt-6">
