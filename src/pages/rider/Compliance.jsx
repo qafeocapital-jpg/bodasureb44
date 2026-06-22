@@ -16,6 +16,7 @@ import RiderIdentitySummary from '@/components/compliance/RiderIdentitySummary';
 import PermitInsuranceCards from '@/components/compliance/PermitInsuranceCards';
 import ComplianceChecklist from '@/components/compliance/ComplianceChecklist';
 import OfficerModeOverlay from '@/components/compliance/OfficerModeOverlay';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { AlertTriangle, Shield } from 'lucide-react';
 
 export default function Compliance() {
@@ -109,11 +110,11 @@ export default function Compliance() {
 
   function computeCompliance(usr, vhc, wlt, docs, members, perms, pols) {
     const scores = {
-      bike_approved: vhc?.status === 'approved' ? 25 : 0,
+      bike_approved: vhc?.status === 'approved' ? 20 : 0,
       active_permit: perms?.length > 0 ? 25 : 0,
       kyc_approved: usr?.kyc_status === 'approved' ? 20 : 0,
       id_verified: docs?.some(d => d.document_type === 'id_front' && d.status === 'approved') && docs?.some(d => d.document_type === 'id_back' && d.status === 'approved') ? 15 : 0,
-      insurance_active: pols?.length > 0 ? 10 : 0,
+      insurance_active: pols?.length > 0 ? 15 : 0,
       sacco_member: members?.length > 0 ? 5 : 0,
     };
 
@@ -140,6 +141,7 @@ export default function Compliance() {
         throw new Error('Insufficient wallet balance. Top up your wallet first.');
       }
 
+      // Process payment atomically
       const res = await processWalletPayment({
         walletId: wallet.id,
         type: 'penalty',
@@ -150,38 +152,41 @@ export default function Compliance() {
         feeSplitParams: null,
       });
 
-      if (res) {
-        await base44.entities.Penalty.update(payingPenalty.id, {
-          status: 'paid',
-          transaction_id: res.transaction?.id || '',
-          paid_at: new Date().toISOString(),
-        });
+      if (!res) throw new Error('Payment processing failed.');
 
-        await auditLog({
-          userId: user.id,
-          action: 'penalty_paid',
-          entityType: 'Penalty',
-          entityId: payingPenalty.id,
-          description: `Penalty paid: ${formatKES(cents)}`,
-        });
+      // Only mark paid if transaction succeeded
+      const transactionId = res.transaction?.id || res.id;
+      await base44.entities.Penalty.update(payingPenalty.id, {
+        status: 'paid',
+        transaction_id: transactionId,
+        paid_at: new Date().toISOString(),
+      });
 
-        const newBal = await getWalletBalance(wallet.id);
-        setBalance(newBal);
+      await auditLog({
+        userId: user.id,
+        action: 'penalty_paid',
+        entityType: 'Penalty',
+        entityId: payingPenalty.id,
+        description: `Penalty paid: ${formatKES(cents)}`,
+      });
 
-        const pendingPenalties = await base44.entities.Penalty.filter(
-          { rider_id: user.id, status: 'pending' },
-          '-created_date',
-          20
-        );
-        setPenalties(pendingPenalties);
+      const newBal = await getWalletBalance(wallet.id);
+      setBalance(newBal);
 
-        toast({
-          title: 'Penalty paid successfully',
-          description: formatKES(cents) + ' deducted from your wallet',
-        });
+      // Fetch next batch with pagination (up to 20 pending)
+      const pendingPenalties = await base44.entities.Penalty.filter(
+        { rider_id: user.id, status: 'pending' },
+        '-created_date',
+        20
+      );
+      setPenalties(pendingPenalties);
 
-        setPayingPenalty(null);
-      }
+      toast({
+        title: 'Penalty paid successfully',
+        description: formatKES(cents) + ' deducted from your wallet',
+      });
+
+      setPayingPenalty(null);
     } catch (e) {
       toast({
         title: 'Payment failed',
@@ -194,18 +199,6 @@ export default function Compliance() {
   }
 
   if (loading || !user) return <PageSkeleton variant="hero-rows" />;
-
-  const activePermit = permits[0];
-  const activePolicy = policies[0];
-  
-  // Memoize days remaining calculations (before early returns to comply with hooks rules)
-  const permitDaysRemaining = useMemo(() => {
-    return activePermit ? Math.max(-1, differenceInDays(new Date(activePermit.end_date), new Date())) : null;
-  }, [activePermit?.id, activePermit?.end_date]);
-  
-  const insuranceDaysRemaining = useMemo(() => {
-    return activePolicy ? Math.max(-1, differenceInDays(new Date(activePolicy.end_date), new Date())) : null;
-  }, [activePolicy?.id, activePolicy?.end_date]);
 
   if (!vehicle) {
     return (
@@ -225,140 +218,144 @@ export default function Compliance() {
   }
 
   return (
-    <div className="p-5 animate-fade-in">
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-heading font-bold">Compliance & Permits</h1>
-        <button
-          onClick={() => setIsOfficerMode(true)}
-          className={`p-2 rounded-lg transition-all ${
-            complianceTier === 'Fully Verified'
-              ? 'bg-primary text-primary-foreground animate-pulse-glow'
-              : 'bg-muted text-muted-foreground'
-          }`}
-          title="Show Officer Mode"
-        >
-          <Shield className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 mb-5 border-b border-border">
-        <button
-          onClick={() => setActiveTab('status')}
-          className={`px-4 py-3 text-sm font-semibold transition-colors ${
-            activeTab === 'status'
-              ? 'text-primary border-b-2 border-primary'
-              : 'text-muted-foreground'
-          }`}
-        >
-          My Status
-        </button>
-        <button
-          onClick={() => setActiveTab('checklist')}
-          className={`px-4 py-3 text-sm font-semibold transition-colors ${
-            activeTab === 'checklist'
-              ? 'text-primary border-b-2 border-primary'
-              : 'text-muted-foreground'
-          }`}
-        >
-          Checklist
-        </button>
-      </div>
-
-      {/* Tab 1: My Status */}
-      {activeTab === 'status' && (
-        <div className="space-y-5">
-          {/* Compliance Tier Hero */}
-          <ComplianceTierHero tier={complianceTier} score={complianceScore} />
-
-          {/* Rider Identity Summary */}
-          <RiderIdentitySummary
-            user={user}
-            vehicle={vehicle}
-            kycDocs={kycDocs}
-            group={group}
-          />
-
-          {/* Permit & Insurance Status */}
-          <PermitInsuranceCards
-            permit={activePermit}
-            policy={activePolicy}
-            permitDaysRemaining={permitDaysRemaining}
-            insuranceDaysRemaining={insuranceDaysRemaining}
-          />
-
-          {/* Pending Penalties */}
-          {penalties.length > 0 && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-5 h-5 text-destructive" />
-                <h2 className="font-heading font-bold text-sm text-destructive">
-                  Pending Penalties ({penalties.length})
-                </h2>
-              </div>
-              <div className="space-y-2">
-                {penalties.map((p) => (
-                  <div
-                    key={p.id}
-                    className="bg-card border border-border rounded-xl p-3 flex items-center justify-between"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold">{formatKES(p.amount_cents)}</p>
-                      <p className="text-xs text-muted-foreground">{p.reason}</p>
-                      {p.created_date && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Issued: {formatDate(p.created_date)}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setPayingPenalty(p)}
-                      disabled={!wallet || wallet.status !== 'active'}
-                      className="bg-destructive text-destructive-foreground rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                    >
-                      Pay Now
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+    <ErrorBoundary>
+      <div className="p-5 animate-fade-in">
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="text-xl font-heading font-bold">Compliance & Permits</h1>
+          {(user?.role?.includes('officer') || user?.role?.includes('admin')) && (
+            <button
+              onClick={() => setIsOfficerMode(true)}
+              className={`p-2 rounded-lg transition-all ${
+                complianceTier === 'Fully Verified'
+                  ? 'bg-primary text-primary-foreground animate-pulse-glow'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+              title="Show Officer Mode"
+            >
+              <Shield className="w-5 h-5" />
+            </button>
           )}
         </div>
-      )}
 
-      {/* Tab 2: Checklist */}
-      {activeTab === 'checklist' && (
-        <ComplianceChecklist
+        {/* Tabs */}
+        <div className="flex gap-2 mb-5 border-b border-border">
+          <button
+            onClick={() => setActiveTab('status')}
+            className={`px-4 py-3 text-sm font-semibold transition-colors ${
+              activeTab === 'status'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground'
+            }`}
+          >
+            My Status
+          </button>
+          <button
+            onClick={() => setActiveTab('checklist')}
+            className={`px-4 py-3 text-sm font-semibold transition-colors ${
+              activeTab === 'checklist'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground'
+            }`}
+          >
+            Checklist
+          </button>
+        </div>
+
+        {/* Tab 1: My Status */}
+        {activeTab === 'status' && (
+          <div className="space-y-5">
+            {/* Compliance Tier Hero */}
+            <ComplianceTierHero tier={complianceTier} score={complianceScore} />
+
+            {/* Rider Identity Summary */}
+            <RiderIdentitySummary
+              user={user}
+              vehicle={vehicle}
+              kycDocs={kycDocs}
+              group={group}
+            />
+
+            {/* Permit & Insurance Status */}
+            <PermitInsuranceCards
+              permit={activePermit}
+              policy={activePolicy}
+              permitDaysRemaining={permitDaysRemaining}
+              insuranceDaysRemaining={insuranceDaysRemaining}
+            />
+
+            {/* Pending Penalties */}
+            {penalties.length > 0 && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  <h2 className="font-heading font-bold text-sm text-destructive">
+                    Pending Penalties ({penalties.length})
+                  </h2>
+                </div>
+                <div className="space-y-2">
+                  {penalties.map((p) => (
+                    <div
+                      key={p.id}
+                      className="bg-card border border-border rounded-xl p-3 flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold">{formatKES(p.amount_cents)}</p>
+                        <p className="text-xs text-muted-foreground">{p.reason}</p>
+                        {p.created_date && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Issued: {formatDate(p.created_date)}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setPayingPenalty(p)}
+                        disabled={!wallet || wallet.status !== 'active'}
+                        className="bg-destructive text-destructive-foreground rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      >
+                        Pay Now
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: Checklist */}
+        {activeTab === 'checklist' && (
+          <ComplianceChecklist
+            user={user}
+            vehicle={vehicle}
+            taskStatuses={taskStatuses}
+            wallet={wallet}
+            groupMember={groupMember}
+          />
+        )}
+
+        {/* Officer Mode Overlay */}
+        <OfficerModeOverlay
+          open={isOfficerMode}
+          onClose={() => setIsOfficerMode(false)}
           user={user}
           vehicle={vehicle}
-          taskStatuses={taskStatuses}
-          wallet={wallet}
-          groupMember={groupMember}
+          permit={activePermit}
+          group={group}
+          kycDocs={kycDocs}
+          tier={complianceTier}
         />
-      )}
 
-      {/* Officer Mode Overlay */}
-      <OfficerModeOverlay
-        open={isOfficerMode}
-        onClose={() => setIsOfficerMode(false)}
-        user={user}
-        vehicle={vehicle}
-        permit={activePermit}
-        group={group}
-        kycDocs={kycDocs}
-        tier={complianceTier}
-      />
-
-      {/* PIN Entry Sheet for Penalties */}
-      <PinEntrySheet
-        open={!!payingPenalty}
-        onClose={() => setPayingPenalty(null)}
-        onConfirm={handlePayPenalty}
-        title="Pay Penalty"
-        message={`Enter your PIN to pay ${
-          payingPenalty ? formatKES(payingPenalty.amount_cents) : ''
-        } from your wallet.`}
-      />
-    </div>
+        {/* PIN Entry Sheet for Penalties */}
+        <PinEntrySheet
+          open={!!payingPenalty}
+          onClose={() => setPayingPenalty(null)}
+          onConfirm={handlePayPenalty}
+          title="Pay Penalty"
+          message={`Enter your PIN to pay ${
+            payingPenalty ? formatKES(payingPenalty.amount_cents) : ''
+          } from your wallet.`}
+        />
+      </div>
+    </ErrorBoundary>
   );
 }

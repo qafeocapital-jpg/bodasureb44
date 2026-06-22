@@ -19,6 +19,10 @@ export default function OfficerModeOverlay({
 
   if (!open) return null;
 
+  // Officer mode only accessible to enforcement officers
+  const isOfficer = user?.role?.includes('officer') || user?.role?.includes('admin');
+  if (!isOfficer) return null;
+
   const selfiDoc = kycDocs?.find(d => d.document_type === 'selfie' && d.file_url);
   const isCompliant = tier === 'Fully Verified' || tier === 'Road-Ready';
 
