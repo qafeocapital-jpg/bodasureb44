@@ -83,7 +83,7 @@ export default function GroupCard({ group, isExpanded, onToggle, onSelect, isJoi
               onClick={onSelect}
               className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-2.5 text-sm font-semibold"
             >
-              Select this SACCO <ChevronRight className="w-4 h-4" />
+              Select this Group <ChevronRight className="w-4 h-4" />
             </button>
           )}
         </div>
