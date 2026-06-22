@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, ChevronRight, ArrowRight, CheckCircle2, CreditCard, Bike, UserCircle, Smartphone, UserCheck } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2, CreditCard, Bike, UserCircle, Smartphone, UserCheck } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import VerificationMiniStepper from '@/components/rider/onboarding/VerificationMiniStepper';
 import VerificationComplete from '@/components/rider/onboarding/VerificationComplete';
@@ -159,16 +159,24 @@ export default function PhaseVerification({ user, vehicle, onCompleted, onBack, 
         </div>
       )}
 
-      {/* Go to Dashboard — always visible */}
-      {!readOnly && (
-      <button
-        onClick={() => navigate('/app')}
-        className="w-full flex items-center justify-center gap-1 border border-border rounded-xl py-3 font-semibold text-sm"
-      >
-        Go to Dashboard <ArrowRight className="w-4 h-4" />
-      </button>
+      {/* Back to Tasks (during sub-task) / Go to Dashboard (at task list) */}
+      {activeTask !== null ? (
+        <button
+          onClick={() => setActiveTask(null)}
+          className="w-full flex items-center justify-center gap-1.5 bg-muted text-foreground rounded-xl py-3 font-semibold text-sm"
+        >
+          <ChevronLeft className="w-4 h-4" /> Back to Tasks
+        </button>
+      ) : !readOnly ? (
+        <button
+          onClick={() => navigate('/app')}
+          className="w-full flex items-center justify-center gap-1 border border-border rounded-xl py-3 font-semibold text-sm"
+        >
+          Go to Dashboard <ArrowRight className="w-4 h-4" />
+        </button>
+      ) : (
+        <ReadOnlyBackButton onExit={onExitReadOnly} />
       )}
-      {readOnly && <ReadOnlyBackButton onExit={onExitReadOnly} />}
     </div>
   );
 }
