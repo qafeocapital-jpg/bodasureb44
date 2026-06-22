@@ -80,16 +80,16 @@ Deno.serve(async (req) => {
     ];
 
     const allStages = [
-      { name: 'Kondele Stage', sub: 'Kisumu Central' },
-      { name: 'Kisumu Town Stage', sub: 'Kisumu Central' },
-      { name: 'Mamboleo Stage', sub: 'Kisumu Central' },
-      { name: 'Migosi Stage', sub: 'Kisumu Central' },
-      { name: 'Nyalandu Stage', sub: 'Kisumu Central' },
-      { name: 'Manyatta Stage', sub: 'Kisumu East' },
-      { name: 'Kibuye Stage', sub: 'Kisumu East' },
-      { name: 'Obunga Stage', sub: 'Kisumu East' },
-      { name: 'Ahero Stage', sub: 'Nyando' },
-      { name: 'Muhoroni Stage', sub: 'Muhoroni' },
+      { name: 'Kondele Stage', sub: 'Kisumu Central', ward: 'Kolwa East' },
+      { name: 'Kisumu Town Stage', sub: 'Kisumu Central', ward: 'Kisumu Central' },
+      { name: 'Mamboleo Stage', sub: 'Kisumu Central', ward: 'Kajulu West' },
+      { name: 'Migosi Stage', sub: 'Kisumu Central', ward: 'Kajulu East' },
+      { name: 'Nyalandu Stage', sub: 'Kisumu Central', ward: 'Nyalenda A' },
+      { name: 'Manyatta Stage', sub: 'Kisumu East', ward: 'Manyatta' },
+      { name: 'Kibuye Stage', sub: 'Kisumu East', ward: 'Nyalenda' },
+      { name: 'Obunga Stage', sub: 'Kisumu East', ward: 'Nyalenda' },
+      { name: 'Ahero Stage', sub: 'Nyando', ward: 'Lower Nyando' },
+      { name: 'Muhoroni Stage', sub: 'Muhoroni', ward: 'Muhoroni Town' },
     ];
 
     for (const sc of subCountyData) {
@@ -122,13 +122,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Representative Stages
+    // 3. Representative Stages — mapped to correct wards
     for (const st of allStages) {
       let subCounties = await sr.entities.SubCounty.filter({ name: st.sub, county_id: county.id });
       if (subCounties.length === 0) continue;
       const subCounty = subCounties[0];
-      let wards = await sr.entities.Ward.filter({ sub_county_id: subCounty.id });
-      const wardId = wards.length > 0 ? wards[0].id : null;
+      // Find the correct ward by name within this sub-county
+      let matchingWards = await sr.entities.Ward.filter({ name: st.ward, sub_county_id: subCounty.id, county_id: county.id });
+      // Fallback: try ward name without county_id filter
+      if (matchingWards.length === 0) {
+        matchingWards = await sr.entities.Ward.filter({ name: st.ward, sub_county_id: subCounty.id });
+      }
+      // Final fallback: first ward in sub-county
+      let wardId;
+      if (matchingWards.length > 0) {
+        wardId = matchingWards[0].id;
+      } else {
+        const allWards = await sr.entities.Ward.filter({ sub_county_id: subCounty.id });
+        wardId = allWards.length > 0 ? allWards[0].id : null;
+      }
       let stages = await sr.entities.Stage.filter({ name: st.name, county_id: county.id });
       if (stages.length === 0) {
         await sr.entities.Stage.create({
@@ -136,9 +148,19 @@ Deno.serve(async (req) => {
           county_id: county.id,
           ward_id: wardId,
           member_count: Math.floor(Math.random() * 40) + 10,
-          description: `${st.name} — bodaboda stage in ${st.sub}`,
+          description: `${st.name} — bodaboda stage in ${st.sub}, ${st.ward} ward`,
         });
         results.stages++;
+      } else {
+        // Update existing stage with correct ward mapping if it has changed
+        const existing = stages[0];
+        if (existing.ward_id !== wardId && wardId) {
+          await sr.entities.Stage.update(existing.id, {
+            ward_id: wardId,
+            description: `${st.name} — bodaboda stage in ${st.sub}, ${st.ward} ward`,
+          });
+          results.stages++;
+        }
       }
     }
 
