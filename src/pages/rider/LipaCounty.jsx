@@ -4,8 +4,10 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
 import { processWalletPayment, getOrCreateWallet, processFeeSplit } from '@/lib/payments';
+import { verifyPin } from '@/lib/pin';
 import { checkServiceAccess } from '@/lib/serviceAccess';
 import UnlockSheet from '@/components/rider/UnlockSheet';
+import PinEntrySheet from '@/components/rider/PinEntrySheet';
 import { ChevronLeft, BadgeCheck, Loader2, CheckCircle2, XCircle, AlertCircle, Receipt, MapPin } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -25,6 +27,7 @@ export default function LipaCounty() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [showPin, setShowPin] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -86,8 +89,16 @@ export default function LipaCounty() {
   const saccoAmount = selectedSchedule ? Math.round(selectedSchedule.amount_cents * saccoPct / 100) : 0;
   const platformAmount = selectedSchedule ? Math.round(selectedSchedule.amount_cents * platformPct / 100) : 0;
 
-  async function handlePay() {
+  function handlePay() {
     if (!selectedBike || !selectedSchedule) return;
+    setShowPin(true);
+  }
+
+  async function handlePinConfirm(pin) {
+    if (!verifyPin(pin, wallet.pin_hash)) {
+      throw new Error('Incorrect PIN. Try again.');
+    }
+    setShowPin(false);
     setLoading(true);
     setResult(null);
     try {
@@ -105,7 +116,7 @@ export default function LipaCounty() {
       const end = new Date(now);
       end.setDate(end.getDate() + (durations[selectedCycle] || 30));
 
-      const permit = await base44.entities.Permit.create({
+      await base44.entities.Permit.create({
         vehicle_id: selectedBike,
         rider_id: user?.id,
         county_id: selectedBikeObj.county_id,
@@ -121,10 +132,15 @@ export default function LipaCounty() {
 
       // Process fee split — moves money to county, SACCO, and platform wallets
       if (feeRule) {
-        // Find rider's SACCO group (if any)
+        // Find rider's SACCO via their GroupMember record (not just any SACCO in the county)
         let saccoGroupId = null;
-        const groups = await base44.entities.Group.filter({ county_id: selectedBikeObj.county_id, status: 'active', type: 'sacco' });
-        if (groups.length > 0) saccoGroupId = groups[0].id;
+        const memberships = await base44.entities.GroupMember.filter({ user_id: user.id, status: 'approved' });
+        if (memberships.length > 0) {
+          const memberGroupIds = memberships.map(m => m.group_id);
+          const memberGroups = await base44.entities.Group.filter({ type: 'sacco', status: 'active' });
+          const riderSacco = memberGroups.find(g => memberGroupIds.includes(g.id));
+          if (riderSacco) saccoGroupId = riderSacco.id;
+        }
 
         await processFeeSplit(res.transaction.id, selectedSchedule.amount_cents, feeRule, {
           countyId: selectedBikeObj.county_id,
@@ -298,6 +314,13 @@ export default function LipaCounty() {
           </div>
         </>
       )}
+
+      <PinEntrySheet
+        open={showPin}
+        onClose={() => setShowPin(false)}
+        onConfirm={handlePinConfirm}
+        title="Enter PIN to Pay"
+      />
     </div>
   );
 }

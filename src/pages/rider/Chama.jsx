@@ -248,6 +248,13 @@ export default function Chama() {
           </div>
         )}
       </div>
+
+      <PinEntrySheet
+        open={showPin}
+        onClose={() => setShowPin(false)}
+        onConfirm={handlePinConfirm}
+        title="Enter PIN to Contribute"
+      />
     </div>
   );
 }

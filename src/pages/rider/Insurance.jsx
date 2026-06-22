@@ -4,8 +4,10 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
 import { processWalletPayment, getOrCreateWallet } from '@/lib/payments';
+import { verifyPin } from '@/lib/pin';
 import { ChevronLeft, ShieldCheck, Loader2, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
+import PinEntrySheet from '@/components/rider/PinEntrySheet';
 
 export default function Insurance() {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export default function Insurance() {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [paying, setPaying] = useState(false);
   const [result, setResult] = useState(null);
+  const [showPin, setShowPin] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -41,8 +44,16 @@ export default function Insurance() {
     load();
   }, [user]);
 
-  async function handlePurchase() {
+  function handlePurchase() {
     if (!selectedBike || !selectedProduct) return;
+    setShowPin(true);
+  }
+
+  async function handlePinConfirm(pin) {
+    if (!verifyPin(pin, wallet.pin_hash)) {
+      throw new Error('Incorrect PIN. Try again.');
+    }
+    setShowPin(false);
     setPaying(true);
     setResult(null);
     try {
@@ -208,6 +219,13 @@ export default function Insurance() {
           </div>
         </div>
       )}
+
+      <PinEntrySheet
+        open={showPin}
+        onClose={() => setShowPin(false)}
+        onConfirm={handlePinConfirm}
+        title="Enter PIN to Purchase"
+      />
     </div>
   );
 }

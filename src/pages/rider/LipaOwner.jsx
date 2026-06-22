@@ -91,19 +91,11 @@ export default function LipaOwner() {
       setSelectedBike('');
       setShowPin(false);
 
-      // Phase 6: Notify the owner of the payment
+      // Notify the owner of the payment via email
       const ownerId = selectedBikeObj?.owner_id;
       if (ownerId) {
         try {
           const ownerUser = owners[ownerId];
-          // Create an in-app announcement for the owner
-          await base44.entities.Announcement.create({
-            title: `Owner Payment Received`,
-            body: `You received ${formatKES(cents)} from ${user.full_name || 'a rider'} for bike ${selectedBikeObj.plate_number}. Ref: ${res.reference}`,
-            audience: 'riders',
-            county_id: selectedBikeObj.county_id || null,
-            status: 'published',
-          });
           // Send email notification if owner has an email
           if (ownerUser?.email) {
             await base44.integrations.Core.SendEmail({
