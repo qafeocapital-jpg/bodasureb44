@@ -88,6 +88,85 @@
     "is_system_group": {
       "type": "boolean",
       "default": false
+    },
+    "registration_number": {
+      "type": "string"
+    },
+    "kra_pin": {
+      "type": "string"
+    },
+    "nature_of_business": {
+      "type": "string"
+    },
+    "physical_address": {
+      "type": "string"
+    },
+    "industry_id": {
+      "type": "string"
+    },
+    "sub_industry_id": {
+      "type": "string"
+    },
+    "estimated_monthly_transaction_amount": {
+      "type": "number"
+    },
+    "estimated_monthly_transaction_count": {
+      "type": "number"
+    },
+    "purpose": {
+      "type": "string",
+      "enum": [
+        "Collection",
+        "Disbursement",
+        "Remittance"
+      ]
+    },
+    "directors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "director_name": {
+            "type": "string"
+          },
+          "director_id_number": {
+            "type": "string"
+          },
+          "director_mobile_number": {
+            "type": "string"
+          },
+          "director_kra_pin": {
+            "type": "string"
+          },
+          "director_document_type": {
+            "type": "string",
+            "enum": [
+              "ID_NUMBER",
+              "PASSPORT",
+              "ALIEN_ID"
+            ]
+          },
+          "director_country_code": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sasapay_request_id": {
+      "type": "string"
+    },
+    "sasapay_account_status": {
+      "type": "string",
+      "enum": [
+        "AWAITING_KYC_UPLOAD",
+        "PENDING",
+        "ACTIVE",
+        "REJECTED"
+      ]
+    },
+    "sasapay_kyc_uploaded_at": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [

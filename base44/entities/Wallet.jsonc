@@ -37,6 +37,26 @@
     },
     "sasapay_customer_id": {
       "type": "string"
+    },
+    "sasapay_request_id": {
+      "type": "string"
+    },
+    "sasapay_account_number": {
+      "type": "string"
+    },
+    "sasapay_account_status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "AWAITING_KYC_UPLOAD",
+        "PENDING",
+        "REJECTED"
+      ],
+      "default": "PENDING"
+    },
+    "sasapay_kyc_uploaded_at": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [

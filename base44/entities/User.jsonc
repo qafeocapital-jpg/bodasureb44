@@ -20,12 +20,12 @@
     "kyc_status": {
       "type": "string",
       "enum": [
-        "none",
+        "unverified",
         "pending",
-        "approved",
+        "verified",
         "rejected"
       ],
-      "default": "none"
+      "default": "unverified"
     },
     "wallet_tier": {
       "type": "integer",
@@ -129,6 +129,23 @@
           "default": false
         }
       }
+    },
+    "kra_pin": {
+      "type": "string"
+    },
+    "middle_name": {
+      "type": "string"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "id_card",
+        "passport",
+        "alien_id"
+      ]
+    },
+    "physical_address": {
+      "type": "string"
     }
   }
 }
