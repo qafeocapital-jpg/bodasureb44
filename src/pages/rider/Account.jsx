@@ -7,7 +7,7 @@ import { formatPhoneDisplay } from '@/lib/phone';
 import KycLevelBadge from '@/components/ui/KycLevelBadge';
 
 export default function Account() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const portals = getAccessiblePortals(user?.role);
 
   const menuItems = [
@@ -82,7 +82,7 @@ export default function Account() {
 
       {/* Logout */}
       <button
-        onClick={() => base44.auth.logout('/')}
+        onClick={logout}
         className="w-full mt-5 flex items-center justify-center gap-2 bg-destructive/5 text-destructive border border-destructive/20 rounded-xl py-3 font-semibold text-sm hover:bg-destructive/10 transition-colors"
       >
         <LogOut className="w-4 h-4" /> Log Out

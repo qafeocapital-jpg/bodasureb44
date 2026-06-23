@@ -15,7 +15,7 @@ const accentMap = {
 export default function StaffLayout({ accent = 'orange', portalName = 'Portal', navItems = [], requiredRole }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const accentCls = accentMap[accent] || accentMap.orange;
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
   const portals = getAccessiblePortals(user?.role);
@@ -87,7 +87,7 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
             </div>
           )}
           <button
-            onClick={() => base44.auth.logout('/')}
+            onClick={logout}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
           >
             <LogOut className="w-4 h-4" /> Log Out
@@ -151,7 +151,7 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
                 </div>
               )}
               <button
-                onClick={() => base44.auth.logout('/')}
+                onClick={logout}
                 className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
               >
                 <LogOut className="w-4 h-4" /> Log Out
