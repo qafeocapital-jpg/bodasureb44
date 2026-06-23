@@ -7,6 +7,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * to collect funds from customers via M-Pesa STK push, SasaPay wallet (OTP),
  * Airtel, T-Kash, or banks.
  *
+ * Tariff-Aware: Looks up SasapayFeeTier for the 'collection' type at the
+ * given amount, calculates the SasaPay base fee + BodaSure markup, and:
+ *   - Routes the fare directly to the rider's SasaPay wallet (ReceiverAccountNumber)
+ *   - Routes BodaSure commission to the merchant account (CommissionAmount)
+ *   - Stores the fee breakdown on the transaction record
+ *
  * Payload:
  * - phone: Customer phone (254...)
  * - amountCents: Amount in cents
@@ -39,6 +45,43 @@ Deno.serve(async (req) => {
 
     const token = await getSasaPayToken();
 
+    // Look up rider's wallet to get SasaPay account number (receiverAccountNumber)
+    let receiverAccountNumber = '';
+    let sasapayFeeKes = 0;
+    let bodasureFeeKes = 0;
+    let totalFeeKes = 0;
+
+    if (walletId) {
+      const wallets = await base44.entities.Wallet.filter({ id: walletId });
+      if (wallets.length > 0) {
+        receiverAccountNumber = wallets[0].sasapay_account_number || '';
+      }
+    }
+
+    // Look up SasaPay fee tier for 'collection' type at this amount
+    const amountKes = amountCents / 100;
+    const feeTiers = await base44.asServiceRole.entities.SasapayFeeTier.filter({
+      transaction_type: 'collection',
+      is_active: true,
+    });
+    const feeTier = feeTiers.find(
+      t => amountKes >= t.min_amount_kes && amountKes <= t.max_amount_kes
+    );
+
+    if (feeTier) {
+      if (feeTier.is_percentage) {
+        sasapayFeeKes = Math.min((amountKes * feeTier.sasapay_base_fee_kes) / 100, 150);
+      } else {
+        sasapayFeeKes = feeTier.sasapay_base_fee_kes;
+      }
+      if (feeTier.bodasure_markup_type === 'percentage') {
+        bodasureFeeKes = (amountKes * (feeTier.bodasure_markup_pct || 0)) / 100;
+      } else {
+        bodasureFeeKes = feeTier.bodasure_markup_kes || 0;
+      }
+      totalFeeKes = sasapayFeeKes + bodasureFeeKes;
+    }
+
     // Convert cents to shillings
     const amountStr = (amountCents / 100).toFixed(2);
     const reference = accountRef || `BS${Date.now()}`;
@@ -54,6 +97,15 @@ Deno.serve(async (req) => {
       TransactionDesc: description || 'BodaSure payment',
       AccountReference: reference,
     };
+
+    // Route fare directly to rider's SasaPay wallet + commission to BodaSure merchant account
+    if (receiverAccountNumber) {
+      c2bPayload.ReceiverAccountNumber = receiverAccountNumber;
+    }
+    if (bodasureFeeKes > 0) {
+      c2bPayload.CommissionAmount = bodasureFeeKes.toFixed(2);
+      c2bPayload.CommissionAccountNumber = merchantCode;
+    }
 
     const response = await fetch(`${getSasaPayApiUrl()}/payments/request-payment/`, {
       method: 'POST',
@@ -79,7 +131,7 @@ Deno.serve(async (req) => {
       }, { status: 502 });
     }
 
-    // Create a pending transaction in the database
+    // Create a pending transaction in the database with fee breakdown
     const txnData = {
       wallet_id: walletId || '',
       type: transactionType,
@@ -90,9 +142,12 @@ Deno.serve(async (req) => {
       product_type: transactionType,
       counterparty_phone: phone,
       description: description || '',
+      sasapay_fee_kes: Math.round(sasapayFeeKes),
+      bodasure_fee_kes: Math.round(bodasureFeeKes),
+      total_fee_kes: Math.round(totalFeeKes),
     };
 
-    const txn = await base44.asServiceRole.entities.Transaction.create(txnData);
+    const txn = await base44.entities.Transaction.create(txnData);
 
     return Response.json({
       status: 'pending',

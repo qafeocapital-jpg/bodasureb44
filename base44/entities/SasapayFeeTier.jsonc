@@ -1,0 +1,63 @@
+{
+  "name": "SasapayFeeTier",
+  "type": "object",
+  "properties": {
+    "transaction_type": {
+      "type": "string",
+      "enum": [
+        "collection",
+        "p2p",
+        "transfer_mobile",
+        "transfer_bank",
+        "b2c"
+      ]
+    },
+    "min_amount_kes": {
+      "type": "number"
+    },
+    "max_amount_kes": {
+      "type": "number"
+    },
+    "sasapay_base_fee_kes": {
+      "type": "number"
+    },
+    "is_percentage": {
+      "type": "boolean",
+      "default": false
+    },
+    "fee_payer": {
+      "type": "string",
+      "enum": [
+        "merchant",
+        "sender"
+      ]
+    },
+    "bodasure_markup_kes": {
+      "type": "number",
+      "default": 0
+    },
+    "bodasure_markup_pct": {
+      "type": "number",
+      "default": 0
+    },
+    "bodasure_markup_type": {
+      "type": "string",
+      "enum": [
+        "flat",
+        "percentage"
+      ],
+      "default": "flat"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "transaction_type",
+    "min_amount_kes",
+    "max_amount_kes",
+    "sasapay_base_fee_kes",
+    "fee_payer"
+  ]
+}

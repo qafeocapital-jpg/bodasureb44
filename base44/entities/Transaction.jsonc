@@ -70,6 +70,15 @@
     "completed_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "sasapay_fee_kes": {
+      "type": "integer"
+    },
+    "bodasure_fee_kes": {
+      "type": "integer"
+    },
+    "total_fee_kes": {
+      "type": "integer"
     }
   },
   "required": [

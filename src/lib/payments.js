@@ -39,7 +39,7 @@ export async function initiateStkPush({ walletId, phone, amountCents, descriptio
     const res = await base44.functions.invoke('sasapayStkPush', {
       phone: normalized,
       amountCents,
-      accountRef: 'BodaSure',
+      accountRef: `BS${Date.now()}`,
       description: description || 'BodaSure payment',
       transactionType,
       networkCode,

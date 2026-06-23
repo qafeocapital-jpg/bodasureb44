@@ -170,7 +170,7 @@ export default function Lipisha() {
         )}
         {limitInfo && (
           <div className="text-xs text-muted-foreground">
-            Daily usage: KES {(limitInfo.daily_used_kes || 0).toLocaleString()} / {limitInfo.daily_limit_kes.toLocaleString()} · Remaining: KES {(limitInfo.remaining_kes || 0).toLocaleString()}
+            Daily usage: KES {(limitInfo.daily_used_kes || 0).toLocaleString()} / {(limitInfo.daily_limit_kes || 0).toLocaleString()} · Remaining: KES {(limitInfo.remaining_kes || 0).toLocaleString()}
           </div>
         )}
         <button

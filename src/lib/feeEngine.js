@@ -88,7 +88,14 @@ export async function checkTransactionLimits(walletId, transactionType, amountKe
 
     return { canProceed: true, ...data };
   } catch (e) {
-    // If limit check fails, allow the transaction (fail open)
-    return { canProceed: true, error: e.message };
+    // If limit check fails, allow the transaction (fail open) but provide zeroed defaults
+    return {
+      canProceed: true,
+      error: e.message,
+      daily_used_kes: 0,
+      daily_limit_kes: 0,
+      per_tx_limit_kes: 0,
+      remaining_kes: 0,
+    };
   }
 }

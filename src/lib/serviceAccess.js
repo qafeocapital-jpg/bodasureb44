@@ -18,18 +18,18 @@ export function checkServiceAccess(service, { user, wallet, bikes, countyLive })
 
   const services = {
     lipisha: {
-      unlocked: walletActive && profileComplete,
-      title: 'Complete Your Profile',
-      message: 'You need to complete your profile (name and county) before collecting fares.',
-      actionLabel: 'Complete Profile',
-      actionLink: '/app/profile',
+      unlocked: walletActive && tier2,
+      title: 'KYC Verification Required',
+      message: 'Complete KYC verification (Tier 2) to collect fares via Lipisha.',
+      actionLabel: 'Verify Now',
+      actionLink: '/app/compliance',
     },
     lipa_owner: {
-      unlocked: walletActive && kycApproved,
-      title: 'KYC Verification Required',
-      message: 'Upload your ID documents and get verified to pay bike owners.',
-      actionLabel: 'Upload Documents',
-      actionLink: '/app/kyc',
+      unlocked: walletActive,
+      title: 'Activate Your Wallet',
+      message: 'Activate your wallet to pay bike owners.',
+      actionLabel: 'Activate Wallet',
+      actionLink: '/app/wallet/activate',
     },
     lipa_county: {
       unlocked: walletActive && hasBike,

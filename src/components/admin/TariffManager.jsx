@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, Plus, Power, Save, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import MarkupInput from '@/components/admin/TariffMarkupInput';
 
 const TYPE_LABELS = {
   collection: 'Collection (Lipisha Fare)',
@@ -179,18 +180,11 @@ export default function TariffManager() {
                       </select>
                     </td>
                     <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={tier.bodasure_markup_type === 'percentage' ? tier.bodasure_markup_pct : tier.bodasure_markup_kes}
-                        onChange={e => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const field = tier.bodasure_markup_type === 'percentage' ? 'bodasure_markup_pct' : 'bodasure_markup_kes';
-                          handleUpdate(tier.id, { [field]: val });
-                        }}
-                        className="w-20 px-2 py-1 rounded border border-input bg-background text-xs"
+                      <MarkupInput
+                        tier={tier}
+                        onSave={updates => handleUpdate(tier.id, updates)}
+                        saving={savingId === tier.id}
                       />
-                      <span className="text-[10px] text-muted-foreground ml-1">{tier.bodasure_markup_type === 'percentage' ? '%' : 'KES'}</span>
                     </td>
                     <td className="px-3 py-2 text-right">
                       <button
