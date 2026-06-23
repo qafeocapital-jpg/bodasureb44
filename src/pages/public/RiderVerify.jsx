@@ -39,42 +39,29 @@ export default function RiderVerify() {
 
     async function load() {
       try {
-        // Fetch rider — only verification_complete flag, no PII fields used
-        const riderData = await base44.entities.User.get(riderId);
-        if (!riderData) {
+        // Use backend function — returns ONLY compliance-relevant fields, no PII
+        const res = await base44.functions.invoke('getPublicRiderVerification', { riderId });
+        const data = res.data;
+        if (data?.error === 'Rider not found') {
           setNotFound(true);
           setLoading(false);
           return;
         }
-        setRider(riderData);
-
-        // Fetch vehicle, permit, policy, group membership in parallel
-        const [vehicleData, permitData, policyData, groupMemberData] = await Promise.all([
-          base44.entities.Vehicle.filter({ rider_id: riderId }, '-created_date').then(vs => vs[0] || null),
-          base44.entities.Permit.filter({ rider_id: riderId, status: 'active' }, '-end_date').then(ps => ps[0] || null),
-          base44.entities.Policy.filter({ rider_id: riderId, status: 'active' }, '-end_date').then(pls => pls[0] || null),
-          base44.entities.GroupMember.filter({ user_id: riderId, status: 'approved' }).then(gms => gms[0] || null),
-        ]);
-
-        setVehicle(vehicleData);
-        setPermit(permitData);
-        setPolicy(policyData);
-
-        if (vehicleData) {
-          const [countyData, stageData] = await Promise.all([
-            vehicleData.county_id ? base44.entities.County.get(vehicleData.county_id) : null,
-            vehicleData.stage_id ? base44.entities.Stage.get(vehicleData.stage_id) : null,
-          ]);
-          setCounty(countyData);
-          setStage(stageData);
+        if (data?.error) {
+          setError(data.error);
+          setLoading(false);
+          return;
         }
 
-        if (groupMemberData) {
-          const groupData = await base44.entities.Group.get(groupMemberData.group_id);
-          setGroup(groupData);
-        }
+        setRider({ verification_complete: data.verification_complete });
+        setVehicle(data.bike);
+        setPermit(data.permit);
+        setPolicy(data.policy);
+        setCounty(data.county);
+        setStage(data.stage);
+        setGroup(data.group);
       } catch (e) {
-        setError(e.message || 'Failed to load verification data');
+        setError(e.response?.data?.error || e.message || 'Failed to load verification data');
       }
       setLoading(false);
     }

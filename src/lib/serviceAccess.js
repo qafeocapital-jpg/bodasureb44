@@ -25,11 +25,11 @@ export function checkServiceAccess(service, { user, wallet, bikes, countyLive })
       actionLink: '/app/wallet/activate',
     },
     lipa_owner: {
-      unlocked: walletActive,
-      title: 'Activate Your Wallet',
-      message: 'Activate your wallet to pay bike owners.',
-      actionLabel: 'Activate Wallet',
-      actionLink: '/app/wallet/activate',
+      unlocked: walletActive && tier2,
+      title: 'Tier 2 Required',
+      message: 'Complete KYC verification (Tier 2) to pay bike owners.',
+      actionLabel: 'Verify Now',
+      actionLink: '/app/compliance',
     },
     lipa_county: {
       unlocked: walletActive && hasBike,

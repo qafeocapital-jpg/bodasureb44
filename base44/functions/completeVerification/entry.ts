@@ -1,15 +1,14 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * Phase 6 Verification Completion — checks all 5 sub-tasks
+ * Phase 6 Verification Completion — checks all 4 sub-tasks
  * and sets verification_complete = true via service role.
  *
- * Sub-tasks:
- * 1. ID Verification (id_front + id_back uploaded)
+ * Sub-tasks (consolidated from 5 → 4):
+ * 1. Identity Verification (id_front + id_back + selfie uploaded)
  * 2. Bike Photos (bike_front + bike_left + bike_rear + bike_right uploaded)
- * 3. Selfie (selfie uploaded)
- * 4. Phone OTP (user.phone_verified === true)
- * 5. Owner Verification (vehicle.is_owner_rider OR vehicle.owner_verified)
+ * 3. Phone OTP (user.phone_verified === true)
+ * 4. Owner Verification (vehicle.is_owner_rider OR vehicle.owner_verified)
  */
 Deno.serve(async (req) => {
   try {
@@ -31,10 +30,11 @@ Deno.serve(async (req) => {
     const vehicles = await sr.entities.Vehicle.filter({ rider_id: user.id }, '-created_date', 1);
     const vehicle = vehicles[0] || null;
 
-    // Sub-task 1: ID Verification
+    // Sub-task 1: Identity Verification (id_front + id_back + selfie)
     const hasIdFront = kycDocs.some(d => d.document_type === 'id_front' && d.file_url);
     const hasIdBack = kycDocs.some(d => d.document_type === 'id_back' && d.file_url);
-    const idDone = hasIdFront && hasIdBack;
+    const hasSelfie = kycDocs.some(d => d.document_type === 'selfie' && d.file_url);
+    const identityDone = hasIdFront && hasIdBack && hasSelfie;
 
     // Sub-task 2: Bike Photos
     const hasBikeFront = kycDocs.some(d => d.document_type === 'bike_front' && d.file_url);
@@ -43,48 +43,31 @@ Deno.serve(async (req) => {
     const hasBikeRight = kycDocs.some(d => d.document_type === 'bike_right' && d.file_url);
     const bikeDone = hasBikeFront && hasBikeLeft && hasBikeRear && hasBikeRight;
 
-    // Sub-task 3: Selfie
-    const hasSelfie = kycDocs.some(d => d.document_type === 'selfie' && d.file_url);
-    const selfieDone = hasSelfie;
-
-    // Sub-task 4: Phone OTP
+    // Sub-task 3: Phone OTP
     const phoneDone = fullUser.phone_verified === true;
 
-    // Sub-task 5: Owner Verification
+    // Sub-task 4: Owner Verification
     const ownerDone = vehicle ? (vehicle.is_owner_rider === true || vehicle.owner_verified === true) : false;
 
-    const allDone = idDone && bikeDone && selfieDone && phoneDone && ownerDone;
+    const allDone = identityDone && bikeDone && phoneDone && ownerDone;
 
     if (!allDone) {
       return Response.json({
         success: false,
         verification_complete: false,
-        tasks: { id: idDone, bike: bikeDone, selfie: selfieDone, phone: phoneDone, owner: ownerDone },
+        tasks: { identity: identityDone, bike: bikeDone, phone: phoneDone, owner: ownerDone },
       });
     }
 
     // Set verification_complete
     await sr.entities.User.update(user.id, { verification_complete: true });
 
-    // Trigger SasaPay Personal Onboarding initialization
-    // This sends an OTP to the rider's phone to begin SasaPay account creation
-    let sasapayInitResult = { success: false };
-    let sasapayInitError = null;
-    try {
-      const sasapayRes = await sr.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
-      sasapayInitResult = sasapayRes.data || {};
-    } catch (e) {
-      console.error('SasaPay init failed:', e.message);
-      sasapayInitError = e.message;
-    }
-
+    // Note: SasaPay personal onboarding is handled during WalletActivate (2-step progressive onboarding).
+    // Verification completion only marks the user as verified — wallet activation happens separately.
     return Response.json({
       success: true,
       verification_complete: true,
-      tasks: { id: idDone, bike: bikeDone, selfie: selfieDone, phone: phoneDone, owner: ownerDone },
-      sasapayInitiated: sasapayInitResult.success || false,
-      sasapayRequestId: sasapayInitResult.requestId || null,
-      sasapayInitError: sasapayInitError,
+      tasks: { identity: identityDone, bike: bikeDone, phone: phoneDone, owner: ownerDone },
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

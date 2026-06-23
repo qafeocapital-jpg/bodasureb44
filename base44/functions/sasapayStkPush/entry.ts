@@ -54,6 +54,10 @@ Deno.serve(async (req) => {
     if (walletId) {
       const wallets = await base44.entities.Wallet.filter({ id: walletId });
       if (wallets.length > 0) {
+        // Verify wallet belongs to the authenticated user
+        if (wallets[0].user_id && wallets[0].user_id !== user.id) {
+          return Response.json({ error: 'Forbidden: wallet does not belong to you' }, { status: 403 });
+        }
         receiverAccountNumber = wallets[0].sasapay_account_number || '';
       }
     }

@@ -162,16 +162,17 @@ export default function Home() {
       {user?.onboarding_complete && !user?.verification_complete && !bannerDismissed && (() => {
         const tasks = getTaskStatuses(kycDocs, user, bikes[0]);
         const doneCount = tasks.filter(t => t.status === 'submitted' || t.status === 'verified').length;
+        const totalTasks = tasks.length;
         return (
           <div className="px-4 pt-4">
             <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-bold text-primary">{doneCount}/5</span>
+                  <span className="text-xs font-bold text-primary">{doneCount}/{totalTasks}</span>
                 </div>
                 <Link to="/app/profile" className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-primary">Complete Verification</p>
-                  <p className="text-[10px] text-muted-foreground">{doneCount} of 5 verification tasks complete</p>
+                  <p className="text-[10px] text-muted-foreground">{doneCount} of {totalTasks} verification tasks complete</p>
                 </Link>
                 <button onClick={() => setBannerDismissed(true)} className="p-1 text-muted-foreground hover:text-foreground">
                   <X className="w-4 h-4" />

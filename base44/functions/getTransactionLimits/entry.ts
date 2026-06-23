@@ -22,6 +22,11 @@ Deno.serve(async (req) => {
     const wallet = await base44.asServiceRole.entities.Wallet.get(wallet_id);
     if (!wallet) return Response.json({ error: 'Wallet not found' }, { status: 404 });
 
+    // Verify wallet belongs to the authenticated user
+    if (wallet.user_id !== user.id) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const tier = wallet.tier || 0;
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);

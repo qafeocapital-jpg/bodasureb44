@@ -333,29 +333,6 @@ export default function Compliance() {
           } from your wallet.`}
         />
 
-        {/* Bottom Tab Bar */}
-        <div className="flex gap-2 mt-6 mb-4">
-          <button
-            onClick={() => setActiveTab('status')}
-            className={`flex-1 py-2 px-4 rounded-full font-bold text-sm transition-all ${
-              activeTab === 'status'
-                ? 'bg-[#EA580C] text-white'
-                : 'border-2 border-[#CCC] text-[#666]'
-            }`}
-          >
-            My Status
-          </button>
-          <button
-            onClick={() => setActiveTab('checklist')}
-            className={`flex-1 py-2 px-4 rounded-full font-bold text-sm transition-all ${
-              activeTab === 'checklist'
-                ? 'bg-[#EA580C] text-white'
-                : 'border-2 border-[#CCC] text-[#666]'
-            }`}
-          >
-            Checklist
-          </button>
-        </div>
       </div>
     </ErrorBoundary>
   );

@@ -20,8 +20,8 @@ Deno.serve(async (req) => {
       isScheduled = true;
     }
 
-    if (!isScheduled && user && user.role !== 'admin') {
-      return Response.json({ error: 'Forbidden — admin only' }, { status: 403 });
+    if (!isScheduled && user && user.role !== 'super_admin') {
+      return Response.json({ error: 'Forbidden — super admin only' }, { status: 403 });
     }
 
     const b44 = base44.asServiceRole;

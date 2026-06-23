@@ -77,9 +77,10 @@ Deno.serve(async (req) => {
       return Response.json({ status: 'already_processed' });
     }
 
-    // Determine new status: ResultCode "0" = success
-    const isSuccess = resultCode === '0' || body.Paid === true;
-    const newStatus = isSuccess ? 'completed' : resultCode ? 'failed' : 'pending';
+    // Determine new status: ResultCode "0" = success (handle both string and int)
+    const resultCodeStr = resultCode !== undefined && resultCode !== null ? String(resultCode) : '';
+    const isSuccess = resultCodeStr === '0' || body.Paid === true;
+    const newStatus = isSuccess ? 'completed' : resultCodeStr && resultCodeStr !== '0' ? 'failed' : 'pending';
 
     // Amount validation: verify the webhook amount matches the transaction
     const paidAmount = body.TransAmount || body.PaidAmount || body.RequestedAmount;
@@ -130,9 +131,15 @@ Deno.serve(async (req) => {
       processed_at: new Date().toISOString(),
     });
 
-    // Create audit log
+    // Create audit log — resolve user_id from wallet
+    let userId = txn.wallet_id;
+    try {
+      const wallet = await base44.asServiceRole.entities.Wallet.get(txn.wallet_id);
+      if (wallet?.user_id) userId = wallet.user_id;
+    } catch {}
+
     await base44.asServiceRole.entities.AuditLog.create({
-      user_id: txn.wallet_id,
+      user_id: userId,
       action: `sasapay_c2b_${newStatus}`,
       entity_type: 'Transaction',
       entity_id: txn.id,

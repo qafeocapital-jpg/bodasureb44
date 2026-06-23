@@ -27,39 +27,22 @@ Deno.serve(async (req) => {
       isScheduled = true;
     }
 
-    if (!isScheduled && user && user.role !== 'admin') {
-      return Response.json({ error: 'Forbidden — admin only' }, { status: 403 });
+    if (!isScheduled && user && user.role !== 'super_admin') {
+      return Response.json({ error: 'Forbidden — super admin only' }, { status: 403 });
     }
 
     const b44 = base44.asServiceRole;
 
-    // Fetch all TransactionLegs that haven't been settled yet.
-    // We track settled legs by checking if a Settlement with their transaction_id exists.
-    const allLegs = [];
-    let skip = 0;
-    const limit = 50;
-    while (true) {
-      const batch = await b44.entities.TransactionLeg.filter({}, '-created_date', limit, skip);
-      if (batch.length === 0) break;
-      allLegs.push(...batch);
-      if (batch.length < limit) break;
-      skip += limit;
-    }
+    // Fetch recent TransactionLegs (last 500 — covers typical settlement cycle).
+    // Avoids loading the entire legs table into memory (scalability for 1M+ users).
+    const allLegs = await b44.entities.TransactionLeg.filter({}, '-created_date', 500);
 
     if (allLegs.length === 0) {
       return Response.json({ processed: 0, settlements_created: 0, message: 'No transaction legs to process' });
     }
 
-    // Fetch all existing settlements to know which transaction_ids are already settled
-    const allSettlements = [];
-    skip = 0;
-    while (true) {
-      const batch = await b44.entities.Settlement.filter({}, '-created_date', limit, skip);
-      if (batch.length === 0) break;
-      allSettlements.push(...batch);
-      if (batch.length < limit) break;
-      skip += limit;
-    }
+    // Fetch recent settlements (last 500) to know which transaction_ids are already settled
+    const allSettlements = await b44.entities.Settlement.filter({}, '-created_date', 500);
 
     const settledTxnIds = new Set();
     allSettlements.forEach(s => {
@@ -72,7 +55,7 @@ Deno.serve(async (req) => {
     const unprocessedLegs = allLegs.filter(leg => !settledTxnIds.has(leg.transaction_id));
 
     if (unprocessedLegs.length === 0) {
-      return Response.json({ processed: 0, settlements_created: 0, message: 'All transaction legs already settled' });
+      return Response.json({ processed: 0, settlements_created: 0, message: 'All recent transaction legs already settled' });
     }
 
     // Group by leg_type (entity_type) + recipient_wallet_id (entity_id proxy)

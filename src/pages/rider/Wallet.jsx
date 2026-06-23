@@ -154,7 +154,7 @@ export default function Wallet() {
     { id: 'withdraw', label: 'Withdraw', icon: ArrowUpFromLine },
   ];
 
-  const needsTier2 = (activeTab === 'send' || activeTab === 'withdraw') && (wallet.tier || 0) < 2;
+  const needsTier2 = (activeTab === 'send' || activeTab === 'withdraw') && (wallet.tier || 0) < 2 && (user?.wallet_tier || 0) < 2;
 
   return (
     <div className="p-5 animate-fade-in">
@@ -190,7 +190,7 @@ export default function Wallet() {
               <p className="text-sm font-medium text-warning">Tier 2 Required</p>
               <p className="text-xs text-muted-foreground mt-0.5">This feature requires KYC approval (Tier 2). Upload your ID documents to unlock.</p>
             </div>
-            <Link to="/app/kyc" className="flex-shrink-0 bg-warning text-warning-foreground rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap">Verify Now</Link>
+            <Link to="/app/compliance" className="flex-shrink-0 bg-warning text-warning-foreground rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap">Verify Now</Link>
           </div>
         )}
         {activeTab === 'send' && (
