@@ -5,36 +5,31 @@ import { useAuth } from '@/lib/AuthContext';
 import { getOrCreateWallet } from '@/lib/payments';
 import { setWalletPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
-import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, FileCheck, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, Loader2, Smartphone, Lock } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
-import { formatPhoneDisplay } from '@/lib/phone';
 
 export default function WalletActivate() {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [step, setStep] = useState(0);
+  const [identity, setIdentity] = useState({ full_name: '', national_id: '', phone: '' });
   const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [requestId, setRequestId] = useState('');
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
-  const [pinError, setPinError] = useState('');
-  const [identityError, setIdentityError] = useState('');
-  const [identity, setIdentity] = useState({ full_name: '', national_id: '', date_of_birth: '' });
   const [saving, setSaving] = useState(false);
-  const [otpSending, setOtpSending] = useState(false);
-  const [otpVerifying, setOtpVerifying] = useState(false);
-  const [otpError, setOtpError] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     async function load() {
       if (!user) return;
+      setIdentity({
+        full_name: user.full_name || '',
+        national_id: user.national_id || '',
+        phone: user.phone || '',
+      });
       try {
-        setIdentity({
-          full_name: user.full_name || '',
-          national_id: user.national_id || '',
-          date_of_birth: user.date_of_birth || '',
-        });
         const w = await getOrCreateWallet(user.id);
         setWallet(w);
       } catch (e) {}
@@ -42,81 +37,96 @@ export default function WalletActivate() {
     load();
   }, [user]);
 
-  async function sendOtp() {
-    setOtpSending(true);
-    setOtpError('');
-    try {
-      const res = await base44.functions.invoke('sendOtp', {});
-      if (res.data?.success) {
-        setOtpSent(true);
-      } else {
-        setOtpError(res.data?.error || 'Failed to send OTP. Try again.');
-      }
-    } catch (e) {
-      setOtpError(e.response?.data?.error || e.message || 'Failed to send OTP. Try again.');
+  // Step 0: Save profile + call SasaPay personal onboarding init
+  async function handleInit() {
+    if (!identity.full_name || !identity.national_id || !identity.phone) {
+      setError('Full name, phone, and National ID are required.');
+      return;
     }
-    setOtpSending(false);
-  }
-
-  async function verifyOtp() {
-    setOtpVerifying(true);
-    setOtpError('');
-    try {
-      const res = await base44.functions.invoke('verifyOtpCode', { otpCode: otp });
-      if (res.data?.valid) {
-        setStep(1);
-      } else {
-        setOtpError(res.data?.error || 'Incorrect or expired code. Try again.');
-      }
-    } catch (e) {
-      setOtpError(e.response?.data?.error || e.message || 'Verification failed. Try again.');
+    if (!/^\d{7,8}$/.test(identity.national_id)) {
+      setError('National ID must be 7–8 digits.');
+      return;
     }
-    setOtpVerifying(false);
-  }
-
-  function handlePinSet() {
-    if (pin.length !== 4) { setPinError('PIN must be 4 digits'); return; }
-    if (pin !== pinConfirm) { setPinError('PINs do not match'); return; }
-    setPinError('');
-    setStep(2);
-  }
-
-  async function handleActivate() {
     setSaving(true);
+    setError('');
     try {
-      // Check National ID uniqueness
-      if (identity.national_id) {
-        const existing = await base44.entities.User.filter({ national_id: identity.national_id });
-        const conflict = existing.find(u => u.id !== user.id);
-        if (conflict) {
-          setIdentityError('This National ID is already registered to another user.');
-          setSaving(false);
-          return;
-        }
-      }
-      // Set PIN securely via backend (PBKDF2 hashing)
-      const pinSet = await setWalletPin(wallet.id, pin);
-      if (!pinSet) {
-        throw new Error('Failed to set wallet PIN. Try again.');
-      }
-
-      await base44.entities.Wallet.update(wallet.id, {
-        tier: 1,
-        status: 'active',
-        sasapay_customer_id: `mock_${user?.id}`,
-      });
+      // Save profile fields first so sasapayPersonalOnboarding can read them
       await base44.auth.updateMe({
-        wallet_tier: 1,
         full_name: identity.full_name,
         national_id: identity.national_id,
-        date_of_birth: identity.date_of_birth,
-        profile_complete: true,
+        phone: identity.phone,
       });
-      await auditLog({ userId: user.id, action: 'wallet_activated', entityType: 'Wallet', entityId: wallet.id, description: `Wallet activated to Level 1 for user ${user.id}` });
+      await refreshUser();
+
+      // Call SasaPay personal onboarding — SasaPay sends OTP to rider's phone
+      const res = await base44.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
+      if (res.data?.success) {
+        setRequestId(res.data.requestId);
+        setStep(1);
+      } else {
+        setError(res.data?.error || 'Failed to start activation. Try again.');
+      }
+    } catch (e) {
+      setError(e.response?.data?.error || e.message || 'Activation failed. Try again.');
+    }
+    setSaving(false);
+  }
+
+  // Step 1: Verify OTP from SasaPay
+  async function handleConfirm() {
+    if (otp.length < 4) {
+      setError('Enter the OTP sent to your phone.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await base44.functions.invoke('sasapayPersonalOnboarding', {
+        action: 'confirm',
+        otp,
+        requestId,
+      });
+      if (res.data?.success) {
+        // Upgrade wallet to Tier 1 — basic SasaPay wallet active
+        await base44.entities.Wallet.update(wallet.id, {
+          tier: 1,
+          status: 'active',
+          sasapay_account_number: res.data.accountNumber || '',
+          sasapay_customer_id: res.data.accountNumber || '',
+          sasapay_account_status: 'ACTIVE',
+        });
+        await base44.auth.updateMe({ wallet_tier: 1 });
+        await refreshUser();
+        setStep(2);
+      } else {
+        setError(res.data?.error || 'Verification failed. Check your code and try again.');
+      }
+    } catch (e) {
+      setError(e.response?.data?.error || e.message || 'Verification failed. Try again.');
+    }
+    setSaving(false);
+  }
+
+  // Step 2: Set transaction PIN
+  async function handleSetPin() {
+    if (pin.length !== 4) { setError('PIN must be 4 digits.'); return; }
+    if (pin !== pinConfirm) { setError('PINs do not match.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const pinSet = await setWalletPin(wallet.id, pin);
+      if (!pinSet) throw new Error('Failed to set PIN.');
+      await auditLog({
+        userId: user.id,
+        action: 'wallet_activated_tier1',
+        entityType: 'Wallet',
+        entityId: wallet.id,
+        description: `Wallet activated to Tier 1 (SasaPay basic onboarding) for user ${user.id}`,
+      });
       await refreshUser();
       setStep(3);
     } catch (e) {
-      setIdentityError(e.message || 'Activation failed. Try again.');
+      setError(e.message || 'Failed to set PIN. Try again.');
     }
     setSaving(false);
   }
@@ -124,10 +134,10 @@ export default function WalletActivate() {
   if (!user) return <PageSkeleton variant="hero-rows" />;
 
   const steps = [
-    { title: 'Verify Phone', icon: Shield },
+    { title: 'Activate', icon: Smartphone },
+    { title: 'Verify OTP', icon: Shield },
     { title: 'Set PIN', icon: KeyRound },
-    { title: 'Identity', icon: FileCheck },
-    { title: 'Activate', icon: Check },
+    { title: 'Done', icon: Check },
   ];
 
   return (
@@ -154,59 +164,101 @@ export default function WalletActivate() {
       <p className="text-xs text-muted-foreground mb-1">Step {step + 1} of {steps.length}</p>
       <h2 className="font-heading font-bold text-lg mb-5">{steps[step].title}</h2>
 
-      {/* Step 0: Phone OTP */}
+      {/* Step 0: Profile + SasaPay init */}
       {step === 0 && (
         <div className="space-y-4">
           <div className="bg-accent rounded-xl p-4 flex items-center gap-3">
-            <Shield className="w-5 h-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">We'll send a one-time code to your email to verify it's you.</p>
+            <Smartphone className="w-5 h-5 text-primary flex-shrink-0" />
+            <p className="text-sm text-muted-foreground">We'll create your SasaPay wallet using your phone number and National ID. An OTP will be sent to your phone.</p>
           </div>
           <div>
-           <label className="text-xs font-medium text-muted-foreground">Email Address</label>
-           <input
-             type="email"
-             value={user.email || ''}
-             disabled
-             className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-muted text-sm"
-           />
+            <label className="text-xs font-medium text-muted-foreground">Full Name</label>
+            <input
+              type="text"
+              value={identity.full_name}
+              onChange={e => setIdentity(i => ({ ...i, full_name: e.target.value }))}
+              placeholder="John Mwangi"
+              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
           </div>
-          {otpError && <p className="text-xs text-destructive">{otpError}</p>}
-          {!otpSent ? (
-           <button onClick={sendOtp} disabled={otpSending} className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
-             {otpSending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : 'Send OTP'}
-           </button>
-          ) : (
-           <>
-             <div>
-               <label className="text-xs font-medium text-muted-foreground">Enter OTP Code</label>
-               <input
-                 type="text"
-                 inputMode="numeric"
-                 maxLength={4}
-                 value={otp}
-                 onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                 placeholder="••••"
-                 className="w-full mt-1 px-3 py-3 rounded-xl border border-input bg-background text-2xl text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-primary"
-               />
-               <p className="text-[10px] text-muted-foreground mt-1.5">Check your email for the 4-digit code</p>
-             </div>
-             <button onClick={verifyOtp} disabled={otp.length !== 4 || otpVerifying} className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
-               {otpVerifying ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</> : <>Verify <ChevronRight className="w-4 h-4" /></>}
-             </button>
-             <button onClick={sendOtp} disabled={otpSending} className="w-full text-center text-sm text-muted-foreground py-1">
-               {otpSending ? 'Resending...' : 'Resend code'}
-             </button>
-           </>
-          )}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
+            <input
+              type="tel"
+              value={identity.phone}
+              onChange={e => setIdentity(i => ({ ...i, phone: e.target.value }))}
+              placeholder="0712345678"
+              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={8}
+              value={identity.national_id}
+              onChange={e => setIdentity(i => ({ ...i, national_id: e.target.value.replace(/[^\d]/g, '') }))}
+              placeholder="00000000"
+              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            {identity.national_id && !/^\d{7,8}$/.test(identity.national_id) && (
+              <p className="text-xs text-destructive mt-1">National ID must be 7–8 digits</p>
+            )}
+          </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <button
+            onClick={handleInit}
+            disabled={saving || !identity.full_name || !identity.national_id || !identity.phone || !/^\d{7,8}$/.test(identity.national_id)}
+            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
+          >
+            {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</> : <><Smartphone className="w-4 h-4" /> Activate Wallet</>}
+          </button>
         </div>
       )}
 
-      {/* Step 1: Set PIN */}
+      {/* Step 1: OTP from SasaPay */}
       {step === 1 && (
         <div className="space-y-4">
           <div className="bg-accent rounded-xl p-4 flex items-center gap-3">
-            <KeyRound className="w-5 h-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">Create a 4-digit PIN. You'll use this to confirm all outgoing transactions from your wallet.</p>
+            <Shield className="w-5 h-5 text-primary flex-shrink-0" />
+            <p className="text-sm text-muted-foreground">Enter the OTP sent to <span className="font-semibold text-foreground">{identity.phone}</span> by SasaPay.</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Enter OTP Code</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+              placeholder="••••"
+              className="w-full mt-1 px-3 py-3 rounded-xl border border-input bg-background text-2xl text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1.5">Check your phone for the code from SasaPay</p>
+          </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex gap-2">
+            <button onClick={() => setStep(0)} className="px-5 py-3 rounded-xl border border-border text-sm font-semibold">
+              Back
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={saving || otp.length < 4}
+              className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
+            >
+              {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</> : <>Verify <ChevronRight className="w-4 h-4" /></>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Set PIN */}
+      {step === 2 && (
+        <div className="space-y-4">
+          <div className="bg-success/10 rounded-xl p-4 flex items-center gap-3">
+            <Check className="w-5 h-5 text-success flex-shrink-0" />
+            <p className="text-sm text-muted-foreground">SasaPay wallet activated! Now set a 4-digit PIN to confirm all your transactions.</p>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Create PIN</label>
@@ -232,72 +284,14 @@ export default function WalletActivate() {
               className="w-full mt-1 px-3 py-3 rounded-xl border border-input bg-background text-2xl text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          {pinError && <p className="text-xs text-destructive">{pinError}</p>}
-          <div className="flex gap-2">
-            <button onClick={() => setStep(0)} className="px-5 py-3 rounded-xl border border-border text-sm font-semibold">
-              Back
-            </button>
-            <button onClick={handlePinSet} disabled={pin.length !== 4 || pinConfirm.length !== 4} className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50">
-              Continue <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 2: Identity */}
-      {step === 2 && (
-        <div className="space-y-4">
-          <div className="bg-accent rounded-xl p-4 flex items-center gap-3">
-            <FileCheck className="w-5 h-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">Confirm your identity details. You'll need to upload KYC documents later to unlock Level 2 (withdrawals).</p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Full Name</label>
-            <input
-              type="text"
-              value={identity.full_name}
-              onChange={e => setIdentity(i => ({ ...i, full_name: e.target.value }))}
-              placeholder="John Mwangi"
-              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">National ID Number *</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={8}
-              value={identity.national_id}
-              onChange={e => setIdentity(i => ({ ...i, national_id: e.target.value.replace(/[^\d]/g, '') }))}
-              placeholder="00000000"
-              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            {identity.national_id && !/^\d{7,8}$/.test(identity.national_id) && (
-              <p className="text-xs text-destructive mt-1">National ID must be 7–8 digits</p>
-            )}
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Date of Birth</label>
-            <input
-              type="date"
-              value={identity.date_of_birth}
-              onChange={e => setIdentity(i => ({ ...i, date_of_birth: e.target.value }))}
-              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button onClick={() => setStep(1)} className="px-5 py-3 rounded-xl border border-border text-sm font-semibold">
-              Back
-            </button>
-            <button
-              onClick={handleActivate}
-              disabled={saving || !identity.full_name || !identity.national_id || !/^\d{7,8}$/.test(identity.national_id)}
-              className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
-            >
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Activating...</> : <><Shield className="w-4 h-4" /> Activate Wallet</>}
-            </button>
-          </div>
-          {identityError && <p className="text-xs text-destructive">{identityError}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <button
+            onClick={handleSetPin}
+            disabled={saving || pin.length !== 4 || pinConfirm.length !== 4}
+            className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
+          >
+            {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Setting PIN...</> : <><KeyRound className="w-4 h-4" /> Set PIN</>}
+          </button>
         </div>
       )}
 
@@ -308,26 +302,26 @@ export default function WalletActivate() {
             <Check className="w-10 h-10 text-success" />
           </div>
           <h2 className="font-heading font-bold text-xl mb-2">Wallet Activated!</h2>
-          <p className="text-sm text-muted-foreground mb-6">Your wallet is now Level 1. You can deposit and receive money. Upload KYC documents to unlock withdrawals and sending.</p>
-          <div className="bg-card border border-border rounded-2xl p-4 mb-6 text-left">
+          <p className="text-sm text-muted-foreground mb-6">Your SasaPay wallet is now Tier 1. You can deposit money, pay county fees, and pay bike owners.</p>
+          <div className="bg-card border border-border rounded-2xl p-4 mb-4 text-left">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground">Verification Level</span>
-              <span className="text-sm font-bold text-primary">Level 1</span>
+              <span className="text-xs text-muted-foreground">Wallet Tier</span>
+              <span className="text-sm font-bold text-primary">Tier 1 (Basic)</span>
             </div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground">Balance Limit</span>
-              <span className="text-sm font-bold">KES 5,000</span>
+              <span className="text-xs text-muted-foreground">Available Features</span>
+              <span className="text-sm font-bold">Deposit, Lipa County, Lipa Owner</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Can Withdraw</span>
-              <span className="text-sm font-bold text-muted-foreground">Upload KYC →</span>
+              <span className="text-xs text-muted-foreground">Locked (Needs KYC)</span>
+              <span className="text-sm font-bold text-muted-foreground flex items-center gap-1"><Lock className="w-3 h-3" /> Lipisha, Withdraw</span>
             </div>
           </div>
           <button onClick={() => navigate('/app/wallet')} className="w-full bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm">
             Go to Wallet
           </button>
-          <button onClick={() => navigate('/app/kyc')} className="w-full mt-2 text-sm text-primary py-2 font-medium">
-            Upload KYC Documents
+          <button onClick={() => navigate('/app/compliance')} className="w-full mt-2 text-sm text-primary py-2 font-medium flex items-center justify-center gap-1">
+            <Shield className="w-4 h-4" /> Complete KYC to Unlock All Features
           </button>
         </div>
       )}

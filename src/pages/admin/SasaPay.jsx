@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatKES, formatDateTime } from '@/lib/format';
-import { Database, Search, Activity, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Database, Search, Activity, CheckCircle2, AlertCircle, Receipt, TrendingUp } from 'lucide-react';
+import TariffManager from '@/components/admin/TariffManager';
+import RevenueReconciliation from '@/components/admin/RevenueReconciliation';
 
 export default function AdminSasaPay() {
   const [tab, setTab] = useState('overview');
@@ -30,6 +32,8 @@ export default function AdminSasaPay() {
     { id: 'overview', label: 'Overview', icon: Activity },
     { id: 'transactions', label: 'Transactions', icon: Database },
     { id: 'wallets', label: 'Customer Accounts', icon: CheckCircle2 },
+    { id: 'tariff', label: 'Tariff Manager', icon: Receipt },
+    { id: 'revenue', label: 'Revenue & Reconciliation', icon: TrendingUp },
     { id: 'webhooks', label: 'Webhook Log', icon: AlertCircle },
   ];
 
@@ -48,7 +52,11 @@ export default function AdminSasaPay() {
         ))}
       </div>
 
-      {loading ? (
+      {tab === 'tariff' ? (
+        <TariffManager />
+      ) : tab === 'revenue' ? (
+        <RevenueReconciliation />
+      ) : loading ? (
         <p className="text-sm text-muted-foreground text-center py-10">Loading...</p>
       ) : tab === 'overview' ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

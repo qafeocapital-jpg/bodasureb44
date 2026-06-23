@@ -9,6 +9,7 @@ import PageSkeleton from '@/components/rider/PageSkeleton';
 import PhoneInput from '@/components/ui/PhoneInput';
 import UnlockSheet from '@/components/rider/UnlockSheet';
 import { checkServiceAccess } from '@/lib/serviceAccess';
+import { lookupFee, checkTransactionLimits } from '@/lib/feeEngine';
 import { isValidKenyanPhone, formatPhoneDisplay } from '@/lib/phone';
 
 export default function Lipisha() {
@@ -22,6 +23,8 @@ export default function Lipisha() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [accessInfo, setAccessInfo] = useState(null);
+  const [feePreview, setFeePreview] = useState(null);
+  const [limitInfo, setLimitInfo] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -35,6 +38,10 @@ export default function Lipisha() {
         setHistory(txns);
         const access = checkServiceAccess('lipisha', { user, wallet: w });
         if (!access.unlocked) setAccessInfo(access);
+        try {
+          const limits = await checkTransactionLimits(w.id, 'lipisha', 0);
+          setLimitInfo(limits);
+        } catch (e) {}
       } catch (e) {}
     }
     load();
@@ -42,7 +49,16 @@ export default function Lipisha() {
 
   async function handleCollect() {
     const cents = Math.round(parseFloat(amount) * 100);
+    const amountKes = parseFloat(amount);
     if (!isValidKenyanPhone(phone) || !cents || cents <= 0) return;
+
+    // Check daily limits before proceeding
+    const limitCheck = await checkTransactionLimits(wallet.id, 'lipisha', amountKes);
+    if (!limitCheck.canProceed) {
+      setResult({ success: false, message: limitCheck.errorMessage });
+      return;
+    }
+
     setLoading(true);
     setResult(null);
     try {
@@ -68,6 +84,13 @@ export default function Lipisha() {
     }
     setLoading(false);
   }
+
+  // Fee preview — lookup when amount changes
+  useEffect(() => {
+    const amountKes = parseFloat(amount);
+    if (!amountKes || amountKes <= 0) { setFeePreview(null); return; }
+    lookupFee('collection', amountKes).then(setFeePreview).catch(() => setFeePreview(null));
+  }, [amount]);
 
   if (!wallet) return <PageSkeleton variant="hero-rows" />;
 
@@ -139,6 +162,17 @@ export default function Lipisha() {
             </button>
           ))}
         </div>
+        {feePreview && feePreview.bodasureMarkupKes > 0 && (
+          <div className="flex items-center justify-between bg-muted/50 rounded-xl px-4 py-2.5">
+            <span className="text-xs text-muted-foreground">Fee (BodaSure markup)</span>
+            <span className="text-sm font-bold text-primary">KES {(feePreview.bodasureMarkupKes / 100).toFixed(2)}</span>
+          </div>
+        )}
+        {limitInfo && (
+          <div className="text-xs text-muted-foreground">
+            Daily usage: KES {(limitInfo.daily_used_kes || 0).toLocaleString()} / {limitInfo.daily_limit_kes.toLocaleString()} · Remaining: KES {(limitInfo.remaining_kes || 0).toLocaleString()}
+          </div>
+        )}
         <button
           onClick={handleCollect}
           disabled={loading || !isValidKenyanPhone(phone) || !amount}
