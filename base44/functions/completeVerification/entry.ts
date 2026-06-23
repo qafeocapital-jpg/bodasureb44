@@ -66,10 +66,23 @@ Deno.serve(async (req) => {
     // Set verification_complete
     await sr.entities.User.update(user.id, { verification_complete: true });
 
+    // Trigger SasaPay Personal Onboarding initialization
+    // This sends an OTP to the rider's phone to begin SasaPay account creation
+    let sasapayInitResult = { success: false };
+    try {
+      const sasapayRes = await sr.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
+      sasapayInitResult = sasapayRes.data || {};
+    } catch (e) {
+      console.error('SasaPay init failed:', e.message);
+      // Do not block verification completion; log the error and continue
+    }
+
     return Response.json({
       success: true,
       verification_complete: true,
       tasks: { id: idDone, bike: bikeDone, selfie: selfieDone, phone: phoneDone, owner: ownerDone },
+      sasapayInitiated: sasapayInitResult.success || false,
+      sasapayRequestId: sasapayInitResult.requestId || null,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
