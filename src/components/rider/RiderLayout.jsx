@@ -1,8 +1,34 @@
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import RiderHeader from './RiderHeader';
 import BottomNav from './BottomNav';
 
 export default function RiderLayout() {
+  const { user } = useAuth();
+  const [walletActive, setWalletActive] = useState(false);
+
+  useEffect(() => {
+    async function checkWallet() {
+      if (!user) {
+        setWalletActive(false);
+        return;
+      }
+      try {
+        const wallets = await base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' });
+        if (wallets.length > 0) {
+          setWalletActive(wallets[0].status === 'active' || wallets[0].tier > 0);
+        } else {
+          setWalletActive(false);
+        }
+      } catch (e) {
+        setWalletActive(false);
+      }
+    }
+    checkWallet();
+  }, [user]);
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-stretch justify-center">
       {/* Left sidebar */}
@@ -24,7 +50,7 @@ export default function RiderLayout() {
         <main className="pt-14 pb-20 min-h-screen">
           <Outlet />
         </main>
-        <BottomNav />
+        <BottomNav walletActive={walletActive} />
       </div>
 
       {/* Right sidebar */}

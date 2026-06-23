@@ -53,6 +53,14 @@ export default function Profile() {
         setCompletedPhase(phase);
         const targetPhase = location.state?.targetPhase;
         const viewStep = location.state?.viewStep;
+        
+        // FIX 2: Auto-skip phase 0 if wallet activation already filled in all fields
+        let initialPhase = Math.min(phase, 6);
+        if (phase === 0 && user.full_name && user.phone && user.national_id && user.county_id) {
+          initialPhase = 1;
+          setCompletedPhase(1);
+        }
+        
         if (targetPhase !== undefined && targetPhase !== null) {
           setCurrentPhase(targetPhase);
           setReadOnly(false);
@@ -60,7 +68,7 @@ export default function Profile() {
           setCurrentPhase(viewStep);
           setReadOnly(true);
         } else {
-          setCurrentPhase(Math.min(phase, 6));
+          setCurrentPhase(initialPhase);
           setReadOnly(false);
         }
       } catch (e) {}

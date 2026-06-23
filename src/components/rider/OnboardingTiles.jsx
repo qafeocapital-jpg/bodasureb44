@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Lock, Clock } from 'lucide-react';
+import { CheckCircle2, Circle, Clock } from 'lucide-react';
 import { ONBOARDING_PHASES, getOnboardingPhase } from '@/lib/onboarding';
 
 const TILE_COLORS = [
@@ -37,17 +37,17 @@ export default function OnboardingTiles({ user, bikes, kycDocs, groupMembers }) 
                   <Icon className="w-5 h-5" />
                 </div>
                 {done ? (
-                  <CheckCircle2 className="w-4 h-4 text-success" />
-                ) : pending ? (
-                  <Clock className="w-4 h-4 text-warning" />
-                ) : (
-                  <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                )}
+                    <CheckCircle2 className="w-4 h-4 text-success" />
+                  ) : pending ? (
+                    <Clock className="w-4 h-4 text-warning" />
+                  ) : (
+                    <Circle className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
               </div>
               <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Step {i + 1}</p>
               <p className="text-xs font-semibold">{p.short}</p>
               <p className={`text-[10px] ${done ? 'text-success' : pending ? 'text-warning' : 'text-muted-foreground'}`}>
-                {done ? 'Complete' : pending ? 'In progress' : 'Locked'}
+                {done ? 'Complete' : pending ? 'In progress' : 'Not Started'}
               </p>
             </Link>
           );

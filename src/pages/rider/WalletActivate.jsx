@@ -13,8 +13,9 @@ export default function WalletActivate() {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const [wallet, setWallet] = useState(null);
+  const [counties, setCounties] = useState([]);
   const [step, setStep] = useState(0);
-  const [identity, setIdentity] = useState({ firstName: '', middleName: '', lastName: '', full_name: '', national_id: '', phone: '' });
+  const [identity, setIdentity] = useState({ firstName: '', middleName: '', lastName: '', full_name: '', national_id: '', phone: '', county_id: '' });
   const [otp, setOtp] = useState('');
   const [requestId, setRequestId] = useState('');
   const [pin, setPin] = useState('');
@@ -33,10 +34,15 @@ export default function WalletActivate() {
         full_name: user.full_name || '',
         national_id: user.national_id || '',
         phone: user.phone || '',
+        county_id: user.county_id || '',
       });
       try {
-        const w = await getOrCreateWallet(user.id);
+        const [w, cs] = await Promise.all([
+          getOrCreateWallet(user.id),
+          base44.entities.County.filter({}),
+        ]);
         setWallet(w);
+        setCounties(cs);
       } catch (e) {}
     }
     load();
@@ -44,12 +50,16 @@ export default function WalletActivate() {
 
   // Step 0: Save profile + call SasaPay personal onboarding init
   async function handleInit() {
-    if (!identity.firstName || !identity.lastName || !identity.national_id || !identity.phone) {
-      setError('First name, last name, phone, and National ID are required.');
+    if (!identity.firstName || !identity.lastName || !identity.national_id || !identity.phone || !identity.county_id) {
+      setError('First name, last name, phone, National ID, and county are required.');
       return;
     }
-    if (!/^\d{7,8}$/.test(identity.national_id)) {
-      setError('National ID must be 7–8 digits.');
+    if (!/^\d{6,8}$/.test(identity.national_id)) {
+      setError('National ID must be 6–8 digits.');
+      return;
+    }
+    if (!/^(\+2547\d{8}|\+2541\d{8}|07\d{8}|01\d{8})$/.test(identity.phone.replace(/\s+/g, ''))) {
+      setError('Enter a valid Kenyan phone number.');
       return;
     }
     setSaving(true);
@@ -61,6 +71,7 @@ export default function WalletActivate() {
         full_name: fullName,
         national_id: identity.national_id,
         phone: identity.phone,
+        county_id: identity.county_id,
       });
       await refreshUser();
 
@@ -194,7 +205,7 @@ export default function WalletActivate() {
                 type="text"
                 value={identity.middleName}
                 onChange={e => setIdentity(i => ({ ...i, middleName: e.target.value }))}
-                placeholder="Mwangi"
+                placeholder="Kimeu"
                 className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
@@ -204,7 +215,7 @@ export default function WalletActivate() {
                 type="text"
                 value={identity.lastName}
                 onChange={e => setIdentity(i => ({ ...i, lastName: e.target.value }))}
-                placeholder="Kamau"
+                placeholder="Omondi"
                 className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
@@ -230,14 +241,25 @@ export default function WalletActivate() {
               placeholder="00000000"
               className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
-            {identity.national_id && !/^\d{7,8}$/.test(identity.national_id) && (
-              <p className="text-xs text-destructive mt-1">National ID must be 7–8 digits</p>
+            {identity.national_id && !/^\d{6,8}$/.test(identity.national_id) && (
+              <p className="text-xs text-destructive mt-1">National ID must be 6–8 digits</p>
             )}
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">County You Operate From</label>
+            <select
+              value={identity.county_id}
+              onChange={e => setIdentity(i => ({ ...i, county_id: e.target.value }))}
+              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Select county</option>
+              {counties.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <button
             onClick={handleInit}
-            disabled={saving || !identity.firstName || !identity.lastName || !identity.national_id || !identity.phone || !/^\d{7,8}$/.test(identity.national_id)}
+            disabled={saving || !identity.firstName || !identity.lastName || !identity.national_id || !identity.phone || !identity.county_id || !/^\d{6,8}$/.test(identity.national_id)}
             className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
           >
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</> : <><Smartphone className="w-4 h-4" /> Activate Wallet</>}

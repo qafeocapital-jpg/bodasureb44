@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import { auditLog } from '@/lib/audit';
-import { ChevronRight, ChevronLeft, Loader2, Check, MapPin, Lock, AlertTriangle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Loader2, Check, MapPin, Lock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import PlateInput from '@/components/rider/onboarding/PlateInput';
 import NtsaConfirmDialog from '@/components/rider/onboarding/NtsaConfirmDialog';
 import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
@@ -22,6 +22,7 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
   const [ownerPhoneError, setOwnerPhoneError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [plateError, setPlateError] = useState('');
+  const [plateVerified, setPlateVerified] = useState(false);
   const [showNtsaDialog, setShowNtsaDialog] = useState(false);
 
   const updateForm = (partial) => {
@@ -60,23 +61,38 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
     } catch (e) { setOwnerFound(false); }
   }
 
+  const isPlateFormatValid = (plate) => /^[A-Z0-9]{8}$/i.test((plate || '').trim());
+
   const canProceed = () => {
-    if (!form.role || form.plate_number?.trim().length !== 8 || !form.make?.trim() || !form.color?.trim()) return false;
+    if (!form.role || !isPlateFormatValid(form.plate_number) || !form.make?.trim() || !form.color?.trim()) return false;
     if (form.role === 'rider' && (!form.owner_phone?.trim() || ownerPhoneError)) return false;
     return true;
   };
 
+  function checkPlateFormatError() {
+    if (!form.plate_number) { setPlateError(''); return false; }
+    if (!isPlateFormatValid(form.plate_number)) {
+      setPlateError('Number plate must be exactly 8 alphanumeric characters');
+      setPlateVerified(false);
+      return true;
+    }
+    setPlateError('');
+    return false;
+  }
+
   async function checkPlateUniqueness() {
+    setPlateVerified(false);
     const plate = form.plate_number?.trim().toUpperCase();
     if (!plate) { setPlateError(''); return false; }
-    if (vehicle?.plate_number?.toUpperCase() === plate) { setPlateError(''); return false; }
+    if (vehicle?.plate_number?.toUpperCase() === plate) { setPlateError(''); setPlateVerified(true); return false; }
     try {
       const existing = await base44.entities.Vehicle.filter({ plate_number: plate });
       if (existing.length > 0 && existing[0].id !== vehicle?.id) {
-        setPlateError('This plate is already registered.');
+        setPlateError('This number plate is already registered in BodaSure under another account');
         return true;
       }
       setPlateError('');
+      setPlateVerified(true);
       return false;
     } catch (e) { setPlateError(''); return false; }
   }
@@ -183,11 +199,17 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
         ))}
       </div>
 
-      <PlateInput
-        value={form.plate_number}
-        onChange={(val) => updateForm({ plate_number: val })}
-        error={plateError}
-      />
+      <div>
+         <div className="flex items-center justify-between">
+           <label className="text-xs font-medium text-muted-foreground">Number Plate</label>
+           {plateVerified && <CheckCircle2 className="w-4 h-4 text-success" />}
+         </div>
+         <PlateInput
+           value={form.plate_number}
+           onChange={(val) => { updateForm({ plate_number: val }); checkPlateFormatError(); setPlateVerified(false); }}
+           error={plateError}
+         />
+       </div>
       <div>
         <label className="text-xs font-medium text-muted-foreground">Make</label>
         <input

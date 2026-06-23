@@ -4,7 +4,7 @@ import { splitFullName, joinFullName } from '@/lib/nameUtils';
 import { base44 } from '@/api/base44Client';
 import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
-import { ChevronRight, ChevronLeft, Loader2, AlertTriangle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 
 export default function PhasePersonal({ user, counties, initialValues, onDraftChange, onSaved, onBack, readOnly, onExitReadOnly }) {
@@ -23,6 +23,8 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
   const [phoneError, setPhoneError] = useState('');
   const [idError, setIdError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [idVerified, setIdVerified] = useState(false);
 
   const updateName = (partial) => {
     const next = { ...form, ...partial };
@@ -37,40 +39,67 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
     onDraftChange?.(next);
   };
 
-  const isNationalIdValid = (id) => /^\d{7,8}$/.test((id || '').trim());
+  const isNationalIdFormatValid = (id) => /^\d{6,8}$/.test((id || '').trim());
+  const isPhoneFormatValid = (phone) => isValidKenyanPhone(phone);
 
   const canProceed = () =>
     form.firstName?.trim() &&
     form.lastName?.trim() &&
-    isValidKenyanPhone(form.phone) &&
-    isNationalIdValid(form.national_id) &&
+    isPhoneFormatValid(form.phone) &&
+    isNationalIdFormatValid(form.national_id) &&
     form.county_id;
 
+  function checkPhoneFormatError() {
+    if (!form.phone) { setPhoneError(''); return false; }
+    if (!isPhoneFormatValid(form.phone)) {
+      setPhoneError('Phone must be a valid Kenyan number (07XX or 01XX)');
+      setPhoneVerified(false);
+      return true;
+    }
+    setPhoneError('');
+    return false;
+  }
+
+  function checkIdFormatError() {
+    if (!form.national_id) { setIdError(''); return false; }
+    if (!isNationalIdFormatValid(form.national_id)) {
+      setIdError('National ID must be 6–8 digits');
+      setIdVerified(false);
+      return true;
+    }
+    setIdError('');
+    return false;
+  }
+
   async function checkPhoneUniqueness() {
-    if (!form.phone || !isValidKenyanPhone(form.phone)) { setPhoneError(''); return false; }
-    if (form.phone === normalizePhone(user?.phone)) { setPhoneError(''); return false; }
+    setPhoneVerified(false);
+    if (!form.phone || !isPhoneFormatValid(form.phone)) { setPhoneError(''); return false; }
+    if (form.phone === normalizePhone(user?.phone)) { setPhoneError(''); setPhoneVerified(true); return false; }
     try {
       const existing = await base44.entities.User.filter({ phone: form.phone });
       if (existing.length > 0 && existing[0].id !== user?.id) {
-        setPhoneError('This phone is already registered.');
+        setPhoneError('This phone number is already registered to another BodaSure account');
         return true;
       }
       setPhoneError('');
+      setPhoneVerified(true);
       return false;
     } catch (e) { setPhoneError(''); return false; }
   }
 
   async function checkIdUniqueness() {
+    setIdVerified(false);
     const id = (form.national_id || '').trim();
-    if (!id || !isNationalIdValid(id)) { setIdError(''); return false; }
-    if (id === user?.national_id) { setIdError(''); return false; }
+    if (!id || !isNationalIdFormatValid(id)) { setIdError(''); return false; }
+    if (id === user?.national_id) { setIdError(''); setIdVerified(true); return false; }
     try {
       const existing = await base44.entities.User.filter({ national_id: id });
       if (existing.length > 0 && existing[0].id !== user?.id) {
-        setIdError('This ID is already registered.');
+        setIdError('This National ID is already linked to another account — please verify your details');
         return true;
       }
       setIdError('');
+      setIdVerified(true);
       return false;
     } catch (e) { setIdError(''); return false; }
   }
@@ -102,53 +131,62 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
       <div className={`space-y-4 ${readOnly ? 'opacity-60 pointer-events-none' : ''}`}>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
-          <label className="text-xs font-medium text-muted-foreground">First Name</label>
-          <input
-            type="text"
-            value={form.firstName}
-            onChange={e => updateName({ firstName: e.target.value })}
-            placeholder="John"
-            className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Middle Name <span className="text-muted-foreground/60">(optional)</span></label>
-          <input
-            type="text"
-            value={form.middleName}
-            onChange={e => updateName({ middleName: e.target.value })}
-            placeholder="Mwangi"
-            className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Last Name</label>
-          <input
-            type="text"
-            value={form.lastName}
-            onChange={e => updateName({ lastName: e.target.value })}
-            placeholder="Kamau"
-            className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
+            <label className="text-xs font-medium text-muted-foreground">First Name</label>
+            <input
+              type="text"
+              value={form.firstName}
+              onChange={e => updateName({ firstName: e.target.value })}
+              placeholder="John"
+              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Middle Name <span className="text-muted-foreground/60">(optional)</span></label>
+            <input
+              type="text"
+              value={form.middleName}
+              onChange={e => updateName({ middleName: e.target.value })}
+              placeholder="Kimeu"
+              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Last Name</label>
+            <input
+              type="text"
+              value={form.lastName}
+              onChange={e => updateName({ lastName: e.target.value })}
+              placeholder="Omondi"
+              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
       </div>
-      <PhoneInput
-        value={form.phone}
-        onChange={(e164) => updateForm({ phone: e164 })}
-        onBlur={checkPhoneUniqueness}
-        error={phoneError}
-      />
       <div>
-        <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
+          {phoneVerified && <CheckCircle2 className="w-4 h-4 text-success" />}
+        </div>
+        <PhoneInput
+          value={form.phone}
+          onChange={(e164) => { updateForm({ phone: e164 }); checkPhoneFormatError(); setPhoneVerified(false); }}
+          onBlur={checkPhoneUniqueness}
+          error={phoneError}
+        />
+      </div>
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
+          {idVerified && <CheckCircle2 className="w-4 h-4 text-success" />}
+        </div>
         <input
           type="text"
           inputMode="numeric"
           value={form.national_id}
-          onChange={e => updateForm({ national_id: e.target.value.replace(/[^\d]/g, '') })}
+          onChange={e => { updateForm({ national_id: e.target.value.replace(/[^\d]/g, '') }); checkIdFormatError(); setIdVerified(false); }}
           onBlur={checkIdUniqueness}
           placeholder="00000000"
           maxLength={8}
-          className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className={`w-full mt-1 px-3 py-2.5 rounded-xl border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary ${idError ? 'border-destructive' : 'border-input'}`}
         />
         {idError && <p className="text-xs text-destructive mt-1">{idError}</p>}
       </div>
