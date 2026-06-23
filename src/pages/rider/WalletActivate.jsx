@@ -130,8 +130,16 @@ export default function WalletActivate() {
       // Call onboarding — BodaSure Wallet sends OTP to rider's phone
       const res = await base44.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
       if (res.data?.success) {
-        setRequestId(res.data.requestId);
-        setStep(1);
+        if (res.data?.recovered) {
+          // Account already exists from a prior partial attempt — wallet was
+          // updated by the backend. Skip OTP and go straight to Set PIN.
+          await base44.auth.updateMe({ wallet_tier: 1 });
+          await refreshUser();
+          setStep(2);
+        } else {
+          setRequestId(res.data.requestId);
+          setStep(1);
+        }
       } else {
         setError(res.data?.error || 'Failed to start activation. Try again.');
       }
