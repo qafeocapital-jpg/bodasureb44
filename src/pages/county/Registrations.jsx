@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { auditLog } from '@/lib/audit';
-import { Users, Bike, BadgeCheck, FileText, MapPin, ArrowLeftRight, Plus, Pencil } from 'lucide-react';
+import { Users, Bike, BadgeCheck, FileText, MapPin, ArrowLeftRight, Plus, Pencil, Clock, X, Loader2, UserCheck } from 'lucide-react';
 import BikeDetailSheet from '@/components/BikeDetailSheet';
 import RiderDetailSheet from '@/components/county/RiderDetailSheet';
 import StageModal from '@/components/county/StageModal';
@@ -25,6 +25,8 @@ export default function CountyRegistrations() {
   const [showStageModal, setShowStageModal] = useState(false);
   const [editingStage, setEditingStage] = useState(null);
   const [verifyRiderId, setVerifyRiderId] = useState(null);
+  const [acting, setActing] = useState(null);
+  const [stageApplicants, setStageApplicants] = useState([]);
   const { toast } = useToast();
 
   const countyId = user?.scope_entity_id || user?.county_id;
@@ -46,6 +48,13 @@ export default function CountyRegistrations() {
       // Further filter riders to this county if scoped
       const countyRiders = countyId ? r.filter(rq => rq.county_id === countyId) : r;
       setRiders(countyRiders); setVehicles(v); setPendingBikes(pending); setStages(s);
+
+      // Fetch applicant names for pending_county stages
+      const pendingApplicantIds = [...new Set(s.filter(st => st.application_status === 'pending_county' && st.pending_leader_id).map(st => st.pending_leader_id))];
+      if (pendingApplicantIds.length > 0) {
+        const applicantData = await Promise.all(pendingApplicantIds.map(id => base44.entities.User.get(id).catch(() => null)));
+        setStageApplicants(applicantData.filter(Boolean));
+      }
     } catch (e) {}
     setLoading(false);
   }
@@ -62,6 +71,46 @@ export default function CountyRegistrations() {
     await base44.entities.Vehicle.update(id, { status: 'rejected', rejection_reason: reason || 'Did not meet requirements' });
     await auditLog({ userId: u.id, action: 'vehicle_rejected', entityType: 'Vehicle', entityId: id, description: `Vehicle rejected via Registrations page` });
     load();
+  }
+
+  async function approveStageLeader(stageId) {
+    const stage = stages.find(s => s.id === stageId);
+    if (!stage?.pending_leader_id) return;
+    setActing(stageId);
+    try {
+      const u = await base44.auth.me();
+      await base44.entities.Stage.update(stageId, {
+        application_status: 'approved',
+        leader_id: stage.pending_leader_id,
+        county_approved_at: new Date().toISOString(),
+        pending_leader_id: null,
+      });
+      await auditLog({ userId: u.id, action: 'stage_leader_approved', entityType: 'Stage', entityId: stageId, description: `Stage leader approved for ${stage.name}` });
+      toast({ title: 'Leader Approved', description: 'Stage leader has been assigned.' });
+      load();
+    } catch (e) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
+    setActing(null);
+  }
+
+  async function rejectStageLeader(stageId) {
+    const reason = window.prompt('Enter rejection reason:');
+    if (!reason) return;
+    setActing(stageId);
+    try {
+      const u = await base44.auth.me();
+      await base44.entities.Stage.update(stageId, {
+        application_status: 'rejected',
+        rejection_reason: reason,
+      });
+      await auditLog({ userId: u.id, action: 'stage_leader_rejected', entityType: 'Stage', entityId: stageId, description: `Stage leader rejected: ${reason}` });
+      toast({ title: 'Application Rejected' });
+      load();
+    } catch (e) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
+    setActing(null);
   }
 
   async function handleStageSubmit(data) {
@@ -85,6 +134,8 @@ export default function CountyRegistrations() {
     setEditingStage(null);
     load();
   }
+
+  const applicantName = (id) => stageApplicants.find(a => a.id === id)?.full_name || 'Unknown Rider';
 
   const tabs = [
     { id: 'riders', label: 'Riders', icon: Users, count: riders.length },
@@ -204,6 +255,54 @@ export default function CountyRegistrations() {
         </div>
       ) : tab === 'stages' && (
         <div>
+          {/* Pending County Approvals */}
+          {stages.filter(s => s.application_status === 'pending_county').length > 0 && (
+            <div className="mb-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-5 h-5 text-amber-600" />
+                <h2 className="font-heading font-bold">Pending Approvals</h2>
+                <span className="text-xs font-bold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
+                  {stages.filter(s => s.application_status === 'pending_county').length}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {stages.filter(s => s.application_status === 'pending_county').map(stage => (
+                  <div key={stage.id} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <MapPin className="w-4 h-4 text-amber-600" />
+                          <p className="font-heading font-bold">{stage.name}</p>
+                        </div>
+                        <div className="space-y-0.5 text-xs text-muted-foreground">
+                          <p>Applicant: <span className="font-medium text-foreground">{applicantName(stage.pending_leader_id)}</span></p>
+                          {stage.pending_leader_note && <p className="italic">"{stage.pending_leader_note}"</p>}
+                          {stage.sacco_approved_at && <p>Forwarded by SACCO: {formatDateTime(stage.sacco_approved_at)}</p>}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => approveStageLeader(stage.id)}
+                          disabled={acting === stage.id}
+                          className="flex items-center gap-1 bg-success text-white rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-50"
+                        >
+                          {acting === stage.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserCheck className="w-3 h-3" />}
+                          Approve &amp; Assign
+                        </button>
+                        <button
+                          onClick={() => rejectStageLeader(stage.id)}
+                          disabled={acting === stage.id}
+                          className="flex items-center gap-1 bg-destructive/10 text-destructive border border-destructive/20 rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-50"
+                        >
+                          <X className="w-3 h-3" /> Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex justify-end mb-3">
             <button onClick={() => { setEditingStage(null); setShowStageModal(true); }} className="flex items-center gap-1 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-semibold">
               <Plus className="w-4 h-4" /> Add Stage

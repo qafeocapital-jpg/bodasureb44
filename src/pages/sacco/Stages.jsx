@@ -56,6 +56,13 @@ export default function SaccoStages() {
         application_status: 'pending_county',
         sacco_approved_at: new Date().toISOString(),
       });
+      await base44.entities.Announcement.create({
+        title: 'Stage Leader Application Forwarded',
+        body: `Stage "${stage.name}" has a leader application pending your approval. Please review in Registrations → Stages.`,
+        audience: 'county_staff',
+        county_id: countyId,
+        status: 'published',
+      });
       toast({ title: 'Approved — sent to County', description: 'Stage leader application forwarded to County for final approval.' });
       setStages(prev => prev.map(s => s.id === stageId ? { ...s, application_status: 'pending_county', sacco_approved_at: new Date().toISOString() } : s));
     } catch (e) {

@@ -72,9 +72,17 @@ export default function SaccoApplications() {
   async function approveStageApp(stageId) {
     setActing(stageId);
     try {
+      const stage = stageApps.find(s => s.id === stageId);
       await base44.entities.Stage.update(stageId, {
         application_status: 'pending_county',
         sacco_approved_at: new Date().toISOString(),
+      });
+      await base44.entities.Announcement.create({
+        title: 'Stage Leader Application Forwarded',
+        body: `Stage "${stage?.name || 'Unknown'}" has a leader application pending your approval. Please review in Registrations → Stages.`,
+        audience: 'county_staff',
+        county_id: countyId,
+        status: 'published',
       });
       toast({ title: 'Approved — sent to County' });
       load();
