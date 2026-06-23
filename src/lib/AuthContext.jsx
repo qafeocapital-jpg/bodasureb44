@@ -139,14 +139,28 @@ export const AuthProvider = ({ children }) => {
       // SDK logout clears the token and reloads the page
       base44.auth.logout();
     } catch (e) {
-      // Fallback: hard redirect to login if SDK logout throws
+      // Fallback: clear tokens and hard redirect to login if SDK logout throws
+      try {
+        localStorage.removeItem('base44_access_token');
+        localStorage.removeItem('token');
+      } catch (_) {}
       window.location.href = '/login';
     }
   };
 
   const navigateToLogin = () => {
-    // Use the SDK's redirectToLogin method
-    base44.auth.redirectToLogin(window.location.href);
+    const pathname = window.location.pathname;
+    // Guard: if already on an auth page, do NOT redirect again — prevents re-entry loop
+    if (
+      pathname.startsWith('/login') ||
+      pathname.startsWith('/register') ||
+      pathname.startsWith('/forgot-password') ||
+      pathname.startsWith('/reset-password')
+    ) {
+      return;
+    }
+    // Pass a clean fixed destination — never the current URL (which may contain login/from_url)
+    base44.auth.redirectToLogin('/app');
   };
 
   return (

@@ -68,6 +68,10 @@ import AdminAnnouncements from './pages/admin/Announcements';
 import AdminSaccos from './pages/admin/AdminSaccos';
 import SeedData from './pages/admin/SeedData';
 import RiderVerify from './pages/public/RiderVerify';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -81,20 +85,27 @@ const AuthenticatedApp = () => {
     );
   }
 
+  // Guard: if already on an auth page, don't redirect — prevents re-entry loop
+  const _pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const _onAuthPage =
+    _pathname.startsWith('/login') ||
+    _pathname.startsWith('/register') ||
+    _pathname.startsWith('/forgot-password') ||
+    _pathname.startsWith('/reset-password');
+
   // Handle authentication errors
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
+      if (!_onAuthPage) navigateToLogin();
       return null;
     }
   }
 
   // Safety guard: if not loading, no authError, but no user — redirect to login
   if (!user) {
-    navigateToLogin();
+    if (!_onAuthPage) navigateToLogin();
     return null;
   }
 
@@ -203,6 +214,12 @@ function App() {
         <Router>
           <ScrollToTop />
           <Routes>
+            {/* Auth routes — explicit so they render instead of falling through to AuthenticatedApp */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+
             {/* Public routes */}
             <Route path="/verify/:riderId" element={<RiderVerify />} />
             
