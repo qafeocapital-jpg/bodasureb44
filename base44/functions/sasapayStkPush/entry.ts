@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
       throw new Error(`SasaPay C2B returned non-JSON (HTTP ${response.status}). Check API endpoint and credentials.`);
     }
 
-    if (!data.status || data.ResponseCode !== '0') {
+    if (!data.status || String(data.ResponseCode) !== '0') {
       return Response.json({
         error: data.detail || data.ResponseDescription || 'C2B payment request failed',
         details: data,
@@ -142,9 +142,9 @@ Deno.serve(async (req) => {
       product_type: transactionType,
       counterparty_phone: phone,
       description: description || '',
-      sasapay_fee_kes: Math.round(sasapayFeeKes),
-      bodasure_fee_kes: Math.round(bodasureFeeKes),
-      total_fee_kes: Math.round(totalFeeKes),
+      sasapay_fee_kes: Math.round(sasapayFeeKes * 100) / 100,
+      bodasure_fee_kes: Math.round(bodasureFeeKes * 100) / 100,
+      total_fee_kes: Math.round(totalFeeKes * 100) / 100,
     };
 
     const txn = await base44.entities.Transaction.create(txnData);

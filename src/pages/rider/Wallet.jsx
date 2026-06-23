@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
 import { initiateStkPush, processWalletPayment, getOrCreateWallet } from '@/lib/payments';
 import { verifyPin } from '@/lib/pin';
+import { checkTransactionLimits } from '@/lib/feeEngine';
 import { normalizePhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
 import PinEntrySheet from '@/components/rider/PinEntrySheet';
@@ -81,6 +82,16 @@ export default function Wallet() {
     if (!cents || cents <= 0) return;
     setLoading(true);
     setResult(null);
+
+    // Check daily transaction limits before proceeding
+    const amountKes = cents / 100;
+    const limitCheck = await checkTransactionLimits(wallet.id, activeTab, amountKes);
+    if (!limitCheck.canProceed) {
+      setResult({ success: false, message: limitCheck.errorMessage });
+      setLoading(false);
+      return;
+    }
+
     try {
       const phoneForSend = activeTab === 'send' ? normalizePhone(recipient) : null;
 

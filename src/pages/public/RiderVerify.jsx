@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { formatDate } from '@/lib/format';
-import { differenceInDays } from 'date-fns';
-import { AlertCircle, MapPin, Users } from 'lucide-react';
+import { AlertCircle, MapPin, Users, ShieldCheck } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import { useAuth } from '@/lib/AuthContext';
 
+/**
+ * Public rider verification page — shows COMPLIANCE STATUS ONLY.
+ * No PII (name, national ID, phone) is exposed to unauthenticated viewers.
+ * Only plate number, county/stage, SACCO name, and permit/insurance status.
+ */
 const getComplianceTier = (verificationComplete, bikeApproved, permitActive, insuranceActive, hasGroup) => {
   if (verificationComplete && bikeApproved && permitActive && insuranceActive) return { tier: 'Fully Verified', color: 'bg-success', textColor: 'text-success' };
   if (bikeApproved && permitActive) return { tier: 'Road-Ready', color: 'bg-chart-1', textColor: 'text-chart-1' };
@@ -16,7 +20,6 @@ const getComplianceTier = (verificationComplete, bikeApproved, permitActive, ins
 
 export default function RiderVerify() {
   const { riderId } = useParams();
-  const navigate = useNavigate();
   const { isLoadingAuth } = useAuth();
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -31,12 +34,12 @@ export default function RiderVerify() {
   const [verifyTime] = useState(new Date().toLocaleString('en-KE'));
 
   useEffect(() => {
-    // Wait for auth to finish loading before attempting to fetch data
     if (isLoadingAuth) return;
+    if (!riderId) return;
 
     async function load() {
       try {
-        // Fetch rider
+        // Fetch rider — only verification_complete flag, no PII fields used
         const riderData = await base44.entities.User.get(riderId);
         if (!riderData) {
           setNotFound(true);
@@ -45,7 +48,7 @@ export default function RiderVerify() {
         }
         setRider(riderData);
 
-        // Fetch vehicle, permit, policy in parallel
+        // Fetch vehicle, permit, policy, group membership in parallel
         const [vehicleData, permitData, policyData, groupMemberData] = await Promise.all([
           base44.entities.Vehicle.filter({ rider_id: riderId }, '-created_date').then(vs => vs[0] || null),
           base44.entities.Permit.filter({ rider_id: riderId, status: 'active' }, '-end_date').then(ps => ps[0] || null),
@@ -75,8 +78,8 @@ export default function RiderVerify() {
       }
       setLoading(false);
     }
-    if (riderId) load();
-  }, [riderId]);
+    load();
+  }, [riderId, isLoadingAuth]);
 
   if (loading) return <PageSkeleton variant="hero-rows" />;
 
@@ -113,8 +116,6 @@ export default function RiderVerify() {
   const insuranceActive = policy && insuranceDaysRemaining >= 0;
   const compliance = getComplianceTier(isVerified, bikeApproved, permitActive, insuranceActive, !!group);
 
-  const selfieDoc = rider?.KycDocuments?.find(d => d.document_type === 'selfie');
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -123,34 +124,18 @@ export default function RiderVerify() {
         <h1 className="text-xl font-heading font-bold text-foreground">Rider Verification</h1>
       </div>
 
-      {/* Content */}
+      {/* Content — NO PII exposed (no name, no national ID, no phone) */}
       <div className="max-w-sm mx-auto p-5 space-y-4">
-        {/* Rider Photo */}
-        <div className="flex justify-center mb-6">
-          <div className="relative">
-            {selfieDoc?.file_url ? (
-              <img
-                src={selfieDoc.file_url}
-                alt={rider?.full_name}
-                className="w-24 h-24 rounded-full object-cover border-4 border-primary/20"
-              />
-            ) : (
-              <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-4 border-primary/20">
-                <span className="text-2xl font-bold text-muted-foreground">{rider?.full_name?.charAt(0) || '?'}</span>
-              </div>
-            )}
+        {/* Shield icon instead of selfie */}
+        <div className="flex justify-center mb-2">
+          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border-4 border-primary/20">
+            <ShieldCheck className="w-10 h-10 text-primary" />
           </div>
-        </div>
-
-        {/* Name */}
-        <div className="text-center">
-          <h2 className="text-lg font-heading font-bold text-foreground">{rider?.full_name || 'Unknown'}</h2>
-          {rider?.national_id && <p className="text-xs text-muted-foreground mt-1">ID: {rider.national_id}</p>}
         </div>
 
         {/* Compliance Tier Badge */}
         <div className={`${compliance.color}/10 border border-${compliance.color}/30 rounded-xl p-3 text-center`}>
-          <p className={`text-xs font-semibold ${compliance.textColor} uppercase`}>{compliance.tier}</p>
+          <p className={`text-sm font-bold ${compliance.textColor} uppercase tracking-wide`}>{compliance.tier}</p>
         </div>
 
         {/* Details Card */}

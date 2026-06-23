@@ -53,7 +53,13 @@ Deno.serve(async (req) => {
       }
     );
 
-    const data = await response.json();
+    const respText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(respText);
+    } catch {
+      throw new Error(`SasaPay KYC upload returned non-JSON (HTTP ${response.status}). Check credentials.`);
+    }
 
     if (data.responseCode !== '0') {
       throw new Error(`SasaPay KYC upload failed: ${data.message}`);

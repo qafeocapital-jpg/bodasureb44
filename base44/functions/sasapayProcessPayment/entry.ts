@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       throw new Error(`SasaPay process-payment returned non-JSON (HTTP ${response.status}). Check API endpoint and credentials.`);
     }
 
-    if (!data.status) {
+    if (!data.status || data.status === false) {
       return Response.json({
         error: data.detail || 'Payment processing failed',
         details: data,

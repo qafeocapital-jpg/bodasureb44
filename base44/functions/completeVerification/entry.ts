@@ -69,12 +69,13 @@ Deno.serve(async (req) => {
     // Trigger SasaPay Personal Onboarding initialization
     // This sends an OTP to the rider's phone to begin SasaPay account creation
     let sasapayInitResult = { success: false };
+    let sasapayInitError = null;
     try {
       const sasapayRes = await sr.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
       sasapayInitResult = sasapayRes.data || {};
     } catch (e) {
       console.error('SasaPay init failed:', e.message);
-      // Do not block verification completion; log the error and continue
+      sasapayInitError = e.message;
     }
 
     return Response.json({
@@ -83,6 +84,7 @@ Deno.serve(async (req) => {
       tasks: { id: idDone, bike: bikeDone, selfie: selfieDone, phone: phoneDone, owner: ownerDone },
       sasapayInitiated: sasapayInitResult.success || false,
       sasapayRequestId: sasapayInitResult.requestId || null,
+      sasapayInitError: sasapayInitError,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

@@ -110,7 +110,14 @@ async function downloadAndEncodeImage(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Failed to download image: ${url}`);
   const buffer = await response.arrayBuffer();
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  const bytes = new Uint8Array(buffer);
+  // Chunked encoding to avoid call stack overflow on large images
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function extractUserDataFromIDAnalyzer(results) {

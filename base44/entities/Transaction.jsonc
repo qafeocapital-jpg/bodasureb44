@@ -72,13 +72,13 @@
       "format": "date-time"
     },
     "sasapay_fee_kes": {
-      "type": "integer"
+      "type": "number"
     },
     "bodasure_fee_kes": {
-      "type": "integer"
+      "type": "number"
     },
     "total_fee_kes": {
-      "type": "integer"
+      "type": "number"
     }
   },
   "required": [

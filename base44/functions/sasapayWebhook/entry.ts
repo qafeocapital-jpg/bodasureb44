@@ -15,7 +15,25 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const body = await req.json();
+
+    // Handle both JSON and form-encoded webhook bodies
+    const contentType = req.headers.get('content-type') || '';
+    let body;
+    if (contentType.includes('application/json')) {
+      body = await req.json();
+    } else {
+      const text = await req.text();
+      try {
+        body = JSON.parse(text);
+      } catch {
+        // Try form-encoded
+        const params = new URLSearchParams(text);
+        body = {};
+        for (const [key, value] of params.entries()) {
+          try { body[key] = JSON.parse(value); } catch { body[key] = value; }
+        }
+      }
+    }
 
     // Enforce mandatory webhook secret
     const webhookSecret = Deno.env.get('SASAPAY_WEBHOOK_SECRET');
@@ -44,7 +62,7 @@ Deno.serve(async (req) => {
     if (txns.length === 0) {
       // Try matching by reference (MerchantRequestID or AccountReference)
       const refTxns = await base44.asServiceRole.entities.Transaction.filter({
-        reference: body.BillRefNumber || body.MerchantReference || '',
+        reference: body.AccountReference || body.BillRefNumber || body.MerchantReference || '',
       });
       if (refTxns.length === 0) {
         return Response.json({ error: 'Transaction not found' }, { status: 404 });

@@ -8,6 +8,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const admin = await base44.auth.me();
     if (!admin?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (admin.role !== 'super_admin') return Response.json({ error: 'Forbidden: super admin only' }, { status: 403 });
 
     const { docId, userId, action, reason, provider = PROVIDER } = await req.json();
 

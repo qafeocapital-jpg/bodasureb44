@@ -79,6 +79,11 @@ export default function Lipisha() {
       setAmount('');
       const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipisha' }, '-created_date', 10);
       setHistory(txns);
+      // Refresh limit info after successful transaction
+      try {
+        const limits = await checkTransactionLimits(wallet.id, 'lipisha', 0);
+        setLimitInfo(limits);
+      } catch (e) {}
     } catch (e) {
       setResult({ success: false, message: e.message || 'Could not collect fare. Please try again.' });
     }

@@ -59,7 +59,6 @@ async function initializePersonalOnboarding(base44, user) {
     documentNumber: user.national_id,
     documentType,
     email: user.email || `rider-${user.id}@bodasure.local`,
-    callbackUrl: `${getBaseUrl()}/functions/invoke/sasapayPersonalOnboardingCallback`,
   };
 
   const response = await fetch(
@@ -74,7 +73,13 @@ async function initializePersonalOnboarding(base44, user) {
     }
   );
 
-  const data = await response.json();
+  const respText = await response.text();
+  let data;
+  try {
+    data = JSON.parse(respText);
+  } catch {
+    throw new Error(`SasaPay init returned non-JSON (HTTP ${response.status}). Check credentials.`);
+  }
 
   if (data.responseCode !== '0') {
     throw new Error(`SasaPay init failed: ${data.message}`);
@@ -121,7 +126,13 @@ async function confirmPersonalOnboarding(base44, user, otp, requestId) {
     }
   );
 
-  const data = await response.json();
+  const respText = await response.text();
+  let data;
+  try {
+    data = JSON.parse(respText);
+  } catch {
+    throw new Error(`SasaPay confirmation returned non-JSON (HTTP ${response.status}). Check credentials.`);
+  }
 
   if (data.responseCode !== '0') {
     throw new Error(`SasaPay confirmation failed: ${data.message}`);
