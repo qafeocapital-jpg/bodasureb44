@@ -9,6 +9,7 @@ import StageLocationDrawer from '@/components/admin/flags/StageLocationDrawer';
 import DuplicateStageDrawer from '@/components/admin/flags/DuplicateStageDrawer';
 import UserProfileDrawer from '@/components/admin/UserProfileDrawer';
 import BikeDetailSheet from '@/components/BikeDetailSheet';
+import FlagReviewDrawer from '@/components/admin/flags/FlagReviewDrawer';
 import { useToast } from '@/components/ui/use-toast';
 
 const PLATE_REGEX = /^K[A-Z]{2}\s?\d{3}[A-Z]$/i;
@@ -57,6 +58,7 @@ export default function AdminFlags() {
   const [stageDrawerIssue, setStageDrawerIssue] = useState(null);
   const [duplicateDrawerIssue, setDuplicateDrawerIssue] = useState(null);
   const [bikeDetailId, setBikeDetailId] = useState(null);
+  const [reviewDrawerIssue, setReviewDrawerIssue] = useState(null);
 
   const loadFlags = useCallback(async () => {
     setLoading(true);
@@ -374,16 +376,16 @@ export default function AdminFlags() {
     try {
       if (action === 'approveKyc') {
         await base44.functions.invoke('processKycDecisionV2', {
-          documentId: issue.rawData.doc.id,
-          decision: 'approve',
+          kycDocumentId: issue.rawData.doc.id,
+          decision: 'approved',
         });
         toast({ title: 'KYC approved' });
         resolve(issue.id);
         return true;
       } else if (action === 'rejectKyc') {
         await base44.functions.invoke('processKycDecisionV2', {
-          documentId: issue.rawData.doc.id,
-          decision: 'reject',
+          kycDocumentId: issue.rawData.doc.id,
+          decision: 'rejected',
           rejectionReason: params.rejectionReason,
         });
         toast({ title: 'KYC rejected' });
@@ -465,7 +467,9 @@ export default function AdminFlags() {
   }
 
   function handleOpenDrawer(issue) {
-    if (issue.type === 'kyc_rejected') {
+    if (issue.type === 'kyc_pending' || issue.type === 'vehicle_pending') {
+      setReviewDrawerIssue(issue);
+    } else if (issue.type === 'kyc_rejected') {
       openUserDrawer(issue, 'kyc');
     } else if (issue.type === 'vehicle_rejected' || issue.type === 'vehicle_needs_review') {
       setBikeDetailId(issue.entityId);
@@ -591,6 +595,14 @@ export default function AdminFlags() {
         onDismiss={(idA, idB) => {
           setDismissedDuplicates((prev) => [...prev, [idA, idB]]);
           setDuplicateDrawerIssue(null);
+        }}
+      />
+      <FlagReviewDrawer
+        open={!!reviewDrawerIssue}
+        onOpenChange={(v) => !v && setReviewDrawerIssue(null)}
+        issue={reviewDrawerIssue}
+        onResolved={() => {
+          if (reviewDrawerIssue) resolve(reviewDrawerIssue.id);
         }}
       />
       {bikeDetailId && (

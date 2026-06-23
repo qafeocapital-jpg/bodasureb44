@@ -115,7 +115,13 @@ export default function IssueRow({ issue, isResolved, onAction, onOpenDrawer, on
               >
                 Reject
               </button>
-            </>
+              <button
+                onClick={() => onOpenDrawer(issue)}
+                className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground font-medium hover:bg-muted flex items-center gap-0.5"
+              >
+                Review <ChevronRight className="w-3 h-3" />
+              </button>
+              </>
           )}
           {issue.type === 'kyc_pending' && showRejectField && (
             <div className="flex flex-col gap-1">
@@ -169,6 +175,12 @@ export default function IssueRow({ issue, isResolved, onAction, onOpenDrawer, on
                 className="text-xs px-3 py-1.5 rounded-lg border border-red-500 text-red-600 font-medium hover:bg-red-50 disabled:opacity-50"
               >
                 {actionLoading ? '...' : 'Reject'}
+              </button>
+              <button
+                onClick={() => onOpenDrawer(issue)}
+                className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground font-medium hover:bg-muted flex items-center gap-0.5"
+              >
+                Review <ChevronRight className="w-3 h-3" />
               </button>
             </>
           )}
