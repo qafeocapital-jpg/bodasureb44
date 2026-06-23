@@ -1,25 +1,24 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * SasaPay WaaS Integration — Transaction Status Query.
+ * SasaPay Transaction Status Query.
  *
- * Queries the status of a pending SasaPay transaction.
- * Used by the frontend to poll for STK push completion when
- * the webhook hasn't fired yet (e.g., user still entering PIN).
+ * Queries SasaPay for the status of a pending C2B transaction.
+ * Uses /api/v1/transactions/status-query/ endpoint.
  *
- * SasaPay API docs: https://developers.sasapay.ke/
+ * Note: SasaPay responds asynchronously — the actual status result is
+ * delivered via callback to the CallbackUrl provided. This function
+ * initiates the query and also checks the local DB for the latest status.
+ *
+ * Payload:
+ * - transactionId: Local transaction ID
+ * - reference: Local transaction reference
  */
-
-const SASAPAY_BASE = {
-  sandbox: 'https://sandbox.sasapay.app/api/v2',
-  production: 'https://api.sasapay.app/api/v2',
-};
-
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
     const { transactionId, reference } = body;
@@ -30,29 +29,29 @@ Deno.serve(async (req) => {
 
     // Read the transaction from the database
     let txn = null;
-    try {
-      if (transactionId) {
+    if (transactionId) {
+      try {
+        txn = await base44.entities.Transaction.get(transactionId);
+      } catch (e) {
         const txns = await base44.entities.Transaction.filter({ id: transactionId });
         txn = txns[0];
       }
-      if (!txn && reference) {
-        const txns = await base44.entities.Transaction.filter({ reference });
-        txn = txns[0];
-      }
-    } catch (e) {
-      // Invalid ID format or other DB error
+    }
+    if (!txn && reference) {
+      const txns = await base44.entities.Transaction.filter({ reference });
+      txn = txns[0];
     }
 
     if (!txn) {
       return Response.json({ error: 'Transaction not found' }, { status: 404 });
     }
 
-    const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
+    const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
     const clientId = Deno.env.get('SASAPAY_CLIENT_ID');
     const clientSecret = Deno.env.get('SASAPAY_CLIENT_SECRET');
 
     // If no SasaPay credentials, return the DB status (mock mode)
-    if (!clientId || !clientSecret) {
+    if (!clientId || !clientSecret || !merchantCode) {
       return Response.json({
         status: txn.status,
         mode: 'mock',
@@ -62,82 +61,36 @@ Deno.serve(async (req) => {
 
     // Live mode: query SasaPay API for the transaction status
     try {
-      const tokenRes = await fetch(`${SASAPAY_BASE[env]}/auth/token/`, {
+      const token = await getSasaPayToken();
+      const callbackUrl = `${getBaseUrl()}/functions/invoke/sasapayWebhook?secret=${Deno.env.get('SASAPAY_WEBHOOK_SECRET')}`;
+
+      const queryPayload = {
+        MerchantCode: merchantCode,
+        CheckoutRequestId: txn.checkout_request_id || '',
+        MerchantTransactionReference: txn.reference,
+        CallbackUrl: callbackUrl,
+      };
+
+      const statusRes = await fetch(`${getSasaPayApiUrl()}/transactions/status-query/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' }),
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(queryPayload),
       });
-      const tokenData = await tokenRes.json();
-      const accessToken = tokenData.access_token;
 
-      if (accessToken) {
-        const statusRes = await fetch(`${SASAPAY_BASE[env]}/payments/status/`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            merchant_code: Deno.env.get('SASAPAY_MERCHANT_CODE'),
-            checkout_request_id: txn.checkout_request_id || txn.reference,
-          }),
-        });
-        const statusData = await statusRes.json();
+      const statusData = await statusRes.json();
 
-        if (statusData.success) {
-          const newStatus = statusData.status === 'success' ? 'completed' : statusData.status === 'failed' ? 'failed' : 'pending';
-
-          // If status changed, update the transaction + wallet
-          if (newStatus !== txn.status) {
-            await base44.asServiceRole.entities.Transaction.update(txn.id, {
-              status: newStatus,
-              completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
-              failure_reason: newStatus === 'failed' ? (statusData.message || 'Payment failed') : null,
-            });
-
-            // Idempotency: check if a PaymentEvent already marked this as processed
-            const existingEvents = await base44.asServiceRole.entities.PaymentEvent.filter({ transaction_id: txn.id, event_type: 'sasapay_webhook' });
-            if (existingEvents.length > 0) {
-              return Response.json({
-                status: txn.status,
-                mode: 'live',
-                reference: txn.reference,
-              });
-            }
-
-            // Credit wallet if just completed
-            if (newStatus === 'completed') {
-              const isCredit = ['deposit', 'lipisha'].includes(txn.type);
-              const snapshots = await base44.asServiceRole.entities.WalletSnapshot.filter({ wallet_id: txn.wallet_id });
-              if (snapshots.length > 0) {
-                const snap = snapshots[0];
-                const newBalance = isCredit
-                  ? (snap.balance_cents || 0) + (txn.amount_cents || 0)
-                  : (snap.balance_cents || 0) - (txn.amount_cents || 0);
-                await base44.asServiceRole.entities.WalletSnapshot.update(snap.id, {
-                  balance_cents: newBalance,
-                  last_synced_at: new Date().toISOString(),
-                });
-              }
-
-              await base44.asServiceRole.entities.PaymentEvent.create({
-                transaction_id: txn.id,
-                event_type: 'sasapay_status_query',
-                reference: txn.reference,
-                payload: statusData,
-                processed: true,
-                processed_at: new Date().toISOString(),
-              });
-            }
-          }
-
-          return Response.json({
-            status: newStatus,
-            mode: 'live',
-            reference: txn.reference,
-          });
-        }
-      }
+      // SasaPay responds with "request received" — actual status comes via callback.
+      // Return current DB status; the webhook will update it when the callback arrives.
+      return Response.json({
+        status: txn.status,
+        mode: 'live',
+        reference: txn.reference,
+        query_accepted: statusData.status === true,
+        message: statusData.message || '',
+      });
     } catch (e) {
       // If SasaPay API call fails, fall back to DB status
     }
@@ -148,6 +101,33 @@ Deno.serve(async (req) => {
       reference: txn.reference,
     });
   } catch (error) {
+    console.error('sasapayQueryStatus error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
+
+async function getSasaPayToken() {
+  const clientId = Deno.env.get('SASAPAY_CLIENT_ID');
+  const clientSecret = Deno.env.get('SASAPAY_CLIENT_SECRET');
+  const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
+
+  const authUrl = `https://${env}.sasapay.app/oauth/token/`;
+  const response = await fetch(authUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`,
+  });
+
+  const data = await response.json();
+  if (!data.access_token) throw new Error('Failed to get SasaPay access token');
+  return data.access_token;
+}
+
+function getSasaPayApiUrl() {
+  const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
+  return `https://${env}.sasapay.app/api/v1`;
+}
+
+function getBaseUrl() {
+  return Deno.env.get('BASE44_APP_URL') || 'https://bodasure.local';
+}

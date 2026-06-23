@@ -1,111 +1,136 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * SasaPay WaaS Integration — STK Push handler.
+ * SasaPay C2B Payment Request — Wallet Top-Up / Lipisha.
  *
- * This function initiates a SasaPay STK Push payment.
- * Currently in MOCK mode — returns a simulated pending transaction.
- * When SasaPay credentials are provisioned, replace the mock block
- * with the actual SasaPay API call below.
+ * Uses the official SasaPay C2B API (/api/v1/payments/request-payment/)
+ * to collect funds from customers via M-Pesa STK push, SasaPay wallet (OTP),
+ * Airtel, T-Kash, or banks.
  *
- * SasaPay API docs: https://developers.sasapay.ke/
- * Required secrets (set in dashboard → environment variables):
- *   - SASAPAY_CLIENT_ID
- *   - SASAPAY_CLIENT_SECRET
- *   - SASAPAY_ENVIRONMENT (sandbox | production)
+ * Payload:
+ * - phone: Customer phone (254...)
+ * - amountCents: Amount in cents
+ * - accountRef: Merchant transaction identifier
+ * - description: Transaction description
+ * - transactionType: 'lipisha' or 'deposit'
+ * - networkCode: '63902' (M-Pesa), '0' (SasaPay), '63903' (Airtel), '63907' (T-Kash)
+ * - walletId: Rider's wallet ID (for creating local transaction record)
  */
-
-const SASAPAY_BASE = {
-  sandbox: 'https://sandbox.sasapay.app/api/v2',
-  production: 'https://api.sasapay.app/api/v2',
-};
-
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { phone, amountCents, accountRef, description, transactionType } = body;
+    const { phone, amountCents, accountRef, description, transactionType = 'lipisha', networkCode = '63902', walletId } = body;
 
     if (!phone || !amountCents) {
       return Response.json({ error: 'Missing required fields: phone, amountCents' }, { status: 400 });
     }
 
-    const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
+    const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
     const clientId = Deno.env.get('SASAPAY_CLIENT_ID');
     const clientSecret = Deno.env.get('SASAPAY_CLIENT_SECRET');
 
-    // ── MOCK MODE ──────────────────────────────────────────────
-    // When credentials are not set, return a mock pending response.
-    // This allows frontend development without SasaPay credentials.
-    if (!clientId || !clientSecret) {
-      const reference = `BS${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    if (!merchantCode || !clientId || !clientSecret) {
+      return Response.json({ error: 'SasaPay credentials not configured' }, { status: 500 });
+    }
+
+    const token = await getSasaPayToken();
+
+    // Convert cents to shillings
+    const amountStr = (amountCents / 100).toFixed(2);
+    const reference = accountRef || `BS${Date.now()}`;
+    const callbackUrl = `${getBaseUrl()}/functions/invoke/sasapayWebhook?secret=${Deno.env.get('SASAPAY_WEBHOOK_SECRET')}`;
+
+    const c2bPayload = {
+      MerchantCode: merchantCode,
+      NetworkCode: networkCode,
+      Currency: 'KES',
+      Amount: amountStr,
+      CallBackURL: callbackUrl,
+      PhoneNumber: phone,
+      TransactionDesc: description || 'BodaSure payment',
+      AccountReference: reference,
+    };
+
+    const response = await fetch(`${getSasaPayApiUrl()}/payments/request-payment/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(c2bPayload),
+    });
+
+    const data = await response.json();
+
+    if (!data.status || data.ResponseCode !== '0') {
       return Response.json({
-        status: 'pending',
-        mode: 'mock',
-        reference,
-        message: 'STK push sent (mock). Prompt user to enter M-Pesa PIN.',
-        checkout_request_id: `mock_checkout_${reference}`,
-      });
-    }
-    // ── END MOCK MODE ──────────────────────────────────────────
-
-    // ── LIVE SASAPAY STK PUSH ──────────────────────────────────
-    // 1. Get access token
-    let tokenData, accessToken;
-    try {
-      const tokenRes = await fetch(`${SASAPAY_BASE[env]}/auth/token/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' }),
-      });
-      tokenData = await tokenRes.json();
-      accessToken = tokenData.access_token;
-    } catch (e) {
-      return Response.json({ error: 'SasaPay API unreachable: ' + e.message }, { status: 502 });
+        error: data.detail || data.ResponseDescription || 'C2B payment request failed',
+        details: data,
+      }, { status: 502 });
     }
 
-    if (!accessToken) {
-      return Response.json({ error: 'Failed to get SasaPay access token', details: tokenData }, { status: 502 });
-    }
+    // Create a pending transaction in the database
+    const txnData = {
+      wallet_id: walletId || '',
+      type: transactionType,
+      amount_cents: amountCents,
+      status: 'pending',
+      reference,
+      checkout_request_id: data.CheckoutRequestID || '',
+      product_type: transactionType,
+      counterparty_phone: phone,
+      description: description || '',
+    };
 
-    // 2. Initiate STK Push
-    let stkData;
-    try {
-      const stkRes = await fetch(`${SASAPAY_BASE[env]}/payments/stk-push/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          merchant_code: Deno.env.get('SASAPAY_MERCHANT_CODE'),
-          network_code: '63902', // Safaricom
-          phone_number: phone,
-          amount: Math.ceil(amountCents / 100), // Convert cents to shillings
-          account_reference: accountRef || 'BodaSure',
-          transaction_desc: description || 'BodaSure payment',
-        }),
-      });
-      stkData = await stkRes.json();
-    } catch (e) {
-      return Response.json({ error: 'SasaPay STK push request failed: ' + e.message }, { status: 502 });
-    }
-
-    if (!stkData.success) {
-      return Response.json({ error: stkData.message || 'STK push failed', details: stkData }, { status: 502 });
-    }
+    const txn = await base44.asServiceRole.entities.Transaction.create(txnData);
 
     return Response.json({
       status: 'pending',
       mode: 'live',
-      reference: stkData.transaction_reference,
-      checkout_request_id: stkData.checkout_request_id,
-      message: 'STK push sent. Awaiting customer confirmation.',
+      reference,
+      transaction_id: txn.id,
+      checkout_request_id: data.CheckoutRequestID,
+      merchant_request_id: data.MerchantRequestID,
+      transaction_reference: data.TransactionReference,
+      payment_gateway: data.PaymentGateway,
+      customer_message: data.CustomerMessage,
+      requires_otp: networkCode === '0',
+      message: networkCode === '0'
+        ? 'OTP sent to customer. Use sasapayProcessPayment to verify.'
+        : data.ResponseDescription || 'STK push sent. Awaiting customer confirmation.',
     });
   } catch (error) {
+    console.error('sasapayStkPush error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
+
+async function getSasaPayToken() {
+  const clientId = Deno.env.get('SASAPAY_CLIENT_ID');
+  const clientSecret = Deno.env.get('SASAPAY_CLIENT_SECRET');
+  const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
+
+  const authUrl = `https://${env}.sasapay.app/oauth/token/`;
+  const response = await fetch(authUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`,
+  });
+
+  const data = await response.json();
+  if (!data.access_token) throw new Error('Failed to get SasaPay access token');
+  return data.access_token;
+}
+
+function getSasaPayApiUrl() {
+  const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
+  return `https://${env}.sasapay.app/api/v1`;
+}
+
+function getBaseUrl() {
+  return Deno.env.get('BASE44_APP_URL') || 'https://bodasure.local';
+}

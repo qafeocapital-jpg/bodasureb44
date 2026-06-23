@@ -3,10 +3,13 @@ import { mockPayment, getWalletBalance } from '@/lib/mockPayments';
 import { normalizePhone } from '@/lib/phone';
 
 /**
- * Unified Payment Service — abstracts mock vs live SasaPay.
+ * Unified Payment Service — abstracts mock vs live SasaPay C2B.
  *
- * STK-based flows (lipisha, deposit):
- *   - Live mode: calls sasapayStkPush → returns pending → webhook completes it
+ * C2B flows (lipisha, deposit):
+ *   - Live mode: calls sasapayStkPush (C2B /api/v1/payments/request-payment/)
+ *     → returns pending → webhook completes it
+ *   - SasaPay wallet: returns requires_otp=true → frontend collects OTP →
+ *     calls sasapayProcessPayment to verify
  *   - Mock mode: falls back to mockPayment (instant completion)
  *
  * Internal wallet flows (lipa_county, lipa_owner, send, chama, penalty, insurance):
@@ -14,9 +17,9 @@ import { normalizePhone } from '@/lib/phone';
  */
 
 /**
- * Initiate an STK Push payment (for lipisha / wallet top-up).
- * Creates the transaction as 'initiated', then calls the sasapayStkPush
- * backend function. In live mode, the webhook will complete it later.
+ * Initiate a C2B payment (for lipisha / wallet top-up).
+ * Creates the transaction as 'pending', then calls the sasapayStkPush
+ * backend function. The webhook will complete it when the callback arrives.
  *
  * @param {Object} params
  * @param {string} params.walletId - Rider's wallet ID (receives the credit)
@@ -24,13 +27,14 @@ import { normalizePhone } from '@/lib/phone';
  * @param {number} params.amountCents - Amount in cents
  * @param {string} [params.description] - Transaction description
  * @param {string} [params.transactionType] - 'lipisha' or 'deposit'
- * @returns {Promise<{success, mode, reference, status, message}>}
+ * @param {string} [params.networkCode] - '63902' (M-Pesa), '0' (SasaPay), '63903' (Airtel), '63907' (T-Kash)
+ * @returns {Promise<{success, mode, reference, status, message, requires_otp?}>}
  */
-export async function initiateStkPush({ walletId, phone, amountCents, description, transactionType = 'lipisha' }) {
+export async function initiateStkPush({ walletId, phone, amountCents, description, transactionType = 'lipisha', networkCode = '63902' }) {
   const normalized = normalizePhone(phone);
   if (!normalized) throw new Error('Invalid phone number.');
 
-  // Try live SasaPay STK Push
+  // Try live SasaPay C2B
   try {
     const res = await base44.functions.invoke('sasapayStkPush', {
       phone: normalized,
@@ -38,28 +42,23 @@ export async function initiateStkPush({ walletId, phone, amountCents, descriptio
       accountRef: 'BodaSure',
       description: description || 'BodaSure payment',
       transactionType,
+      networkCode,
+      walletId,
     });
     const data = res.data;
 
-    // If live mode, create a pending transaction to be completed by webhook
-    if (data.mode === 'live' && data.status === 'pending') {
-      await base44.entities.Transaction.create({
-        wallet_id: walletId,
-        type: transactionType,
-        amount_cents: amountCents,
-        status: 'pending',
-        reference: data.reference,
-        checkout_request_id: data.checkout_request_id || null,
-        product_type: transactionType,
-        counterparty_phone: normalized,
-        description: description || '',
-      });
+    if (data.mode === 'live' && (data.status === 'pending' || data.requires_otp)) {
       return {
         success: true,
         mode: 'live',
         reference: data.reference,
+        transactionId: data.transaction_id,
+        checkoutRequestId: data.checkout_request_id,
         status: 'pending',
-        message: data.message || 'STK push sent. Awaiting customer confirmation.',
+        requiresOtp: data.requires_otp || false,
+        paymentGateway: data.payment_gateway || '',
+        customerMessage: data.customer_message || '',
+        message: data.message || 'Payment request sent. Awaiting customer confirmation.',
       };
     }
   } catch (e) {
@@ -83,6 +82,34 @@ export async function initiateStkPush({ walletId, phone, amountCents, descriptio
     status: 'completed',
     message: 'Payment completed (mock mode).',
   };
+}
+
+/**
+ * Verify SasaPay wallet OTP for a pending C2B transaction.
+ * Only needed when networkCode="0" (SasaPay wallet channel).
+ *
+ * @param {string} checkoutRequestId - From the initial C2B payment response
+ * @param {string} verificationCode - 6-digit OTP from the customer
+ * @returns {Promise<{success, status, message}>}
+ */
+export async function verifySasaPayOtp(checkoutRequestId, verificationCode) {
+  try {
+    const res = await base44.functions.invoke('sasapayProcessPayment', {
+      checkoutRequestId,
+      verificationCode,
+    });
+    return {
+      success: res.data.success,
+      status: res.data.status,
+      message: res.data.message,
+    };
+  } catch (e) {
+    return {
+      success: false,
+      status: 'failed',
+      message: e.message || 'OTP verification failed',
+    };
+  }
 }
 
 /**
