@@ -45,7 +45,7 @@ export const adminNav = [
   { label: 'Overview', path: '/admin/overview', icon: LayoutDashboard },
   { label: 'Counties', path: '/admin/counties', icon: Building2 },
   { label: 'SACCOs', path: '/admin/saccos', icon: Building2 },
-  { label: 'SasaPay', path: '/admin/sasapay', icon: Database },
+  { label: 'Wallet Ops', path: '/admin/sasapay', icon: Database },
   { label: 'Users', path: '/admin/users', icon: Users },
   { label: 'KYC Review', path: '/admin/kyc', icon: FileCheck },
   { label: 'Money Config', path: '/admin/money', icon: Coins },

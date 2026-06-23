@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { getOrCreateWallet } from '@/lib/payments';
 import { setWalletPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
+import { splitFullName, joinFullName } from '@/lib/nameUtils';
 import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, Loader2, Smartphone, Lock } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -13,7 +14,7 @@ export default function WalletActivate() {
   const { user, refreshUser } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [step, setStep] = useState(0);
-  const [identity, setIdentity] = useState({ full_name: '', national_id: '', phone: '' });
+  const [identity, setIdentity] = useState({ firstName: '', middleName: '', lastName: '', full_name: '', national_id: '', phone: '' });
   const [otp, setOtp] = useState('');
   const [requestId, setRequestId] = useState('');
   const [pin, setPin] = useState('');
@@ -24,7 +25,11 @@ export default function WalletActivate() {
   useEffect(() => {
     async function load() {
       if (!user) return;
+      const nameParts = splitFullName(user.full_name || '');
       setIdentity({
+        firstName: nameParts.firstName,
+        middleName: nameParts.middleName,
+        lastName: nameParts.lastName,
         full_name: user.full_name || '',
         national_id: user.national_id || '',
         phone: user.phone || '',
@@ -39,8 +44,8 @@ export default function WalletActivate() {
 
   // Step 0: Save profile + call SasaPay personal onboarding init
   async function handleInit() {
-    if (!identity.full_name || !identity.national_id || !identity.phone) {
-      setError('Full name, phone, and National ID are required.');
+    if (!identity.firstName || !identity.lastName || !identity.national_id || !identity.phone) {
+      setError('First name, last name, phone, and National ID are required.');
       return;
     }
     if (!/^\d{7,8}$/.test(identity.national_id)) {
@@ -50,15 +55,16 @@ export default function WalletActivate() {
     setSaving(true);
     setError('');
     try {
+      const fullName = joinFullName(identity.firstName, identity.middleName, identity.lastName);
       // Save profile fields first so sasapayPersonalOnboarding can read them
       await base44.auth.updateMe({
-        full_name: identity.full_name,
+        full_name: fullName,
         national_id: identity.national_id,
         phone: identity.phone,
       });
       await refreshUser();
 
-      // Call SasaPay personal onboarding — SasaPay sends OTP to rider's phone
+      // Call onboarding — BodaSure Wallet sends OTP to rider's phone
       const res = await base44.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
       if (res.data?.success) {
         setRequestId(res.data.requestId);
@@ -169,17 +175,39 @@ export default function WalletActivate() {
         <div className="space-y-4">
           <div className="bg-accent rounded-xl p-4 flex items-center gap-3">
             <Smartphone className="w-5 h-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">We'll create your SasaPay wallet using your phone number and National ID. An OTP will be sent to your phone.</p>
+            <p className="text-sm text-muted-foreground">We'll create your BodaSure Wallet using your phone number and National ID. An OTP will be sent to your phone.</p>
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Full Name</label>
-            <input
-              type="text"
-              value={identity.full_name}
-              onChange={e => setIdentity(i => ({ ...i, full_name: e.target.value }))}
-              placeholder="John Mwangi"
-              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">First Name</label>
+              <input
+                type="text"
+                value={identity.firstName}
+                onChange={e => setIdentity(i => ({ ...i, firstName: e.target.value }))}
+                placeholder="John"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Middle Name <span className="text-muted-foreground/60">(optional)</span></label>
+              <input
+                type="text"
+                value={identity.middleName}
+                onChange={e => setIdentity(i => ({ ...i, middleName: e.target.value }))}
+                placeholder="Mwangi"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Last Name</label>
+              <input
+                type="text"
+                value={identity.lastName}
+                onChange={e => setIdentity(i => ({ ...i, lastName: e.target.value }))}
+                placeholder="Kamau"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
@@ -209,7 +237,7 @@ export default function WalletActivate() {
           {error && <p className="text-xs text-destructive">{error}</p>}
           <button
             onClick={handleInit}
-            disabled={saving || !identity.full_name || !identity.national_id || !identity.phone || !/^\d{7,8}$/.test(identity.national_id)}
+            disabled={saving || !identity.firstName || !identity.lastName || !identity.national_id || !identity.phone || !/^\d{7,8}$/.test(identity.national_id)}
             className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
           >
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</> : <><Smartphone className="w-4 h-4" /> Activate Wallet</>}
@@ -222,7 +250,7 @@ export default function WalletActivate() {
         <div className="space-y-4">
           <div className="bg-accent rounded-xl p-4 flex items-center gap-3">
             <Shield className="w-5 h-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">Enter the OTP sent to <span className="font-semibold text-foreground">{identity.phone}</span> by SasaPay.</p>
+            <p className="text-sm text-muted-foreground">Enter the OTP sent to <span className="font-semibold text-foreground">{identity.phone}</span> by BodaSure Wallet.</p>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Enter OTP Code</label>
@@ -235,7 +263,7 @@ export default function WalletActivate() {
               placeholder="••••"
               className="w-full mt-1 px-3 py-3 rounded-xl border border-input bg-background text-2xl text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-primary"
             />
-            <p className="text-[10px] text-muted-foreground mt-1.5">Check your phone for the code from SasaPay</p>
+            <p className="text-[10px] text-muted-foreground mt-1.5">Check your phone for the verification code</p>
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex gap-2">
@@ -258,7 +286,7 @@ export default function WalletActivate() {
         <div className="space-y-4">
           <div className="bg-success/10 rounded-xl p-4 flex items-center gap-3">
             <Check className="w-5 h-5 text-success flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">SasaPay wallet activated! Now set a 4-digit PIN to confirm all your transactions.</p>
+            <p className="text-sm text-muted-foreground">BodaSure Wallet activated! Now set a 4-digit PIN to confirm all your transactions.</p>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Create PIN</label>
@@ -302,7 +330,7 @@ export default function WalletActivate() {
             <Check className="w-10 h-10 text-success" />
           </div>
           <h2 className="font-heading font-bold text-xl mb-2">Wallet Activated!</h2>
-          <p className="text-sm text-muted-foreground mb-6">Your SasaPay wallet is now Tier 1. You can deposit money, pay county fees, and pay bike owners.</p>
+          <p className="text-sm text-muted-foreground mb-6">Your BodaSure Wallet is now Tier 1. You can deposit money, pay county fees, and pay bike owners.</p>
           <div className="bg-card border border-border rounded-2xl p-4 mb-4 text-left">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-muted-foreground">Wallet Tier</span>
@@ -320,8 +348,8 @@ export default function WalletActivate() {
           <button onClick={() => navigate('/app/wallet')} className="w-full bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm">
             Go to Wallet
           </button>
-          <button onClick={() => navigate('/app/compliance')} className="w-full mt-2 text-sm text-primary py-2 font-medium flex items-center justify-center gap-1">
-            <Shield className="w-4 h-4" /> Complete KYC to Unlock All Features
+          <button onClick={() => navigate('/app/profile', { state: { targetPhase: 5 } })} className="w-full mt-2 text-sm text-primary py-2 font-medium flex items-center justify-center gap-1">
+            <Shield className="w-4 h-4" /> Continue to KYC Verification
           </button>
         </div>
       )}

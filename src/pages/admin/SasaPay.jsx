@@ -4,6 +4,7 @@ import { formatKES, formatDateTime } from '@/lib/format';
 import { Database, Search, Activity, CheckCircle2, AlertCircle, Receipt, TrendingUp } from 'lucide-react';
 import TariffManager from '@/components/admin/TariffManager';
 import RevenueReconciliation from '@/components/admin/RevenueReconciliation';
+import CustomerAccountsTable from '@/components/admin/CustomerAccountsTable';
 
 export default function AdminSasaPay() {
   const [tab, setTab] = useState('overview');
@@ -41,7 +42,7 @@ export default function AdminSasaPay() {
 
   return (
     <div className="p-6 animate-fade-in">
-      <h1 className="text-2xl font-heading font-bold mb-1">SasaPay Operations</h1>
+      <h1 className="text-2xl font-heading font-bold mb-1">BodaSure Wallet Operations</h1>
       <p className="text-sm text-muted-foreground mb-5">Monitor wallets, transactions, and webhooks</p>
 
       <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide">
@@ -97,27 +98,7 @@ export default function AdminSasaPay() {
           </div>
         </div>
       ) : tab === 'wallets' ? (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Account</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Tier</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {wallets.map(w => (
-                <tr key={w.id} className="border-t border-border hover:bg-accent/50">
-                  <td className="px-4 py-3 font-mono text-xs">{w.account_number || w.sasapay_customer_id || '—'}</td>
-                  <td className="px-4 py-3">Tier {w.tier}</td>
-                  <td className="px-4 py-3"><span className={`text-xs font-semibold ${w.status === 'active' ? 'text-success' : 'text-muted-foreground'}`}>{w.status}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {wallets.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No wallets yet</p>}
-        </div>
+        <CustomerAccountsTable />
       ) : (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <table className="w-full text-sm">

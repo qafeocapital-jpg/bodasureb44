@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useAuth } from '@/lib/AuthContext';
+import { splitFullName, joinFullName } from '@/lib/nameUtils';
 import { base44 } from '@/api/base44Client';
 import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
@@ -6,8 +8,13 @@ import { ChevronRight, ChevronLeft, Loader2, AlertTriangle } from 'lucide-react'
 import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 
 export default function PhasePersonal({ user, counties, initialValues, onDraftChange, onSaved, onBack, readOnly, onExitReadOnly }) {
+  const { refreshUser } = useAuth();
+  const nameParts = splitFullName(initialValues?.full_name || user?.full_name || '');
   const [form, setForm] = useState({
     full_name: initialValues?.full_name || '',
+    firstName: nameParts.firstName,
+    middleName: nameParts.middleName,
+    lastName: nameParts.lastName,
     phone: initialValues?.phone || '',
     national_id: initialValues?.national_id || '',
     county_id: initialValues?.county_id || '',
@@ -16,6 +23,13 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
   const [phoneError, setPhoneError] = useState('');
   const [idError, setIdError] = useState('');
   const [saveError, setSaveError] = useState('');
+
+  const updateName = (partial) => {
+    const next = { ...form, ...partial };
+    next.full_name = joinFullName(next.firstName, next.middleName, next.lastName);
+    setForm(next);
+    onDraftChange?.(next);
+  };
 
   const updateForm = (partial) => {
     const next = { ...form, ...partial };
@@ -26,7 +40,8 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
   const isNationalIdValid = (id) => /^\d{7,8}$/.test((id || '').trim());
 
   const canProceed = () =>
-    form.full_name?.trim() &&
+    form.firstName?.trim() &&
+    form.lastName?.trim() &&
     isValidKenyanPhone(form.phone) &&
     isNationalIdValid(form.national_id) &&
     form.county_id;
@@ -73,6 +88,7 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
         national_id: form.national_id.trim(),
         county_id: form.county_id,
       });
+      await refreshUser();
       await onSaved();
     } catch (e) {
       setSaveError(e.message || 'Failed to save profile. Please try again.');
@@ -84,15 +100,37 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
     <div className="space-y-4">
       {readOnly && <ReadOnlyBanner />}
       <div className={`space-y-4 ${readOnly ? 'opacity-60 pointer-events-none' : ''}`}>
-      <div>
-        <label className="text-xs font-medium text-muted-foreground">Full Name</label>
-        <input
-          type="text"
-          value={form.full_name}
-          onChange={e => updateForm({ full_name: e.target.value })}
-          placeholder="John Mwangi"
-          className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">First Name</label>
+          <input
+            type="text"
+            value={form.firstName}
+            onChange={e => updateName({ firstName: e.target.value })}
+            placeholder="John"
+            className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Middle Name <span className="text-muted-foreground/60">(optional)</span></label>
+          <input
+            type="text"
+            value={form.middleName}
+            onChange={e => updateName({ middleName: e.target.value })}
+            placeholder="Mwangi"
+            className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Last Name</label>
+          <input
+            type="text"
+            value={form.lastName}
+            onChange={e => updateName({ lastName: e.target.value })}
+            placeholder="Kamau"
+            className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
       </div>
       <PhoneInput
         value={form.phone}

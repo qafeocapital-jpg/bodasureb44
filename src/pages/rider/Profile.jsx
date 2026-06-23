@@ -14,6 +14,7 @@ import PhaseStage from '@/components/rider/onboarding/PhaseStage';
 import PhaseSacco from '@/components/rider/onboarding/PhaseSacco';
 import PhaseVerification from '@/components/rider/onboarding/PhaseVerification';
 import CompletionScreen from '@/components/rider/onboarding/CompletionScreen';
+import { getOrCreateWallet } from '@/lib/payments';
 import KycTierStatus from '@/components/rider/KycTierStatus';
 
 export default function Profile() {
@@ -30,25 +31,32 @@ export default function Profile() {
   const [draftData, setDraftData] = useState({});
   const [readOnly, setReadOnly] = useState(false);
   const [kycDocs, setKycDocs] = useState([]);
+  const [wallet, setWallet] = useState(null);
 
   useEffect(() => {
     async function load() {
       if (!user || hasInitialized) return;
       try {
-        const [cs, vs, gms, kd] = await Promise.all([
+        const [cs, vs, gms, kd, w] = await Promise.all([
           base44.entities.County.filter({}),
           base44.entities.Vehicle.filter({ rider_id: user.id }, '-created_date'),
           base44.entities.GroupMember.filter({ user_id: user.id }),
           base44.entities.KycDocument.filter({ user_id: user.id }),
+          getOrCreateWallet(user.id),
         ]);
         setCounties(cs);
         setVehicles(vs);
         setGroupMembers(gms);
         setKycDocs(kd);
+        setWallet(w);
         const phase = getOnboardingPhase(user, vs, gms);
         setCompletedPhase(phase);
+        const targetPhase = location.state?.targetPhase;
         const viewStep = location.state?.viewStep;
-        if (viewStep !== undefined && viewStep !== null && user?.onboarding_complete) {
+        if (targetPhase !== undefined && targetPhase !== null) {
+          setCurrentPhase(targetPhase);
+          setReadOnly(false);
+        } else if (viewStep !== undefined && viewStep !== null && user?.onboarding_complete) {
           setCurrentPhase(viewStep);
           setReadOnly(true);
         } else {
@@ -218,6 +226,7 @@ export default function Profile() {
           <PhaseVerification
             user={user}
             vehicle={vehicles[0]}
+            wallet={wallet}
             onCompleted={() => setCurrentPhase(6)}
             onBack={() => setCurrentPhase(4)}
             readOnly={readOnly}
