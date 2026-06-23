@@ -8,11 +8,14 @@ import BottomNav from './BottomNav';
 export default function RiderLayout() {
   const { user } = useAuth();
   const [walletActive, setWalletActive] = useState(false);
+  const [walletCheckComplete, setWalletCheckComplete] = useState(false);
 
   useEffect(() => {
     async function checkWallet() {
+      setWalletCheckComplete(false);
       if (!user) {
         setWalletActive(false);
+        setWalletCheckComplete(true);
         return;
       }
       try {
@@ -24,6 +27,8 @@ export default function RiderLayout() {
         }
       } catch (e) {
         setWalletActive(false);
+      } finally {
+        setWalletCheckComplete(true);
       }
     }
     checkWallet();

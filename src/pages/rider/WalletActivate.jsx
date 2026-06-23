@@ -6,6 +6,7 @@ import { getOrCreateWallet } from '@/lib/payments';
 import { setWalletPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
 import { splitFullName, joinFullName } from '@/lib/nameUtils';
+import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, Loader2, Smartphone, Lock } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -39,10 +40,15 @@ export default function WalletActivate() {
       try {
         const [w, cs] = await Promise.all([
           getOrCreateWallet(user.id),
-          base44.entities.County.filter({}),
+          base44.entities.County.filter({}).catch(() => []),
         ]);
         setWallet(w);
-        setCounties(cs);
+        if (cs && cs.length > 0) {
+          setCounties(cs);
+        } else {
+          setCounties([]);
+          // Don't fail, allow user to proceed but warn them
+        }
       } catch (e) {}
     }
     load();
@@ -58,8 +64,9 @@ export default function WalletActivate() {
       setError('National ID must be 6–8 digits.');
       return;
     }
-    if (!/^(\+2547\d{8}|\+2541\d{8}|07\d{8}|01\d{8})$/.test(identity.phone.replace(/\s+/g, ''))) {
-      setError('Enter a valid Kenyan phone number.');
+    const normalizedPhone = normalizePhone(identity.phone);
+    if (!normalizedPhone || !isValidKenyanPhone(identity.phone)) {
+      setError('Enter a valid Kenyan phone number (07XX or 01XX).');
       return;
     }
     setSaving(true);
@@ -120,6 +127,26 @@ export default function WalletActivate() {
       }
     } catch (e) {
       setError(e.response?.data?.error || e.message || 'Verification failed. Try again.');
+    }
+    setSaving(false);
+  }
+
+  async function handleResendOtp() {
+    setSaving(true);
+    setError('');
+    try {
+      const res = await base44.functions.invoke('sasapayPersonalOnboarding', {
+        action: 'resendOtp',
+        requestId,
+      });
+      if (res.data?.success) {
+        setOtp('');
+        setError('');
+      } else {
+        setError(res.data?.error || 'Failed to resend OTP. Try again.');
+      }
+    } catch (e) {
+      setError(e.response?.data?.error || e.message || 'Failed to resend OTP. Try again.');
     }
     setSaving(false);
   }
@@ -229,6 +256,9 @@ export default function WalletActivate() {
               placeholder="0712345678"
               className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
+            {identity.phone && !isValidKenyanPhone(identity.phone) && (
+              <p className="text-xs text-destructive mt-1">Phone must be a valid Kenyan number (07XX or 01XX)</p>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
@@ -259,7 +289,7 @@ export default function WalletActivate() {
           {error && <p className="text-xs text-destructive">{error}</p>}
           <button
             onClick={handleInit}
-            disabled={saving || !identity.firstName || !identity.lastName || !identity.national_id || !identity.phone || !identity.county_id || !/^\d{6,8}$/.test(identity.national_id)}
+            disabled={saving || !identity.firstName || !identity.lastName || !identity.national_id || !identity.phone || !identity.county_id || !/^\d{6,8}$/.test(identity.national_id) || !isValidKenyanPhone(identity.phone)}
             className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
           >
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</> : <><Smartphone className="w-4 h-4" /> Activate Wallet</>}
@@ -300,6 +330,13 @@ export default function WalletActivate() {
               {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</> : <>Verify <ChevronRight className="w-4 h-4" /></>}
             </button>
           </div>
+          <button
+            onClick={handleResendOtp}
+            disabled={saving}
+            className="w-full text-sm text-primary font-medium py-2 hover:underline"
+          >
+            Didn't receive code? Resend OTP
+          </button>
         </div>
       )}
 

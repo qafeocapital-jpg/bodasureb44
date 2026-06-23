@@ -25,6 +25,8 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
   const [saveError, setSaveError] = useState('');
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [idVerified, setIdVerified] = useState(false);
+  const [phoneChecking, setPhoneChecking] = useState(false);
+  const [idChecking, setIdChecking] = useState(false);
 
   const updateName = (partial) => {
     const next = { ...form, ...partial };
@@ -72,9 +74,11 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
   }
 
   async function checkPhoneUniqueness() {
+    if (phoneChecking) return false;
     setPhoneVerified(false);
     if (!form.phone || !isPhoneFormatValid(form.phone)) { setPhoneError(''); return false; }
     if (form.phone === normalizePhone(user?.phone)) { setPhoneError(''); setPhoneVerified(true); return false; }
+    setPhoneChecking(true);
     try {
       const existing = await base44.entities.User.filter({ phone: form.phone });
       if (existing.length > 0 && existing[0].id !== user?.id) {
@@ -85,13 +89,16 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
       setPhoneVerified(true);
       return false;
     } catch (e) { setPhoneError(''); return false; }
+    finally { setPhoneChecking(false); }
   }
 
   async function checkIdUniqueness() {
+    if (idChecking) return false;
     setIdVerified(false);
     const id = (form.national_id || '').trim();
     if (!id || !isNationalIdFormatValid(id)) { setIdError(''); return false; }
     if (id === user?.national_id) { setIdError(''); setIdVerified(true); return false; }
+    setIdChecking(true);
     try {
       const existing = await base44.entities.User.filter({ national_id: id });
       if (existing.length > 0 && existing[0].id !== user?.id) {
@@ -102,9 +109,14 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
       setIdVerified(true);
       return false;
     } catch (e) { setIdError(''); return false; }
+    finally { setIdChecking(false); }
   }
 
   async function handleSave() {
+    // Force format validation even if onBlur didn't trigger
+    if (checkPhoneFormatError() || checkIdFormatError()) {
+      return;
+    }
     setSaving(true);
     setSaveError('');
     try {
@@ -162,22 +174,17 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
           </div>
       </div>
       <div>
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
-          {phoneVerified && <CheckCircle2 className="w-4 h-4 text-success" />}
-        </div>
+        <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
         <PhoneInput
           value={form.phone}
           onChange={(e164) => { updateForm({ phone: e164 }); checkPhoneFormatError(); setPhoneVerified(false); }}
           onBlur={checkPhoneUniqueness}
           error={phoneError}
         />
+        {phoneVerified && <p className="text-xs text-success mt-1 font-medium flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Phone verified</p>}
       </div>
       <div>
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
-          {idVerified && <CheckCircle2 className="w-4 h-4 text-success" />}
-        </div>
+        <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
         <input
           type="text"
           inputMode="numeric"
@@ -189,6 +196,7 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
           className={`w-full mt-1 px-3 py-2.5 rounded-xl border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary ${idError ? 'border-destructive' : 'border-input'}`}
         />
         {idError && <p className="text-xs text-destructive mt-1">{idError}</p>}
+        {idVerified && <p className="text-xs text-success mt-1 font-medium flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> ID verified</p>}
       </div>
       <div>
         <label className="text-xs font-medium text-muted-foreground">County You Operate From</label>

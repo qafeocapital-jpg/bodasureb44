@@ -105,6 +105,11 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
   }
 
   async function handleSave() {
+    // Force format validation even if onChange checks didn't trigger
+    if (checkPlateFormatError()) {
+      setSaving(false);
+      return;
+    }
     setSaving(true);
     setSaveError('');
     setPlateError('');
@@ -118,9 +123,8 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
           return;
         }
       }
-      // Check plate uniqueness
-      const plateTaken = await checkPlateUniqueness();
-      if (plateTaken) { setSaving(false); return; }
+      // Plate uniqueness already checked in handleRegisterClick; if we reach here via NTSA dialog, it's valid
+      // Skip duplicate check to improve performance
       let ownerId = isOwner ? user.id : null;
       if (!isOwner && form.owner_phone) {
         const normalized = normalizePhone(form.owner_phone);
@@ -200,16 +204,14 @@ export default function PhaseBike({ user, counties, vehicle, initialValues, onDr
       </div>
 
       <div>
-         <div className="flex items-center justify-between">
-           <label className="text-xs font-medium text-muted-foreground">Number Plate</label>
-           {plateVerified && <CheckCircle2 className="w-4 h-4 text-success" />}
-         </div>
-         <PlateInput
-           value={form.plate_number}
-           onChange={(val) => { updateForm({ plate_number: val }); checkPlateFormatError(); setPlateVerified(false); }}
-           error={plateError}
-         />
-       </div>
+        <label className="text-xs font-medium text-muted-foreground">Number Plate</label>
+        <PlateInput
+          value={form.plate_number}
+          onChange={(val) => { updateForm({ plate_number: val }); checkPlateFormatError(); setPlateVerified(false); }}
+          error={plateError}
+        />
+        {plateVerified && <p className="text-xs text-success mt-1 font-medium flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Plate verified</p>}
+      </div>
       <div>
         <label className="text-xs font-medium text-muted-foreground">Make</label>
         <input

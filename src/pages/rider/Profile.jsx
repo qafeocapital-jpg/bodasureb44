@@ -54,9 +54,9 @@ export default function Profile() {
         const targetPhase = location.state?.targetPhase;
         const viewStep = location.state?.viewStep;
         
-        // FIX 2: Auto-skip phase 0 if wallet activation already filled in all fields
+        // FIX 2: Auto-skip phase 0 only if wallet is active AND all profile fields filled
         let initialPhase = Math.min(phase, 6);
-        if (phase === 0 && user.full_name && user.phone && user.national_id && user.county_id) {
+        if (phase === 0 && user.full_name && user.phone && user.national_id && user.county_id && w.status === 'active') {
           initialPhase = 1;
           setCompletedPhase(1);
         }
