@@ -108,7 +108,8 @@ export default function Home() {
           const countyOk = !a.county_id || a.county_id === riderCounty;
           return audienceOk && countyOk;
         });
-        if (visible.length > 0) setLatestAnnouncement(visible[0]);
+        const nonWelcome = visible.filter(a => !a.title?.toLowerCase().includes('welcome to bodasure'));
+        if (nonWelcome.length > 0) setLatestAnnouncement(nonWelcome[0]);
       } catch (e) {}
       // 3) Clear loading ALWAYS
       clearTimeout(timeoutId);
@@ -152,6 +153,7 @@ export default function Home() {
         <p className="text-sm text-orange-100 font-medium">
           {getGreeting()}{user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''} 👋
         </p>
+        <p className="text-xs text-orange-100/80 font-medium">Welcome to BodaSure!</p>
         <div className="mt-4">
           <p className="text-xs text-orange-100 uppercase tracking-wide font-medium">Wallet Balance</p>
           <p className="text-3xl font-heading font-extrabold mt-0.5">{formatKES(balance)}</p>
