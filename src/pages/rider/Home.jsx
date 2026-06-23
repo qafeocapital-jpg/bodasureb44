@@ -49,6 +49,7 @@ export default function Home() {
   }, [user?.kyc_status, user?.id, prevKycStatus, toast]);
 
   useEffect(() => {
+    let unsub;
     async function loadData() {
       if (!user) return;
       try {
@@ -69,17 +70,18 @@ export default function Home() {
           base44.entities.Announcement.filter({ status: 'published' }, '-created_date', 10).catch(() => []),
         ]);
 
+        // 1) Set wallet state if wallet exists (and subscribe for live updates)
         if (wallets.length > 0) {
           setWalletActive(wallets[0].status === 'active' || wallets[0].tier > 0);
           if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
-          // Subscribe to wallet updates to sync state when activated
-          const unsubWallet = base44.entities.Wallet.subscribe((event) => {
+          unsub = base44.entities.Wallet.subscribe((event) => {
             if (event.id === wallets[0].id) {
               setWalletActive(event.data?.status === 'active' || event.data?.tier > 0);
             }
           });
-          return unsubWallet;
         }
+
+        // 2) Set bikes, kyc, groups, announcements ALWAYS (not in else)
         const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
         setBikes(merged);
         setKycDocs(kyc);
@@ -94,10 +96,11 @@ export default function Home() {
         });
         if (visible.length > 0) setLatestAnnouncement(visible[0]);
       } catch (e) {}
+      // 3) Clear loading ALWAYS (was previously skipped for wallet users via early return)
       setLoading(false);
     }
-    const unsub = loadData();
-    return () => unsub?.then?.(u => u?.());
+    loadData();
+    return () => unsub?.();
   }, [user]);
 
   // Show loading state while checking wallet status
