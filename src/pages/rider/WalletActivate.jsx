@@ -157,13 +157,10 @@ export default function WalletActivate() {
       });
       if (res.data?.success) {
         if (!wallet) throw new Error('Wallet not loaded. Please go back and try again.');
-        // Upgrade wallet to Tier 1 — basic SasaPay wallet active
+        // Upgrade wallet to Tier 1 — SasaPay account fields already written by backend
         await base44.entities.Wallet.update(wallet.id, {
           tier: 1,
           status: 'active',
-          sasapay_account_number: res.data.accountNumber || '',
-          sasapay_customer_id: res.data.accountNumber || '',
-          sasapay_account_status: 'ACTIVE',
         });
         await base44.auth.updateMe({ wallet_tier: 1 });
         await refreshUser();
