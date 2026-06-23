@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -7,6 +7,8 @@ import { setWalletPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
 import { splitFullName, joinFullName } from '@/lib/nameUtils';
 import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
+import PhoneInput from '@/components/ui/PhoneInput';
+import CountyPicker from '@/components/rider/CountyPicker';
 import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, Loader2, Smartphone, Lock } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -23,6 +25,9 @@ export default function WalletActivate() {
   const [pinConfirm, setPinConfirm] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [phoneConflict, setPhoneConflict] = useState(false);
+  const [phoneChecking, setPhoneChecking] = useState(false);
+  const phoneCheckTimer = useRef(null);
 
   useEffect(() => {
     async function load() {
@@ -53,6 +58,37 @@ export default function WalletActivate() {
     }
     load();
   }, [user]);
+
+  useEffect(() => {
+    return () => clearTimeout(phoneCheckTimer.current);
+  }, []);
+
+  async function checkPhoneUniqueness(normalized) {
+    if (!normalized || !isValidKenyanPhone(normalized)) {
+      setPhoneConflict(false);
+      setPhoneChecking(false);
+      return;
+    }
+    setPhoneChecking(true);
+    try {
+      const existing = await base44.entities.User.filter({ phone: normalized });
+      setPhoneConflict(existing.some(u => u.id !== user?.id));
+    } catch (e) {
+      setPhoneConflict(false);
+    }
+    setPhoneChecking(false);
+  }
+
+  function handlePhoneBlur() {
+    const normalized = normalizePhone(identity.phone);
+    if (!normalized) {
+      setPhoneConflict(false);
+      return;
+    }
+    setPhoneChecking(true);
+    clearTimeout(phoneCheckTimer.current);
+    phoneCheckTimer.current = setTimeout(() => checkPhoneUniqueness(normalized), 400);
+  }
 
   // Step 0: Save profile + call SasaPay personal onboarding init
   async function handleInit() {
@@ -250,19 +286,15 @@ export default function WalletActivate() {
               />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
-            <input
-              type="tel"
-              value={identity.phone}
-              onChange={e => setIdentity(i => ({ ...i, phone: e.target.value }))}
-              placeholder="0712345678"
-              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            {identity.phone && !isValidKenyanPhone(identity.phone) && (
-              <p className="text-xs text-destructive mt-1">Phone must be a valid Kenyan number (07XX or 01XX)</p>
-            )}
-          </div>
+          <PhoneInput
+            value={identity.phone}
+            onChange={(e164) => {
+              setIdentity(i => ({ ...i, phone: e164 }));
+              if (phoneConflict) setPhoneConflict(false);
+            }}
+            onBlur={handlePhoneBlur}
+            error={phoneConflict ? 'This number is already linked to a BodaSure account.' : ''}
+          />
           <div>
             <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
             <input
@@ -278,21 +310,15 @@ export default function WalletActivate() {
               <p className="text-xs text-destructive mt-1">National ID must be 6–8 digits</p>
             )}
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">County You Operate From</label>
-            <select
-              value={identity.county_id}
-              onChange={e => setIdentity(i => ({ ...i, county_id: e.target.value }))}
-              className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Select county</option>
-              {counties.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          <CountyPicker
+            counties={counties}
+            value={identity.county_id}
+            onChange={(id) => setIdentity(i => ({ ...i, county_id: id }))}
+          />
           {error && <p className="text-xs text-destructive">{error}</p>}
           <button
             onClick={handleInit}
-            disabled={saving || !identity.firstName || !identity.lastName || !identity.national_id || !identity.phone || !identity.county_id || !/^\d{6,8}$/.test(identity.national_id) || !isValidKenyanPhone(identity.phone)}
+            disabled={saving || !identity.firstName || !identity.lastName || !identity.national_id || !identity.phone || !identity.county_id || !/^\d{6,8}$/.test(identity.national_id) || !isValidKenyanPhone(identity.phone) || phoneConflict || phoneChecking}
             className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
           >
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting...</> : <><Smartphone className="w-4 h-4" /> Activate Wallet</>}
