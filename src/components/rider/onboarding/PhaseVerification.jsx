@@ -5,9 +5,8 @@ import { Loader2, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2, CreditCar
 import { useAuth } from '@/lib/AuthContext';
 import VerificationMiniStepper from '@/components/rider/onboarding/VerificationMiniStepper';
 import VerificationComplete from '@/components/rider/onboarding/VerificationComplete';
-import SubTaskID from '@/components/rider/onboarding/verification/SubTaskID';
+import SubTaskIdentity from '@/components/rider/onboarding/verification/SubTaskIdentity';
 import SubTaskBikePhotos from '@/components/rider/onboarding/verification/SubTaskBikePhotos';
-import SubTaskSelfie from '@/components/rider/onboarding/verification/SubTaskSelfie';
 import SubTaskPhoneOTP from '@/components/rider/onboarding/verification/SubTaskPhoneOTP';
 import SubTaskOwner from '@/components/rider/onboarding/verification/SubTaskOwner';
 import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
@@ -15,7 +14,7 @@ import { VERIFICATION_TASKS, getTaskStatuses, isAllSubmitted, TASK_STATUS_CONFIG
 import TierBenefitsCard from '@/components/rider/TierBenefitsCard';
 import { getKycLevel } from '@/components/ui/KycLevelBadge';
 
-const TASK_ICONS = [CreditCard, Bike, UserCircle, Smartphone, UserCheck];
+const TASK_ICONS = [CreditCard, Bike, Smartphone, UserCheck];
 
 export default function PhaseVerification({ user, vehicle, wallet, onCompleted, onBack, readOnly, onExitReadOnly }) {
   const navigate = useNavigate();
@@ -41,6 +40,13 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     }
     load();
   }, []);
+
+  // Clear kyc_just_approved flag after showing the celebration banner
+  useEffect(() => {
+    if (user?.kyc_just_approved) {
+      base44.auth.updateMe({ kyc_just_approved: false }).then(() => refreshUser?.()).catch(() => {});
+    }
+  }, [user?.kyc_just_approved]);
 
   // Check completion state
   const tasks = getTaskStatuses(kycDocs, user, vehicle);
@@ -143,11 +149,10 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   const renderSubTask = () => {
     const props = { user, vehicle, kycDocs, onDataChange: refreshData, onBack: () => setActiveTask(null) };
     switch (activeTask) {
-      case 0: return <SubTaskID {...props} />;
+      case 0: return <SubTaskIdentity {...props} />;
       case 1: return <SubTaskBikePhotos {...props} />;
-      case 2: return <SubTaskSelfie {...props} />;
-      case 3: return <SubTaskPhoneOTP {...props} />;
-      case 4: return <SubTaskOwner {...props} />;
+      case 2: return <SubTaskPhoneOTP {...props} />;
+      case 3: return <SubTaskOwner {...props} />;
       default: return null;
     }
   };
@@ -155,6 +160,13 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   return (
     <div className="space-y-4">
       {readOnly && <ReadOnlyBanner />}
+      {user?.kyc_just_approved && (
+        <div className="bg-success/5 border border-success/20 rounded-2xl p-4 text-center animate-fade-in">
+          <CheckCircle2 className="w-8 h-8 mx-auto text-success mb-2" />
+          <p className="text-sm font-bold text-success">KYC Approved — Tier 2 Unlocked!</p>
+          <p className="text-xs text-muted-foreground mt-1">You can now send money, withdraw, and access all services.</p>
+        </div>
+      )}
       {getKycLevel(user) < 2 && <TierBenefitsCard />}
       {/* Header */}
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">

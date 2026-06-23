@@ -146,6 +146,17 @@
     },
     "physical_address": {
       "type": "string"
+    },
+    "id_extracted_name": {
+      "type": "string"
+    },
+    "id_extracted_dob": {
+      "type": "string",
+      "format": "date"
+    },
+    "kyc_just_approved": {
+      "type": "boolean",
+      "default": false
     }
   }
 }

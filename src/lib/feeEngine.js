@@ -81,7 +81,10 @@ export async function checkTransactionLimits(walletId, transactionType, amountKe
     if (amountKes > remaining) {
       return {
         canProceed: false,
-        errorMessage: `Daily ${transactionType} limit is KES ${data.daily_limit_kes.toLocaleString()}. You have used KES ${data.daily_used_kes.toLocaleString()} today. You can only transact KES ${remaining.toLocaleString()} more.`,
+        tier1Capped: data.tier1_capped === true,
+        errorMessage: data.tier1_capped
+          ? `You've hit your KES ${data.daily_limit_kes.toLocaleString()} daily limit. Verify your ID in 2 minutes to unlock unlimited earning.`
+          : `Daily ${transactionType} limit is KES ${data.daily_limit_kes.toLocaleString()}. You have used KES ${data.daily_used_kes.toLocaleString()} today. You can only transact KES ${remaining.toLocaleString()} more.`,
         ...data,
       };
     }

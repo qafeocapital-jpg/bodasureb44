@@ -1,18 +1,14 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * Webhook callback handler for ID Analyzer results.
- * Called by ID Analyzer after document processing completes.
- *
- * Validates a shared-secret query parameter (not a cryptographic signature —
- * ID Analyzer's legacy API does not sign webhooks). The secret must match
- * the IDANALYZER_WEBHOOK_SECRET environment variable.
+ * Webhook callback handler for ID Analyzer v2 results.
+ * Called by ID Analyzer after async document processing completes.
+ * Validates a shared-secret query parameter.
  */
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Validate webhook secret passed as query param
     const secret = Deno.env.get('IDANALYZER_WEBHOOK_SECRET');
     if (!secret) {
       return Response.json({ error: 'Webhook secret not configured' }, { status: 500 });
@@ -23,13 +19,14 @@ Deno.serve(async (req) => {
     }
 
     const payload = await req.json();
-    const { id, status, results, user_reference } = payload;
+    // v2 uses 'result' (singular); v1 used 'results' (plural)
+    const { id, status, result, results, user_reference } = payload;
+    const data = result || results;
 
     if (!id || !status || !user_reference) {
       return Response.json({ error: 'Missing required fields: id, status, user_reference' }, { status: 400 });
     }
 
-    // Find KycDocument by provider_reference (the ID Analyzer transaction id)
     const kycDocuments = await base44.asServiceRole.entities.KycDocument.filter({
       provider_reference: id,
     });
@@ -39,24 +36,31 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, message: 'Document not found, silently accepted' });
     }
 
-    const kycDoc = kycDocuments[0];
     const docStatus = status === 'success' ? 'approved' : status === 'failure' ? 'rejected' : 'pending';
-
-    // Update KycDocument with result
     const updateData = { status: docStatus };
     if (status === 'failure' && payload.error) {
       updateData.rejection_reason = payload.error;
     }
 
-    await base44.asServiceRole.entities.KycDocument.update(kycDoc.id, updateData);
+    // Update all matching documents
+    await Promise.all(kycDocuments.map(doc =>
+      base44.asServiceRole.entities.KycDocument.update(doc.id, updateData)
+    ));
 
-    // Extract and hydrate User data if approved
-    if (status === 'success' && results) {
-      const user = await base44.asServiceRole.entities.User.get(kycDoc.user_id);
+    // Hydrate user data if approved
+    if (status === 'success' && data) {
+      const userId = kycDocuments[0].user_id;
+      const user = await base44.asServiceRole.entities.User.get(userId);
       if (user) {
-        const extractedData = extractUserDataFromIDAnalyzer(results);
-        if (Object.keys(extractedData).length > 0) {
-          await base44.asServiceRole.entities.User.update(kycDoc.user_id, extractedData);
+        const extractedData = extractDataFromV2(data);
+        const userUpdate = {};
+        if (extractedData.fullName) userUpdate.id_extracted_name = extractedData.fullName;
+        if (extractedData.dob) userUpdate.id_extracted_dob = extractedData.dob;
+        if (extractedData.documentNumber && !user.national_id) {
+          userUpdate.national_id = extractedData.documentNumber;
+        }
+        if (Object.keys(userUpdate).length > 0) {
+          await base44.asServiceRole.entities.User.update(userId, userUpdate);
         }
       }
     }
@@ -68,32 +72,23 @@ Deno.serve(async (req) => {
   }
 });
 
-function extractUserDataFromIDAnalyzer(results) {
-  if (!results) return {};
-
+function extractDataFromV2(data) {
   const extracted = {};
+  const doc = data?.document || {};
+  const name = data?.name || {};
 
-  const firstName = results.name?.first_name || '';
-  const lastName = results.name?.last_name || '';
+  const firstName = name.first_name || doc.first_name || '';
+  const lastName = name.last_name || doc.last_name || '';
   if (firstName || lastName) {
-    extracted.full_name = `${firstName} ${lastName}`.trim();
+    extracted.fullName = `${firstName} ${lastName}`.trim();
   }
 
-  if (results.date_of_birth?.raw) {
-    extracted.date_of_birth = results.date_of_birth.raw;
+  if (doc.number || data?.document_number) {
+    extracted.documentNumber = doc.number || data.document_number;
   }
 
-  if (results.document_number) {
-    extracted.national_id = results.document_number;
-  }
-
-  if (results.document_type) {
-    const docTypeMap = { 'ID Card': 'id_card', 'Passport': 'passport', 'Alien ID': 'alien_id' };
-    extracted.document_type = docTypeMap[results.document_type] || 'id_card';
-  }
-
-  if (results.address?.raw) {
-    extracted.physical_address = results.address.raw;
+  if (data?.date_of_birth?.raw || doc.date_of_birth) {
+    extracted.dob = data?.date_of_birth?.raw || doc.date_of_birth;
   }
 
   return extracted;

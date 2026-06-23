@@ -18,11 +18,11 @@ export function checkServiceAccess(service, { user, wallet, bikes, countyLive })
 
   const services = {
     lipisha: {
-      unlocked: walletActive && tier2,
-      title: 'KYC Verification Required',
-      message: 'Complete KYC verification (Tier 2) to collect fares via Lipisha.',
-      actionLabel: 'Verify Now',
-      actionLink: '/app/compliance',
+      unlocked: walletActive,
+      title: 'Activate Your Wallet',
+      message: 'Activate your BodaSure Wallet to start collecting fares.',
+      actionLabel: 'Activate Wallet',
+      actionLink: '/app/wallet/activate',
     },
     lipa_owner: {
       unlocked: walletActive,

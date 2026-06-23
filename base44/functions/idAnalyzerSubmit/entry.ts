@@ -1,13 +1,14 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * Submit KYC documents to ID Analyzer for automated verification and data extraction.
- * 
- * Payload:
- * - documentType: 'id_front' | 'id_back' | 'selfie'
- * - imageUrl: URL of the image to analyze
- * 
- * ID Analyzer will extract data from ID documents and call the webhook to process results.
+ * V2: Batched ID Analyzer submission.
+ * Sends ID front + ID back + selfie to ID Analyzer v2 API in a single flow.
+ * - /v5/verify_document: OCR + document authenticity (ID front + back)
+ * - /v5/verify_facematch: face match between ID photo and selfie
+ * Total: 2 API calls (down from 3+ per-document calls).
+ *
+ * Payload: { idFrontUrl, idBackUrl, selfieUrl }
+ * Returns: { success, decision: 'accept'|'review'|'reject', extractedData, faceConfidence }
  */
 Deno.serve(async (req) => {
   try {
@@ -15,90 +16,117 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { documentType, imageUrl } = await req.json();
-
-    if (!documentType || !imageUrl) {
-      return Response.json({ error: 'Missing documentType or imageUrl' }, { status: 400 });
+    const { idFrontUrl, idBackUrl, selfieUrl } = await req.json();
+    if (!idFrontUrl || !idBackUrl || !selfieUrl) {
+      return Response.json({ error: 'Missing idFrontUrl, idBackUrl, or selfieUrl' }, { status: 400 });
     }
 
-    const validTypes = ['id_front', 'id_back', 'selfie'];
-    if (!validTypes.includes(documentType)) {
-      return Response.json({ error: `Invalid documentType. Must be one of: ${validTypes.join(', ')}` }, { status: 400 });
-    }
-
-    // Download image and encode to base64
-    const imageBase64 = await downloadAndEncodeImage(imageUrl);
-
-    // Call ID Analyzer API
     const apiKey = Deno.env.get('IDANALYZER_API_KEY');
-    if (!apiKey) {
-      throw new Error('IDANALYZER_API_KEY not configured');
-    }
+    if (!apiKey) throw new Error('IDANALYZER_API_KEY not configured');
+    const profileId = Deno.env.get('IDANALYZER_PROFILE_ID');
 
-    const payload = {
-      api_key: apiKey,
-      modules: 'idanalyzer',
-      return_image: '0',
-      return_type: 'json',
-      document_primary: imageBase64,
-      country: 'KE',
+    // Download and encode all 3 images in parallel
+    const [frontBase64, backBase64, selfieBase64] = await Promise.all([
+      downloadAndEncodeImage(idFrontUrl),
+      downloadAndEncodeImage(idBackUrl),
+      downloadAndEncodeImage(selfieUrl),
+    ]);
+
+    // Call 1: Document verification (OCR + authenticity) — ID front + back
+    const docPayload = {
+      document_primary: { country: 'KE', document_type: 'national_id' },
+      document_primary_image: frontBase64,
+      document_secondary_image: backBase64,
     };
+    if (profileId) docPayload.profile = profileId;
 
-    // Determine if this is a secondary document (back side)
-    if (documentType === 'id_back') {
-      payload.document_secondary = imageBase64;
-      delete payload.document_primary;
-    }
-
-    const response = await fetch('https://api.idanalyzer.com/v1', {
+    const docResponse = await fetch('https://api2.idanalyzer.com/v5/verify_document', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(payload),
+      headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(docPayload),
     });
+    const docResult = await docResponse.json();
+    const docStatus = docResult.status || (docResult.error ? 'failure' : 'review');
 
-    const result = await response.json();
-
-    if (result.error) {
-      throw new Error(`ID Analyzer error: ${result.error.message}`);
+    // Call 2: Face match (ID photo vs selfie)
+    let faceConfidence = 0;
+    try {
+      const faceResponse = await fetch('https://api2.idanalyzer.com/v5/verify_facematch', {
+        method: 'POST',
+        headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_image: frontBase64, selfie_image: selfieBase64 }),
+      });
+      const faceResult = await faceResponse.json();
+      faceConfidence = faceResult.result?.face?.confidence ?? faceResult.confidence ?? 0;
+    } catch (e) {
+      console.warn('Face match failed:', e.message);
     }
 
-    // Store extraction result in KycDocument with provider reference
-    const kycDocuments = await base44.asServiceRole.entities.KycDocument.filter({
-      user_id: user.id,
-      document_type: documentType,
-    });
-
-    const docData = {
-      user_id: user.id,
-      document_type: documentType,
-      file_url: imageUrl,
-      status: 'pending',
-      provider_name: 'id_analyzer',
-      provider_reference: result.id || `idanalyzer_${Date.now()}`,
-    };
-
-    if (kycDocuments.length > 0) {
-      await base44.asServiceRole.entities.KycDocument.update(kycDocuments[0].id, docData);
+    // Determine overall decision
+    let decision;
+    if (docStatus === 'success' && faceConfidence >= 0.7) {
+      decision = 'accept';
+    } else if (docStatus === 'failure') {
+      decision = 'reject';
     } else {
-      await base44.asServiceRole.entities.KycDocument.create(docData);
+      decision = 'review';
     }
 
-    // Extract and store data from ID document
-    if (documentType === 'id_front' && result.results) {
-      const extractedData = extractUserDataFromIDAnalyzer(result.results);
-      
-      // Hydrate User entity with extracted data
-      if (Object.keys(extractedData).length > 0) {
-        await base44.asServiceRole.entities.User.update(user.id, extractedData);
+    // Extract data from document verification result
+    const extractedData = extractDataFromV2(docResult);
+    const kycStatus = decision === 'accept' ? 'approved' : decision === 'reject' ? 'rejected' : 'pending';
+    const providerRef = docResult.id || `idanalyzer_v2_${Date.now()}`;
+
+    const sr = base44.asServiceRole;
+    const docTypes = ['id_front', 'id_back', 'selfie'];
+    const urls = { id_front: idFrontUrl, id_back: idBackUrl, selfie: selfieUrl };
+
+    // Fetch existing docs for this user (batch)
+    const existingDocs = await sr.entities.KycDocument.filter({ user_id: user.id });
+
+    // Batch update all 3 KycDocuments in parallel
+    await Promise.all(docTypes.map(async (docType) => {
+      const existing = existingDocs.find(d => d.document_type === docType);
+      const updateData = {
+        user_id: user.id,
+        document_type: docType,
+        file_url: urls[docType],
+        status: kycStatus,
+        provider_name: 'idanalyzer_v2',
+        provider_reference: providerRef,
+      };
+      if (kycStatus === 'approved') {
+        updateData.reviewed_at = new Date().toISOString();
+      }
+      if (kycStatus === 'rejected') {
+        updateData.rejection_reason = docResult.error?.message || 'Document verification failed';
+      }
+      if (existing) {
+        await sr.entities.KycDocument.update(existing.id, updateData);
+      } else {
+        await sr.entities.KycDocument.create(updateData);
+      }
+    }));
+
+    // Hydrate user profile — store in separate fields to avoid name reversion bug
+    if (Object.keys(extractedData).length > 0) {
+      const userUpdate = {};
+      if (extractedData.fullName) userUpdate.id_extracted_name = extractedData.fullName;
+      if (extractedData.dob) userUpdate.id_extracted_dob = extractedData.dob;
+      if (extractedData.documentNumber && !user.national_id) {
+        userUpdate.national_id = extractedData.documentNumber;
+      }
+      if (Object.keys(userUpdate).length > 0) {
+        await sr.entities.User.update(user.id, userUpdate);
       }
     }
 
     return Response.json({
       success: true,
-      documentType,
-      status: 'pending',
-      providerReference: result.id || `idanalyzer_${Date.now()}`,
-      extractedData: documentType === 'id_front' ? extractUserDataFromIDAnalyzer(result.results) : {},
+      decision,
+      extractedData,
+      faceConfidence,
+      docStatus,
     });
   } catch (error) {
     console.error('idAnalyzerSubmit error:', error);
@@ -111,7 +139,6 @@ async function downloadAndEncodeImage(url) {
   if (!response.ok) throw new Error(`Failed to download image: ${url}`);
   const buffer = await response.arrayBuffer();
   const bytes = new Uint8Array(buffer);
-  // Chunked encoding to avoid call stack overflow on large images
   let binary = '';
   const chunkSize = 8192;
   for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -120,37 +147,23 @@ async function downloadAndEncodeImage(url) {
   return btoa(binary);
 }
 
-function extractUserDataFromIDAnalyzer(results) {
-  if (!results) return {};
-
+function extractDataFromV2(result) {
   const extracted = {};
+  const doc = result.result?.document || {};
+  const name = result.result?.name || {};
 
-  // Extract full name (combine first, middle, last names)
-  const firstName = results.name?.first_name || '';
-  const lastName = results.name?.last_name || '';
+  const firstName = name.first_name || doc.first_name || '';
+  const lastName = name.last_name || doc.last_name || '';
   if (firstName || lastName) {
-    extracted.full_name = `${firstName} ${lastName}`.trim();
+    extracted.fullName = `${firstName} ${lastName}`.trim();
   }
 
-  // Extract date of birth
-  if (results.date_of_birth?.raw) {
-    extracted.date_of_birth = results.date_of_birth.raw;
+  if (doc.number || result.result?.document_number) {
+    extracted.documentNumber = doc.number || result.result.document_number;
   }
 
-  // Extract national ID / document number
-  if (results.document_number) {
-    extracted.national_id = results.document_number;
-  }
-
-  // Extract document type
-  if (results.document_type) {
-    const docTypeMap = { 'ID Card': 'id_card', 'Passport': 'passport', 'Alien ID': 'alien_id' };
-    extracted.document_type = docTypeMap[results.document_type] || 'id_card';
-  }
-
-  // Extract address
-  if (results.address?.raw) {
-    extracted.physical_address = results.address.raw;
+  if (result.result?.date_of_birth?.raw || doc.date_of_birth) {
+    extracted.dob = result.result?.date_of_birth?.raw || doc.date_of_birth;
   }
 
   return extracted;

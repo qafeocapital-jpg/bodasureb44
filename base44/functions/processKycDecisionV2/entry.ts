@@ -70,6 +70,21 @@ Deno.serve(async (req) => {
           status: 'active',
         });
       }
+
+      // Upgrade user wallet_tier + flag for UI notification
+      await sr.entities.User.update(kycDoc.user_id, {
+        wallet_tier: 2,
+        kyc_just_approved: true,
+      });
+
+      // Audit log for Tier 2 upgrade
+      await sr.entities.AuditLog.create({
+        user_id: user.id,
+        action: 'kyc_approved_tier2',
+        entity_type: 'User',
+        entity_id: kycDoc.user_id,
+        description: `KYC approved — Tier 2 unlocked for user ${kycDoc.user_id}`,
+      });
     }
 
     // Create audit log

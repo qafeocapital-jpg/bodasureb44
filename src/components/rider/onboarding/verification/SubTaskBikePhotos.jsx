@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Bike, ChevronLeft, Check, AlertTriangle, RotateCw } from 'lucide-react';
+import { Bike, ChevronLeft, Check, AlertTriangle, RotateCw, Loader2 } from 'lucide-react';
 import CameraCapture from '@/components/rider/onboarding/CameraCapture';
 import PlateInput from '@/components/rider/onboarding/PlateInput';
 import NtsaConfirmDialog from '@/components/rider/onboarding/NtsaConfirmDialog';
@@ -18,20 +18,39 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
   const [error, setError] = useState('');
   const [activeAngle, setActiveAngle] = useState(0);
   const [showNtsaDialog, setShowNtsaDialog] = useState(false);
+  const [verifyingPlate, setVerifyingPlate] = useState(false);
 
   async function handleUpload(docType, fileUrl) {
     setError('');
     try {
+      // ANPR hard-block for bike_rear — plate must match
+      if (docType === 'bike_rear' && vehicle?.plate_number) {
+        setVerifyingPlate(true);
+        const res = await base44.functions.invoke('verifyPlateRecognizer', {
+          imageUrl: fileUrl,
+          expectedPlate: vehicle.plate_number,
+        });
+        setVerifyingPlate(false);
+        if (!res.data?.match) {
+          setError(res.data?.reason || 'Number plate not detected. Please retake the rear photo with the plate clearly visible.');
+          return;
+        }
+        const providerRef = `${res.data.detectedPlate}|${res.data.score?.toFixed(2)}`;
+        const existing = kycDocs.find(d => d.document_type === docType);
+        if (existing) {
+          await base44.entities.KycDocument.update(existing.id, { file_url: fileUrl, status: 'pending', rejection_reason: null, provider_name: 'platerecognizer', provider_reference: providerRef });
+        } else {
+          await base44.entities.KycDocument.create({ user_id: user.id, document_type: docType, file_url: fileUrl, status: 'pending', provider_name: 'platerecognizer', provider_reference: providerRef });
+        }
+        await onDataChange();
+        return;
+      }
+      // Normal upload for other angles
       const existing = kycDocs.find(d => d.document_type === docType);
       if (existing) {
         await base44.entities.KycDocument.update(existing.id, { file_url: fileUrl, status: 'pending', rejection_reason: null });
       } else {
-        await base44.entities.KycDocument.create({
-          user_id: user.id,
-          document_type: docType,
-          file_url: fileUrl,
-          status: 'pending',
-        });
+        await base44.entities.KycDocument.create({ user_id: user.id, document_type: docType, file_url: fileUrl, status: 'pending' });
       }
       await onDataChange();
     } catch (e) {
@@ -116,6 +135,13 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
           onUploaded={url => handleUpload(currentAngle.key, url)}
         />
       </div>
+
+      {verifyingPlate && (
+        <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-warning animate-spin" />
+          <p className="text-xs text-warning font-medium">Verifying number plate...</p>
+        </div>
+      )}
 
       {/* Next angle button */}
       {!allUploaded && activeAngle < 3 && (

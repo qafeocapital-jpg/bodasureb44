@@ -8,6 +8,7 @@ import { ChevronLeft, HandCoins, Loader2, CheckCircle2, XCircle, Receipt } from 
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import PhoneInput from '@/components/ui/PhoneInput';
 import UnlockSheet from '@/components/rider/UnlockSheet';
+import TierLimitGateSheet from '@/components/rider/TierLimitGateSheet';
 import { checkServiceAccess } from '@/lib/serviceAccess';
 import { lookupFee, checkTransactionLimits } from '@/lib/feeEngine';
 import { isValidKenyanPhone, formatPhoneDisplay } from '@/lib/phone';
@@ -25,6 +26,7 @@ export default function Lipisha() {
   const [accessInfo, setAccessInfo] = useState(null);
   const [feePreview, setFeePreview] = useState(null);
   const [limitInfo, setLimitInfo] = useState(null);
+  const [tierGateInfo, setTierGateInfo] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -55,7 +57,11 @@ export default function Lipisha() {
     // Check daily limits before proceeding
     const limitCheck = await checkTransactionLimits(wallet.id, 'lipisha', amountKes);
     if (!limitCheck.canProceed) {
-      setResult({ success: false, message: limitCheck.errorMessage });
+      if (limitCheck.tier1Capped) {
+        setTierGateInfo(limitCheck);
+      } else {
+        setResult({ success: false, message: limitCheck.errorMessage });
+      }
       return;
     }
 
@@ -194,6 +200,12 @@ export default function Lipisha() {
           <p className="text-xs text-muted-foreground">Waiting for M-Pesa confirmation...</p>
         </div>
       )}
+
+      <TierLimitGateSheet
+        open={!!tierGateInfo}
+        onClose={() => setTierGateInfo(null)}
+        limitInfo={tierGateInfo}
+      />
 
       <UnlockSheet
         open={!!accessInfo}

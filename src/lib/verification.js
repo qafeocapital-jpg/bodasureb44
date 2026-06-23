@@ -1,7 +1,6 @@
 export const VERIFICATION_TASKS = [
-  { id: 'id', name: 'ID Verification', short: 'ID' },
+  { id: 'identity', name: 'Identity Verification', short: 'Identity' },
   { id: 'bike', name: 'Bike Photos', short: 'Bike' },
-  { id: 'selfie', name: 'Rider Selfie', short: 'Selfie' },
   { id: 'phone', name: 'Phone OTP', short: 'Phone' },
   { id: 'owner', name: 'Owner Verification', short: 'Owner' },
 ];
@@ -11,17 +10,21 @@ export const VERIFICATION_TASKS = [
  * @returns Array of { id, status } where status is: not_started | in_progress | submitted | verified
  */
 export function getTaskStatuses(kycDocs = [], user, vehicle) {
-  // Sub-task 1: ID Verification
+  // Task 1: Identity Verification (ID front + ID back + Selfie — batched)
   const idFront = kycDocs.find(d => d.document_type === 'id_front' && d.file_url);
   const idBack = kycDocs.find(d => d.document_type === 'id_back' && d.file_url);
+  const selfie = kycDocs.find(d => d.document_type === 'selfie' && d.file_url);
   const idFrontApproved = kycDocs.some(d => d.document_type === 'id_front' && d.status === 'approved');
   const idBackApproved = kycDocs.some(d => d.document_type === 'id_back' && d.status === 'approved');
-  const idStatus = (idFrontApproved && idBackApproved) ? 'verified'
-    : (idFront && idBack) ? 'submitted'
-    : (idFront || idBack) ? 'in_progress'
+  const selfieApproved = kycDocs.some(d => d.document_type === 'selfie' && d.status === 'approved');
+  const allThreeApproved = idFrontApproved && idBackApproved && selfieApproved;
+  const uploadedCount = [idFront, idBack, selfie].filter(Boolean).length;
+  const identityStatus = allThreeApproved ? 'verified'
+    : uploadedCount === 3 ? 'submitted'
+    : uploadedCount > 0 ? 'in_progress'
     : 'not_started';
 
-  // Sub-task 2: Bike Photos
+  // Task 2: Bike Photos
   const bikeTypes = ['bike_front', 'bike_left', 'bike_rear', 'bike_right'];
   const bikeDocs = bikeTypes.map(t => kycDocs.find(d => d.document_type === t && d.file_url));
   const bikeUploaded = bikeDocs.filter(Boolean).length;
@@ -31,17 +34,10 @@ export function getTaskStatuses(kycDocs = [], user, vehicle) {
     : bikeUploaded > 0 ? 'in_progress'
     : 'not_started';
 
-  // Sub-task 3: Selfie
-  const selfieDoc = kycDocs.find(d => d.document_type === 'selfie' && d.file_url);
-  const selfieApproved = kycDocs.some(d => d.document_type === 'selfie' && d.status === 'approved');
-  const selfieStatus = selfieApproved ? 'verified'
-    : selfieDoc ? 'submitted'
-    : 'not_started';
-
-  // Sub-task 4: Phone OTP
+  // Task 3: Phone OTP
   const phoneStatus = user?.phone_verified ? 'verified' : 'not_started';
 
-  // Sub-task 5: Owner Verification
+  // Task 4: Owner Verification
   const ownerStatus = vehicle
     ? (vehicle.is_owner_rider === true || vehicle.owner_verified === true)
       ? 'verified'
@@ -49,9 +45,8 @@ export function getTaskStatuses(kycDocs = [], user, vehicle) {
     : 'not_started';
 
   return [
-    { id: 'id', status: idStatus },
+    { id: 'identity', status: identityStatus },
     { id: 'bike', status: bikeStatus },
-    { id: 'selfie', status: selfieStatus },
     { id: 'phone', status: phoneStatus },
     { id: 'owner', status: ownerStatus },
   ];
