@@ -25,13 +25,14 @@ export default function SaccoMembers() {
         // Scope to the SACCO's own group, not county
         if (groupId) {
           const groupMembers = await base44.entities.GroupMember.filter({ group_id: groupId }, '-created_date', 100);
-          // Fetch user details for each member
-          const memberUsers = await Promise.all(
-            groupMembers.map(async (gm) => {
-              const users = await base44.entities.User.filter({ id: gm.user_id });
-              return { ...gm, user: users[0] || null };
-            })
-          );
+          // Batch fetch user details to avoid N+1
+          const riderIds = [...new Set(groupMembers.map(gm => gm.user_id).filter(Boolean))];
+          let riderMap = {};
+          if (riderIds.length > 0) {
+            const allUsers = await Promise.all(riderIds.map(id => base44.entities.User.get(id).catch(() => null)));
+            allUsers.filter(Boolean).forEach(u => { riderMap[u.id] = u; });
+          }
+          const memberUsers = groupMembers.map(gm => ({ ...gm, user: riderMap[gm.user_id] || null }));
           setMembers(memberUsers);
         } else {
           setMembers([]);
@@ -50,15 +51,8 @@ export default function SaccoMembers() {
         joined_date: new Date().toISOString(),
       });
       toast({ title: 'Member approved' });
-      // Reload
-      const groupMembers = await base44.entities.GroupMember.filter({ group_id: groupId }, '-created_date', 100);
-      const memberUsers = await Promise.all(
-        groupMembers.map(async (gm) => {
-          const users = await base44.entities.User.filter({ id: gm.user_id });
-          return { ...gm, user: users[0] || null };
-        })
-      );
-      setMembers(memberUsers);
+      // Update local state instead of refetching everything
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, status: 'approved', joined_date: new Date().toISOString() } : m));
     } catch (e) {
       toast({ title: 'Failed to approve', description: e.message, variant: 'destructive' });
     }
@@ -70,14 +64,7 @@ export default function SaccoMembers() {
     try {
       await base44.entities.GroupMember.update(memberId, { status: 'rejected' });
       toast({ title: 'Member rejected' });
-      const groupMembers = await base44.entities.GroupMember.filter({ group_id: groupId }, '-created_date', 100);
-      const memberUsers = await Promise.all(
-        groupMembers.map(async (gm) => {
-          const users = await base44.entities.User.filter({ id: gm.user_id });
-          return { ...gm, user: users[0] || null };
-        })
-      );
-      setMembers(memberUsers);
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, status: 'rejected' } : m));
     } catch (e) {
       toast({ title: 'Failed to reject', description: e.message, variant: 'destructive' });
     }

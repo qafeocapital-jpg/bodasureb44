@@ -28,6 +28,9 @@ export default function SaccoStages() {
           base44.entities.Permit.filter({ status: 'active' }),
           base44.entities.Ward.filter({ county_id: countyId }).catch(() => []),
         ]);
+        // Filter stages to SACCO-owned if we have a group ID
+        const saccoScoped = saccoGroupId ? s.filter(st => !st.sacco_id || st.sacco_id === saccoGroupId) : s;
+        setStages(saccoScoped);
         setStages(s);
         setBikes(b);
         setPermits(p);

@@ -50,12 +50,12 @@ export default function CountyEnforcement() {
         base44.entities.Penalty.filter(penaltyFilter, '-created_date', 20),
         base44.entities.Inspection.filter(inspectionFilter, '-created_date', 20),
         base44.entities.Vehicle.filter(vehicleFilter),
-        base44.entities.User.filter({ role: 'field_agent' }),
+        countyId ? base44.entities.User.filter({ county_id: countyId, role: 'field_agent' }) : base44.entities.User.filter({ role: 'field_agent' }),
         countyId ? base44.entities.SubCounty.filter({ county_id: countyId }).catch(() => []) : Promise.resolve([]),
         countyId ? base44.entities.Ward.filter({ county_id: countyId }).catch(() => []) : Promise.resolve([]),
         countyId ? base44.entities.Stage.filter({ county_id: countyId }).catch(() => []) : Promise.resolve([]),
         countyId ? base44.entities.Group.filter({ county_id: countyId }) : base44.entities.Group.filter({}),
-        base44.entities.Permit.filter({ status: 'active' }),
+        base44.entities.Permit.filter(vehicleFilter),
       ]);
       setPenalties(p); setInspections(i); setVehicles(v);
       setOfficers(fa); setSubCounties(sc); setWards(w); setStages(st); setGroups(grps);
@@ -102,7 +102,8 @@ export default function CountyEnforcement() {
 
   async function flagGroup(groupId, reason) {
     try {
-      await base44.entities.Group.update(groupId, { status: 'inactive', description: `FLAGGED: ${reason}` });
+      const group = groups.find(g => g.id === groupId);
+      await base44.entities.Group.update(groupId, { status: 'inactive', description: `${group?.description || ''} [FLAGGED: ${reason}]`.trim() });
       toast({ title: 'Group flagged' });
       load();
     } catch (e) {
@@ -140,7 +141,7 @@ export default function CountyEnforcement() {
     { id: 'inspections', label: 'Inspections', icon: FileText },
   ];
 
-  const saccoStages = (saccoId) => stages.filter(s => s.county_id === countyId);
+  const saccoStages = (saccoId) => stages.filter(s => s.county_id === countyId && (!s.sacco_id || s.sacco_id === saccoId));
 
   return (
     <div className="p-6 animate-fade-in">
@@ -252,7 +253,7 @@ export default function CountyEnforcement() {
           ) : (
             saccos.map(sacco => {
               const sStages = saccoStages(sacco.id);
-              const sBikes = vehicles.filter(v => v.county_id === countyId);
+              const sBikes = vehicles.filter(v => v.county_id === countyId && (!v.sacco_id || v.sacco_id === sacco.id));
               const compliant = sBikes.filter(b => permits.some(p => p.vehicle_id === b.id)).length;
               const compPct = sBikes.length > 0 ? Math.round((compliant / sBikes.length) * 100) : 0;
               const isExpanded = expandedSacco === sacco.id;

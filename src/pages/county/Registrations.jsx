@@ -40,14 +40,12 @@ export default function CountyRegistrations() {
       const vehicleFilter = countyId ? { county_id: countyId } : {};
       const stageFilter = countyId ? { county_id: countyId } : {};
       const [r, v, pending, s] = await Promise.all([
-        base44.entities.User.filter({ staff_type: 'none' }),
+        countyId ? base44.entities.User.filter({ county_id: countyId, staff_type: 'none' }) : base44.entities.User.filter({ staff_type: 'none' }),
         base44.entities.Vehicle.filter(vehicleFilter),
         base44.entities.Vehicle.filter({ ...vehicleFilter, status: 'pending' }),
         base44.entities.Stage.filter(stageFilter),
       ]);
-      // Further filter riders to this county if scoped
-      const countyRiders = countyId ? r.filter(rq => rq.county_id === countyId) : r;
-      setRiders(countyRiders); setVehicles(v); setPendingBikes(pending); setStages(s);
+      setRiders(r); setVehicles(v); setPendingBikes(pending); setStages(s);
 
       // Fetch applicant names for pending_county stages
       const pendingApplicantIds = [...new Set(s.filter(st => st.application_status === 'pending_county' && st.pending_leader_id).map(st => st.pending_leader_id))];

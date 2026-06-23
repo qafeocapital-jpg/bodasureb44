@@ -24,17 +24,18 @@ export default function MyFleet() {
     async function load() {
       if (!user) return;
       try {
-        const [owned, allPermits, allPolicies, allTxs, myWallets] = await Promise.all([
-          base44.entities.Vehicle.filter({ owner_id: user.id }),
+        const owned = await base44.entities.Vehicle.filter({ owner_id: user.id });
+        const ownedBikeIds = new Set(owned.map(b => b.id));
+        const myWallets = await base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' });
+        const [allPermits, allPolicies, allTxs] = await Promise.all([
           base44.entities.Permit.filter({}),
-          base44.entities.Policy.filter({ rider_id: user.id }),
+          base44.entities.Policy.filter({}),
           base44.entities.Transaction.filter({ type: 'lipa_owner' }),
-          base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' }),
         ]);
         setBikes(owned);
-        setPermits(allPermits);
-        setPolicies(allPolicies);
-        setTransactions(allTxs);
+        setPermits(allPermits.filter(p => p.vehicle_id && ownedBikeIds.has(p.vehicle_id)));
+        setPolicies(allPolicies.filter(p => p.vehicle_id && ownedBikeIds.has(p.vehicle_id)));
+        setTransactions(allTxs.filter(t => t.vehicle_id && ownedBikeIds.has(t.vehicle_id)));
         setWallets(myWallets);
 
         // Fetch rider names for assigned bikes

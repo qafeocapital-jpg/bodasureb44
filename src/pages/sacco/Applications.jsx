@@ -115,6 +115,7 @@ export default function SaccoApplications() {
         title: 'SACCO Invitation',
         body: `You've been invited to join our SACCO. Open BodaSure → Groups to accept.`,
         audience: 'riders',
+        county_id: countyId || undefined,
         status: 'published',
       });
       toast({ title: 'Invitation sent', description: `Invitation sent to ${invitePhone}` });

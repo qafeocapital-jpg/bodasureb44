@@ -4,6 +4,8 @@ import { BadgeCheck, AlertCircle } from 'lucide-react';
 
 export default function StageCompliance() {
   const [members, setMembers] = useState([]);
+  const [bikes, setBikes] = useState([]);
+  const [permits, setPermits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -11,8 +13,14 @@ export default function StageCompliance() {
       try {
         const u = await base44.auth.me();
         if (u?.scope_entity_id) {
-          const m = await base44.entities.User.filter({ stage_id: u.scope_entity_id, staff_type: 'none' });
+          const [m, b, p] = await Promise.all([
+            base44.entities.User.filter({ stage_id: u.scope_entity_id, staff_type: 'none' }),
+            base44.entities.Vehicle.filter({ stage_id: u.scope_entity_id }),
+            base44.entities.Permit.filter({ status: 'active' }),
+          ]);
           setMembers(m);
+          setBikes(b);
+          setPermits(p);
         }
       } catch (e) {}
       setLoading(false);
@@ -20,8 +28,10 @@ export default function StageCompliance() {
     load();
   }, []);
 
-  const compliant = members.filter(m => m.profile_complete).length;
-  const nonCompliant = members.length - compliant;
+  const compliantVehicleIds = new Set(permits.map(p => p.vehicle_id));
+  const compliant = bikes.filter(b => compliantVehicleIds.has(b.id)).length;
+  const nonCompliant = bikes.length - compliant;
+  const compliantRiderIds = new Set(bikes.filter(b => compliantVehicleIds.has(b.id)).map(b => b.rider_id).filter(Boolean));
 
   return (
     <div className="p-6 animate-fade-in">
@@ -50,21 +60,24 @@ export default function StageCompliance() {
             </tr>
           </thead>
           <tbody>
-            {members.map(m => (
-              <tr key={m.id} className="border-t border-border hover:bg-accent/50">
-                <td className="px-4 py-3 font-medium">{m.full_name || 'Unknown'}</td>
-                <td className="px-4 py-3">
-                  {m.profile_complete ? (
-                    <span className="text-xs font-semibold text-success bg-success/10 rounded-full px-2 py-0.5">Compliant</span>
-                  ) : (
-                    <span className="text-xs font-semibold text-destructive bg-destructive/10 rounded-full px-2 py-0.5">Non-Compliant</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {members.map(m => {
+              const isCompliant = compliantRiderIds.has(m.id);
+              return (
+                <tr key={m.id} className="border-t border-border hover:bg-accent/50">
+                  <td className="px-4 py-3 font-medium">{m.full_name || 'Unknown'}</td>
+                  <td className="px-4 py-3">
+                    {isCompliant ? (
+                      <span className="text-xs font-semibold text-success bg-success/10 rounded-full px-2 py-0.5">Compliant</span>
+                    ) : (
+                      <span className="text-xs font-semibold text-destructive bg-destructive/10 rounded-full px-2 py-0.5">Non-Compliant</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
-        </table>
-        {members.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No members</p>}
+          </table>
+          {members.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No members</p>}
       </div>
     </div>
   );

@@ -15,7 +15,7 @@ export default function SaccoBikes() {
   useEffect(() => {
     async function load() {
       try {
-        const countyId = user?.scope_entity_id || user?.county_id;
+        const countyId = user?.county_id;
         const b = countyId
           ? await base44.entities.Vehicle.filter({ county_id: countyId })
           : await base44.entities.Vehicle.filter({});
@@ -24,12 +24,8 @@ export default function SaccoBikes() {
         const riderIds = [...new Set(b.map(v => v.rider_id).filter(Boolean))];
         if (riderIds.length > 0) {
           const riderMap = {};
-          await Promise.all(riderIds.map(async rid => {
-            try {
-              const r = await base44.entities.User.filter({ id: rid });
-              if (r.length > 0) riderMap[rid] = r[0];
-            } catch (e) {}
-          }));
+          const riderData = await Promise.all(riderIds.map(rid => base44.entities.User.get(rid).catch(() => null)));
+          riderData.filter(Boolean).forEach(r => { riderMap[r.id] = r; });
           setRiders(riderMap);
         }
       } catch (e) {}

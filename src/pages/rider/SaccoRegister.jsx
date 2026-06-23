@@ -64,6 +64,14 @@ export default function SaccoRegister() {
     }
   }, [form.county_id]);
 
+  // Sync constituency name to constituency_hint when selected
+  useEffect(() => {
+    if (form.constituency_id) {
+      const c = constituencies.find(c => c.id === form.constituency_id);
+      if (c) update('constituency_hint', c.name);
+    }
+  }, [form.constituency_id]);
+
   function update(field, value) {
     setForm(f => ({ ...f, [field]: value }));
   }

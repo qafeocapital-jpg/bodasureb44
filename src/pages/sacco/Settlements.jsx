@@ -30,15 +30,18 @@ export default function SaccoSettlements() {
   }, [user]);
 
   async function markPaid(id) {
+    const settlement = settlements.find(s => s.id === id);
+    if (!settlement) return;
+    // Ownership check: ensure this settlement belongs to this SACCO
+    if (saccoGroupId && settlement.entity_id && settlement.entity_id !== saccoGroupId) {
+      toast({ title: 'Access denied', description: 'This settlement does not belong to your SACCO.', variant: 'destructive' });
+      return;
+    }
     try {
       await base44.entities.Settlement.update(id, { status: 'processed', settled_at: new Date().toISOString() });
       await auditLog({ userId: user.id, action: 'settlement_marked_paid', entityType: 'Settlement', entityId: id, description: 'SACCO settlement marked as paid' });
       toast({ title: 'Settlement marked as paid' });
-      const filter = saccoGroupId
-        ? { entity_type: 'sacco', entity_id: saccoGroupId }
-        : { entity_type: 'sacco' };
-      const s = await base44.entities.Settlement.filter(filter, '-created_date', 20);
-      setSettlements(s);
+      setSettlements(prev => prev.map(s => s.id === id ? { ...s, status: 'processed', settled_at: new Date().toISOString() } : s));
     } catch (e) {
       toast({ title: 'Failed to update settlement', description: e.message, variant: 'destructive' });
     }

@@ -16,11 +16,10 @@ export default function StageDashboard() {
           stageId
             ? base44.entities.Vehicle.filter({ stage_id: stageId })
             : base44.entities.Vehicle.filter({}),
-          stageId
-            ? base44.entities.Permit.filter({ status: 'active' })
-            : base44.entities.Permit.filter({ status: 'active' }),
+          base44.entities.Permit.filter({ status: 'active' }),
         ]);
-        const compliantVehicleIds = new Set(permits.map(p => p.vehicle_id));
+        const stageVehicleIds = new Set(vehicles.map(v => v.id));
+        const compliantVehicleIds = new Set(permits.filter(p => stageVehicleIds.has(p.vehicle_id)).map(p => p.vehicle_id));
         const compliant = vehicles.filter(v => compliantVehicleIds.has(v.id)).length;
         setStats({
           members: vehicles.length,

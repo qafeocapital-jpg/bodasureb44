@@ -19,40 +19,19 @@ export default function CountyDashboard() {
       try {
         const vehicleFilter = countyId ? { county_id: countyId } : {};
         const permitFilter = countyId ? { county_id: countyId, status: 'active' } : { status: 'active' };
-        const [allRiders, bikes, permits, recentPerms] = await Promise.all([
-          base44.entities.User.filter({ staff_type: 'none' }),
+        const [riders, bikes, permits, recentPerms, recentTxns] = await Promise.all([
+          countyId ? base44.entities.User.filter({ county_id: countyId, staff_type: 'none' }) : base44.entities.User.filter({ staff_type: 'none' }),
           base44.entities.Vehicle.filter(vehicleFilter),
           base44.entities.Permit.filter(permitFilter),
           base44.entities.Permit.filter(countyId ? { county_id: countyId } : {}, '-created_date', 5),
+          base44.entities.Transaction.filter(countyId ? { county_id: countyId, type: 'lipa_county' } : { type: 'lipa_county' }, '-created_date', 10),
         ]);
 
-        // Build a set of county vehicle IDs for scoping transactions
         const countyVehicleIds = new Set(bikes.map(v => v.id));
-
-        // Paginate through lipa_county transactions to get all completed ones for this county
-        const countyTxns = [];
-        let skip = 0;
-        const batchLimit = 50;
-        while (true) {
-          const batch = await base44.entities.Transaction.filter({ type: 'lipa_county' }, '-created_date', batchLimit, skip);
-          if (batch.length === 0) break;
-          // Filter to this county's vehicles + completed status
-          const matching = countyId
-            ? batch.filter(t => t.status === 'completed' && (!t.vehicle_id || countyVehicleIds.has(t.vehicle_id)))
-            : batch.filter(t => t.status === 'completed');
-          countyTxns.push(...matching);
-          if (batch.length < batchLimit) break;
-          skip += batchLimit;
-        }
-
-        const revenue = countyTxns.reduce((sum, t) => sum + (t.amount_cents || 0), 0);
-        const riders = countyId ? allRiders.filter(r => r.county_id === countyId) : allRiders;
+        const completedTxns = recentTxns.filter(t => t.status === 'completed');
+        const revenue = completedTxns.reduce((sum, t) => sum + (t.amount_cents || 0), 0);
         setStats({ riders: riders.length, bikes: bikes.length, permits: permits.length, revenue });
-        // Show 10 most recent lipa_county txns for this county (including non-completed for activity feed)
-        const recentCountyTxns = countyId
-          ? countyTxns.slice(0, 10)
-          : countyTxns.slice(0, 10);
-        setRecentTxns(recentCountyTxns);
+        setRecentTxns(recentTxns);
         setRecentPermits(recentPerms);
       } catch (e) {}
     }

@@ -19,9 +19,13 @@ export default function SaccoDashboard() {
           ? await base44.entities.GroupMember.filter({ group_id: saccoGroupId, status: 'approved' })
           : [];
         const memberUserIds = groupMembers.map(m => m.user_id);
-        const bikes = memberUserIds.length > 0
-          ? await base44.entities.Vehicle.filter({ county_id: user.county_id })
-          : [];
+        // Fetch bikes belonging to SACCO members (not all county bikes)
+        let bikes = [];
+        if (memberUserIds.length > 0) {
+          const bikePromises = memberUserIds.map(uid => base44.entities.Vehicle.filter({ rider_id: uid }).catch(() => []));
+          const bikeResults = await Promise.all(bikePromises);
+          bikes = bikeResults.flat();
+        }
         const [settlements, applications] = await Promise.all([
           saccoGroupId
             ? base44.entities.Settlement.filter({ entity_type: 'sacco', entity_id: saccoGroupId, status: 'pending' })
