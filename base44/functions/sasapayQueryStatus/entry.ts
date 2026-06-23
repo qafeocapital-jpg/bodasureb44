@@ -80,7 +80,13 @@ Deno.serve(async (req) => {
         body: JSON.stringify(queryPayload),
       });
 
-      const statusData = await statusRes.json();
+      const statusText = await statusRes.text();
+      let statusData;
+      try {
+        statusData = JSON.parse(statusText);
+      } catch {
+        throw new Error(`SasaPay status query returned non-JSON (HTTP ${statusRes.status}).`);
+      }
 
       // SasaPay responds with "request received" — actual status comes via callback.
       // Return current DB status; the webhook will update it when the callback arrives.
@@ -111,15 +117,23 @@ async function getSasaPayToken() {
   const clientSecret = Deno.env.get('SASAPAY_CLIENT_SECRET');
   const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
 
-  const authUrl = `https://${env}.sasapay.app/oauth/token/`;
+  const authUrl = `https://${env}.sasapay.app/api/v1/auth/token/?grant_type=client_credentials`;
+  const credentials = btoa(`${clientId}:${clientSecret}`);
   const response = await fetch(authUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`,
+    method: 'GET',
+    headers: { 'Authorization': `Basic ${credentials}` },
   });
 
-  const data = await response.json();
-  if (!data.access_token) throw new Error('Failed to get SasaPay access token');
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`SasaPay auth returned non-JSON (HTTP ${response.status}). Check your SASAPAY_CLIENT_ID and SASAPAY_CLIENT_SECRET.`);
+  }
+  if (!data.access_token) {
+    throw new Error(`SasaPay auth failed: ${data.detail || data.error || text.substring(0, 200)}`);
+  }
   return data.access_token;
 }
 

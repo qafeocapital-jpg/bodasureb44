@@ -41,7 +41,13 @@ Deno.serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
+    const respText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(respText);
+    } catch {
+      throw new Error(`SasaPay process-payment returned non-JSON (HTTP ${response.status}). Check API endpoint and credentials.`);
+    }
 
     if (!data.status) {
       return Response.json({
@@ -66,15 +72,23 @@ async function getSasaPayToken() {
   const clientSecret = Deno.env.get('SASAPAY_CLIENT_SECRET');
   const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
 
-  const authUrl = `https://${env}.sasapay.app/oauth/token/`;
+  const authUrl = `https://${env}.sasapay.app/api/v1/auth/token/?grant_type=client_credentials`;
+  const credentials = btoa(`${clientId}:${clientSecret}`);
   const response = await fetch(authUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`,
+    method: 'GET',
+    headers: { 'Authorization': `Basic ${credentials}` },
   });
 
-  const data = await response.json();
-  if (!data.access_token) throw new Error('Failed to get SasaPay access token');
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`SasaPay auth returned non-JSON (HTTP ${response.status}). Check your SASAPAY_CLIENT_ID and SASAPAY_CLIENT_SECRET.`);
+  }
+  if (!data.access_token) {
+    throw new Error(`SasaPay auth failed: ${data.detail || data.error || text.substring(0, 200)}`);
+  }
   return data.access_token;
 }
 
