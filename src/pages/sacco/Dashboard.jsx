@@ -14,32 +14,31 @@ export default function SaccoDashboard() {
       if (!user) return;
       try {
         const saccoGroupId = user?.scope_entity_id;
+        const countyId = user?.county_id;
         // Fetch members of this SACCO
         const groupMembers = saccoGroupId
           ? await base44.entities.GroupMember.filter({ group_id: saccoGroupId, status: 'approved' })
           : [];
-        const memberUserIds = groupMembers.map(m => m.user_id);
-        // Fetch bikes belonging to SACCO members (not all county bikes)
-        let bikes = [];
-        if (memberUserIds.length > 0) {
-          const bikePromises = memberUserIds.map(uid => base44.entities.Vehicle.filter({ rider_id: uid }).catch(() => []));
-          const bikeResults = await Promise.all(bikePromises);
-          bikes = bikeResults.flat();
-        }
+        const memberUserIds = new Set(groupMembers.map(m => m.user_id));
+        // Fetch all county bikes in one call, then filter to SACCO members
+        const allCountyBikes = countyId
+          ? await base44.entities.Vehicle.filter({ county_id: countyId })
+          : [];
+        const bikes = allCountyBikes.filter(b => b.rider_id && memberUserIds.has(b.rider_id));
         const [settlements, applications] = await Promise.all([
           saccoGroupId
             ? base44.entities.Settlement.filter({ entity_type: 'sacco', entity_id: saccoGroupId, status: 'pending' })
             : base44.entities.Settlement.filter({ entity_type: 'sacco', status: 'pending' }),
           base44.entities.GroupMember.filter({ group_id: saccoGroupId, status: 'pending' }).catch(() => []),
         ]);
-        // Fetch permits and stages for compliance widgets
-        const countyId = user?.county_id;
+        // Fetch permits scoped to SACCO member bikes + stages for compliance widgets
+        const bikeIds = new Set(bikes.map(b => b.id));
         const [allPermits, allStages] = await Promise.all([
           countyId ? base44.entities.Permit.filter({ county_id: countyId }) : base44.entities.Permit.filter({}),
           countyId ? base44.entities.Stage.filter({ county_id: countyId }).catch(() => []) : [],
         ]);
 
-        const activePermits = allPermits.filter(p => p.status === 'active');
+        const activePermits = allPermits.filter(p => p.status === 'active' && p.vehicle_id && bikeIds.has(p.vehicle_id));
         const compliantBikes = bikes.filter(b => activePermits.some(p => p.vehicle_id === b.id));
         const complianceRate = bikes.length > 0 ? Math.round((compliantBikes.length / bikes.length) * 100) : 0;
 

@@ -28,6 +28,7 @@ export default function CountyEnforcement() {
   const [saccos, setSaccos] = useState([]);
   const [saccoBikes, setSaccoBikes] = useState({});
   const [permits, setPermits] = useState([]);
+  const [saccoMemberRiders, setSaccoMemberRiders] = useState({});
   const [expandedSacco, setExpandedSacco] = useState(null);
   const [expandedStage, setExpandedStage] = useState(null);
 
@@ -46,6 +47,7 @@ export default function CountyEnforcement() {
       const penaltyFilter = countyId ? { county_id: countyId } : {};
       const inspectionFilter = countyId ? { county_id: countyId } : {};
       const vehicleFilter = countyId ? { county_id: countyId, status: 'approved' } : { status: 'approved' };
+      const permitFilter = countyId ? { county_id: countyId, status: 'active' } : { status: 'active' };
       const [p, i, v, fa, sc, w, st, grps, allPermits] = await Promise.all([
         base44.entities.Penalty.filter(penaltyFilter, '-created_date', 20),
         base44.entities.Inspection.filter(inspectionFilter, '-created_date', 20),
@@ -55,12 +57,23 @@ export default function CountyEnforcement() {
         countyId ? base44.entities.Ward.filter({ county_id: countyId }).catch(() => []) : Promise.resolve([]),
         countyId ? base44.entities.Stage.filter({ county_id: countyId }).catch(() => []) : Promise.resolve([]),
         countyId ? base44.entities.Group.filter({ county_id: countyId }) : base44.entities.Group.filter({}),
-        base44.entities.Permit.filter(vehicleFilter),
+        base44.entities.Permit.filter(permitFilter),
       ]);
       setPenalties(p); setInspections(i); setVehicles(v);
       setOfficers(fa); setSubCounties(sc); setWards(w); setStages(st); setGroups(grps);
       setPermits(allPermits);
       setSaccos(grps.filter(g => g.type === 'sacco'));
+
+      // Resolve SACCO member rider IDs for compliance map filtering
+      const saccoList = grps.filter(g => g.type === 'sacco');
+      const memberMap = {};
+      await Promise.all(saccoList.map(async (sacco) => {
+        try {
+          const members = await base44.entities.GroupMember.filter({ group_id: sacco.id, status: 'approved' });
+          memberMap[sacco.id] = new Set(members.map(m => m.user_id).filter(Boolean));
+        } catch { memberMap[sacco.id] = new Set(); }
+      }));
+      setSaccoMemberRiders(memberMap);
     } catch (e) {}
     setLoading(false);
   }
@@ -141,7 +154,7 @@ export default function CountyEnforcement() {
     { id: 'inspections', label: 'Inspections', icon: FileText },
   ];
 
-  const saccoStages = (saccoId) => stages.filter(s => s.county_id === countyId && (!s.sacco_id || s.sacco_id === saccoId));
+  const saccoStages = (saccoId) => stages.filter(s => s.county_id === countyId);
 
   return (
     <div className="p-6 animate-fade-in">
@@ -253,7 +266,8 @@ export default function CountyEnforcement() {
           ) : (
             saccos.map(sacco => {
               const sStages = saccoStages(sacco.id);
-              const sBikes = vehicles.filter(v => v.county_id === countyId && (!v.sacco_id || v.sacco_id === sacco.id));
+              // Resolve SACCO member rider IDs for accurate bike filtering
+              const sBikes = vehicles.filter(v => v.county_id === countyId && saccoMemberRiders[sacco.id]?.has(v.rider_id));
               const compliant = sBikes.filter(b => permits.some(p => p.vehicle_id === b.id)).length;
               const compPct = sBikes.length > 0 ? Math.round((compliant / sBikes.length) * 100) : 0;
               const isExpanded = expandedSacco === sacco.id;

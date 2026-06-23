@@ -13,14 +13,13 @@ import { base44 } from '@/api/base44Client';
  * @returns {Promise<boolean>}
  */
 export async function verifyPin(pin, walletId) {
-  if (!pin || !walletId) return false;
-  if (pin.length !== 4 || !/^\d{4}$/.test(pin)) return false;
-  try {
-    const res = await base44.functions.invoke('verifyWalletPin', { walletId, pin });
-    return res.data?.valid === true;
-  } catch (e) {
-    return false;
-  }
+  if (!pin || !walletId) throw new Error('Missing PIN or wallet.');
+  if (pin.length !== 4 || !/^\d{4}$/.test(pin)) throw new Error('PIN must be 4 digits.');
+  const res = await base44.functions.invoke('verifyWalletPin', { walletId, pin });
+  const data = res.data;
+  if (data?.valid === true) return true;
+  // Surface backend error messages (locked wallet, remaining attempts, etc.)
+  throw new Error(data?.error || 'Incorrect PIN. Try again.');
 }
 
 /**

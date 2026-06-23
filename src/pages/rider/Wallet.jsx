@@ -10,7 +10,7 @@ import { normalizePhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
 import PinEntrySheet from '@/components/rider/PinEntrySheet';
 import TransactionDetailSheet from '@/components/rider/TransactionDetailSheet';
-import { ArrowDownToLine, ArrowUpFromLine, Send, AlertCircle } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Send, AlertCircle, History } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
 export default function Wallet() {
@@ -152,6 +152,7 @@ export default function Wallet() {
     { id: 'deposit', label: 'Deposit', icon: ArrowDownToLine },
     { id: 'send', label: 'Send', icon: Send },
     { id: 'withdraw', label: 'Withdraw', icon: ArrowUpFromLine },
+    { id: 'history', label: 'History', icon: History },
   ];
 
   const needsTier2 = (activeTab === 'send' || activeTab === 'withdraw') && (wallet.tier || 0) < 2 && (user?.wallet_tier || 0) < 2;
@@ -181,7 +182,8 @@ export default function Wallet() {
         </div>
       </div>
 
-      {/* Action Form */}
+      {/* Action Form (hidden in history mode) */}
+      {activeTab !== 'history' && (
       <div className="mt-5 bg-card border border-border rounded-2xl p-4">
         {needsTier2 && (
           <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-center gap-3 mb-4">
@@ -223,6 +225,7 @@ export default function Wallet() {
           </div>
         )}
       </div>
+      )}
 
       {/* Transaction List */}
       <div className="mt-6">

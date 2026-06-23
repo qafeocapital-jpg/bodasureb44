@@ -37,15 +37,13 @@ export default function LipaOwner() {
         const ridden = await base44.entities.Vehicle.filter({ rider_id: user.id, status: 'approved' });
         const notOwned = ridden.filter(b => !b.is_owner_rider && b.owner_id !== user.id);
         setBikes(notOwned);
-        // Fetch owner user details
+        // Fetch owner user details (batch)
         const ownerIds = [...new Set(notOwned.map(b => b.owner_id).filter(Boolean))];
         const ownerMap = {};
-        await Promise.all(ownerIds.map(async oid => {
-          try {
-            const u = await base44.entities.User.filter({ id: oid });
-            if (u.length > 0) ownerMap[oid] = u[0];
-          } catch (e) {}
-        }));
+        if (ownerIds.length > 0) {
+          const ownerData = await Promise.all(ownerIds.map(oid => base44.entities.User.get(oid).catch(() => null)));
+          ownerData.filter(Boolean).forEach(u => { ownerMap[u.id] = u; });
+        }
         setOwners(ownerMap);
         const txns = await base44.entities.Transaction.filter({ wallet_id: w.id, type: 'lipa_owner' }, '-created_date', 10);
         setHistory(txns);
@@ -61,8 +59,10 @@ export default function LipaOwner() {
   async function handleConfirm() {
     setPinError('');
     if (pin.length !== 4) { setPinError('Enter your 4-digit PIN'); return; }
-    if (!(await verifyPin(pin, wallet.id))) {
-      setPinError('Incorrect PIN. Please try again.');
+    try {
+      await verifyPin(pin, wallet.id);
+    } catch (e) {
+      setPinError(e.message || 'Incorrect PIN. Please try again.');
       return;
     }
     setLoading(true);

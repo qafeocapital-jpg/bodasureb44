@@ -27,7 +27,9 @@ Deno.serve(async (req) => {
       isScheduled = true;
     }
 
-    if (!isScheduled && user && user.role !== 'super_admin') {
+    const userRoles = new Set(user?.roles || []);
+    if (user?.role) userRoles.add(user.role);
+    if (!isScheduled && user && !userRoles.has('super_admin')) {
       return Response.json({ error: 'Forbidden — super admin only' }, { status: 403 });
     }
 
@@ -58,14 +60,37 @@ Deno.serve(async (req) => {
       return Response.json({ processed: 0, settlements_created: 0, message: 'All recent transaction legs already settled' });
     }
 
-    // Group by leg_type (entity_type) + recipient_wallet_id (entity_id proxy)
+    // Resolve recipient wallets to entity IDs (group_id for sacco, county_id for county, 'PLATFORM' for platform)
+    const walletIds = [...new Set(unprocessedLegs.map(l => l.recipient_wallet_id).filter(Boolean))];
+    const walletEntityMap = {}; // wallet_id → entity_id
+    if (walletIds.length > 0) {
+      const walletsData = await Promise.all(
+        walletIds.map(wid => b44.entities.Wallet.get(wid).catch(() => null))
+      );
+      walletsData.filter(Boolean).forEach(w => {
+        if (w.account_number?.startsWith('COUNTY_')) {
+          walletEntityMap[w.id] = w.account_number.replace('COUNTY_', '');
+        } else if (w.account_number?.startsWith('SACCO_')) {
+          walletEntityMap[w.id] = w.account_number.replace('SACCO_', '');
+        } else if (w.account_number === 'PLATFORM') {
+          walletEntityMap[w.id] = 'PLATFORM';
+        } else if (w.group_id) {
+          walletEntityMap[w.id] = w.group_id;
+        } else {
+          walletEntityMap[w.id] = w.id;
+        }
+      });
+    }
+
+    // Group by leg_type (entity_type) + entity_id
     const groups = {};
     for (const leg of unprocessedLegs) {
-      const key = `${leg.leg_type}__${leg.recipient_wallet_id || 'unknown'}`;
+      const entityId = walletEntityMap[leg.recipient_wallet_id] || leg.recipient_wallet_id || '';
+      const key = `${leg.leg_type}__${entityId}`;
       if (!groups[key]) {
         groups[key] = {
           entity_type: leg.leg_type,
-          entity_id: leg.recipient_wallet_id || '',
+          entity_id: entityId,
           amount_cents: 0,
           transaction_ids: [],
           period_start: leg.created_date,

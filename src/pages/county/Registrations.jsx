@@ -83,8 +83,21 @@ export default function CountyRegistrations() {
         county_approved_at: new Date().toISOString(),
         pending_leader_id: null,
       });
+
+      // Assign stage_admin role + scope to the approved leader
+      const leader = stageApplicants.find(a => a.id === stage.pending_leader_id);
+      if (leader) {
+        const currentRoles = leader.roles || ['rider'];
+        const newRoles = currentRoles.includes('stage_admin') ? currentRoles : [...currentRoles, 'stage_admin'];
+        await base44.entities.User.update(leader.id, {
+          roles: newRoles,
+          scope_entity_id: stageId,
+          stage_id: stageId,
+        });
+      }
+
       await auditLog({ userId: u.id, action: 'stage_leader_approved', entityType: 'Stage', entityId: stageId, description: `Stage leader approved for ${stage.name}` });
-      toast({ title: 'Leader Approved', description: 'Stage leader has been assigned.' });
+      toast({ title: 'Leader Approved', description: 'Stage leader has been assigned and can now access the Stage Portal.' });
       load();
     } catch (e) {
       toast({ title: 'Failed', description: e.message, variant: 'destructive' });
@@ -237,7 +250,7 @@ export default function CountyRegistrations() {
                     {b.bike_photo_url && <img src={b.bike_photo_url} alt={b.plate_number} className="w-14 h-14 rounded-lg object-cover" />}
                     <div>
                       <p className="font-heading font-bold">{b.plate_number}</p>
-                      <p className="text-xs text-muted-foreground">{b.make} · {b.color} · {b.year || '—'}</p>
+                      <p className="text-xs text-muted-foreground">{b.make} {b.model ? `· ${b.model}` : ''} · {b.color}</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">{formatDateTime(b.created_date)}</p>
                     </div>
                   </div>

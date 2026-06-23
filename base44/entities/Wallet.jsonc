@@ -35,6 +35,14 @@
     "pin_hash": {
       "type": "string"
     },
+    "pin_attempts": {
+      "type": "integer",
+      "default": 0
+    },
+    "pin_locked_until": {
+      "type": "string",
+      "format": "date-time"
+    },
     "sasapay_customer_id": {
       "type": "string"
     },

@@ -24,14 +24,18 @@ export default function CountyDashboard() {
           base44.entities.Vehicle.filter(vehicleFilter),
           base44.entities.Permit.filter(permitFilter),
           base44.entities.Permit.filter(countyId ? { county_id: countyId } : {}, '-created_date', 5),
-          base44.entities.Transaction.filter(countyId ? { county_id: countyId, type: 'lipa_county' } : { type: 'lipa_county' }, '-created_date', 10),
+          base44.entities.Transaction.filter({ type: 'lipa_county' }, '-created_date', 50),
         ]);
 
+        // Transaction entity has no county_id — filter by vehicle_id membership
         const countyVehicleIds = new Set(bikes.map(v => v.id));
-        const completedTxns = recentTxns.filter(t => t.status === 'completed');
+        const countyTxns = countyId
+          ? recentTxns.filter(t => !t.vehicle_id || countyVehicleIds.has(t.vehicle_id))
+          : recentTxns;
+        const completedTxns = countyTxns.filter(t => t.status === 'completed');
         const revenue = completedTxns.reduce((sum, t) => sum + (t.amount_cents || 0), 0);
         setStats({ riders: riders.length, bikes: bikes.length, permits: permits.length, revenue });
-        setRecentTxns(recentTxns);
+        setRecentTxns(countyTxns.slice(0, 10));
         setRecentPermits(recentPerms);
       } catch (e) {}
     }

@@ -84,6 +84,14 @@ Deno.serve(async (req) => {
       return Response.json({ valid: false, error: 'No PIN set' });
     }
 
+    // Brute force protection: lock after 5 failed attempts for 30 minutes
+    const pinAttempts = wallet.pin_attempts || 0;
+    const pinLockedUntil = wallet.pin_locked_until ? new Date(wallet.pin_locked_until) : null;
+    if (pinLockedUntil && pinLockedUntil > new Date()) {
+      const minsLeft = Math.ceil((pinLockedUntil - new Date()) / 60000);
+      return Response.json({ valid: false, error: `Wallet locked. Try again in ${minsLeft} minute${minsLeft !== 1 ? 's' : ''}.` });
+    }
+
     let valid = false;
     let needsUpgrade = false;
 
@@ -108,7 +116,26 @@ Deno.serve(async (req) => {
       const iterations = 100000;
       const hash = await pbkdf2Hash(pin, salt, iterations);
       const pinHash = `pbkdf2$${iterations}$${salt}$${hash}`;
-      await base44.asServiceRole.entities.Wallet.update(wallet.id, { pin_hash: pinHash });
+      await base44.asServiceRole.entities.Wallet.update(wallet.id, { pin_hash: pinHash, pin_attempts: 0, pin_locked_until: null });
+    }
+
+    // Brute force tracking: increment on failure, reset on success, lock after 5 failures
+    if (!valid) {
+      const newAttempts = pinAttempts + 1;
+      const lockAfter = 5;
+      if (newAttempts >= lockAfter) {
+        const lockUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+        await base44.asServiceRole.entities.Wallet.update(wallet.id, { pin_attempts: newAttempts, pin_locked_until: lockUntil.toISOString() });
+        return Response.json({ valid: false, error: 'Too many incorrect attempts. Wallet locked for 30 minutes.' });
+      }
+      await base44.asServiceRole.entities.Wallet.update(wallet.id, { pin_attempts: newAttempts });
+      const remaining = lockAfter - newAttempts;
+      return Response.json({ valid: false, error: `Incorrect PIN. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.` });
+    }
+
+    // Reset attempts on successful verification
+    if (pinAttempts > 0) {
+      await base44.asServiceRole.entities.Wallet.update(wallet.id, { pin_attempts: 0, pin_locked_until: null });
     }
 
     return Response.json({ valid });

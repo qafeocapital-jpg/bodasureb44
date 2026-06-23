@@ -20,7 +20,9 @@ Deno.serve(async (req) => {
       isScheduled = true;
     }
 
-    if (!isScheduled && user && user.role !== 'super_admin') {
+    const userRoles = new Set(user?.roles || []);
+    if (user?.role) userRoles.add(user.role);
+    if (!isScheduled && user && !userRoles.has('super_admin')) {
       return Response.json({ error: 'Forbidden — super admin only' }, { status: 403 });
     }
 
