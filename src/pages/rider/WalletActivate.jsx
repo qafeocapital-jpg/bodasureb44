@@ -164,12 +164,18 @@ export default function WalletActivate() {
         requestId,
       });
       if (res.data?.success) {
-        if (!wallet) throw new Error('Wallet not loaded. Please go back and try again.');
-        // Upgrade wallet to Tier 1 — SasaPay account fields already written by backend
-        await base44.entities.Wallet.update(wallet.id, {
-          tier: 1,
-          status: 'active',
-        });
+        // BUG 4: Re-attempt wallet fetch if it failed to load on mount
+        let activeWallet = wallet;
+        if (!activeWallet) {
+          try {
+            activeWallet = await getOrCreateWallet(user.id);
+            setWallet(activeWallet);
+          } catch {
+            throw new Error('Wallet not loaded. Please go back and try again.');
+          }
+        }
+        // BUG 5/6: Backend already sets tier=1/status=active in confirmPersonalOnboarding;
+        // no duplicate frontend Wallet.update needed — just update the user profile.
         await base44.auth.updateMe({ wallet_tier: 1 });
         await refreshUser();
         setStep(2);
@@ -191,6 +197,9 @@ export default function WalletActivate() {
         requestId,
       });
       if (res.data?.success) {
+        if (res.data?.requestId) {
+          setRequestId(res.data.requestId);
+        }
         setOtp('');
         setError('');
       } else {

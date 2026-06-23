@@ -116,7 +116,7 @@ async function initializePersonalOnboarding(base44, user) {
           message: 'Your BodaSure Wallet account already exists. Set your PIN to continue.',
         });
       }
-      throw new Error(`SasaPay init failed: ${data.message} [recovery attempted but no match found]`);
+      throw new Error('We couldn\'t automatically recover your account. Please contact support with your phone number.');
     }
     throw new Error(`SasaPay init failed: ${data.message}`);
   }
@@ -190,6 +190,8 @@ async function confirmPersonalOnboarding(base44, user, otp, requestId) {
       sasapay_customer_id: accountNumberStr,
       sasapay_account_number: accountNumberStr,
       sasapay_account_status: accountStatus,
+      tier: 1,
+      status: 'active',
     });
   }
 
@@ -277,7 +279,7 @@ async function recoverExistingSasaPayAccount(base44, user, token) {
   let total_pages = 1;
   let page = 1;
 
-  while (page <= total_pages && page <= 100) {
+  while (page <= total_pages && page <= 10) {
     let listData;
     try {
       const listRes = await fetch(`${baseUrl}&page=${page}`, {
@@ -296,7 +298,7 @@ async function recoverExistingSasaPayAccount(base44, user, token) {
     const customers = listData.results?.customers || [];
     for (const c of customers) {
       const displayName = (c.client?.display_name || '').toLowerCase();
-      const mobile = (c.mobile_number || '').replace(/\D/g, '');
+      const mobile = (c.client?.mobile_number || '').replace(/\D/g, '');
       const phoneMatch = mobile && (
         mobile === localPhone ||
         mobile.endsWith(localPhone) ||
