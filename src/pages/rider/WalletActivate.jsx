@@ -74,10 +74,11 @@ export default function WalletActivate() {
     try {
       const fullName = joinFullName(identity.firstName, identity.middleName, identity.lastName);
       // Save profile fields first so sasapayPersonalOnboarding can read them
+      const normalizedPhoneForSave = normalizePhone(identity.phone);
       await base44.auth.updateMe({
         full_name: fullName,
         national_id: identity.national_id,
-        phone: identity.phone,
+        phone: normalizedPhoneForSave || identity.phone,
         county_id: identity.county_id,
       });
       await refreshUser();
@@ -111,6 +112,7 @@ export default function WalletActivate() {
         requestId,
       });
       if (res.data?.success) {
+        if (!wallet) throw new Error('Wallet not loaded. Please go back and try again.');
         // Upgrade wallet to Tier 1 — basic SasaPay wallet active
         await base44.entities.Wallet.update(wallet.id, {
           tier: 1,
@@ -158,6 +160,7 @@ export default function WalletActivate() {
     setSaving(true);
     setError('');
     try {
+      if (!wallet) throw new Error('Wallet not loaded. Please go back and try again.');
       const pinSet = await setWalletPin(wallet.id, pin);
       if (!pinSet) throw new Error('Failed to set PIN.');
       await auditLog({

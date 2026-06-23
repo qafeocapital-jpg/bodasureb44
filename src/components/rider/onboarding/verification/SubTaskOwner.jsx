@@ -33,17 +33,9 @@ export default function SubTaskOwner({ user, vehicle, onDataChange, onBack }) {
         owner_invite_sent_at: new Date().toISOString(),
       });
 
-      // Stub: send invite email via SendEmail (real SMS provider plugged in later)
-      // The owner will see a "Verify My Bike" section when they log in
-      try {
-        await base44.integrations.Core.SendEmail({
-          to: user.email,
-          subject: 'BodaSure — Bike Ownership Verification',
-          body: `<p>Hello,</p><p>A rider has registered a bike (${vehicle.plate_number}) with you as the owner.</p><p>Please log in to BodaSure and verify this bike in the "Verify My Bike" section.</p><p>If you did not expect this, please ignore this email.</p>`,
-        });
-      } catch (e) {
-        // Email send is a stub — don't block the flow
-      }
+      // Owner verification is handled in-app: when the owner logs in with this phone,
+      // they'll see a "Verify My Bike" section on their Home dashboard.
+      // SMS gateway integration is deferred — the invite is recorded on the vehicle.
 
       await onDataChange();
     } catch (e) {

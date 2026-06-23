@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Loader2, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2, CreditCard, Bike, UserCircle, Smartphone, UserCheck, Wallet } from 'lucide-react';
@@ -34,19 +34,25 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   }, [user.id, refreshUser]);
 
   useEffect(() => {
+    let mounted = true;
     async function load() {
       await refreshData();
-      setLoading(false);
+      if (mounted) setLoading(false);
     }
     load();
-  }, []);
+    return () => { mounted = false; };
+  }, [refreshData]);
 
   // Clear kyc_just_approved flag after showing the celebration banner
+  const clearingFlag = useRef(false);
   useEffect(() => {
-    if (user?.kyc_just_approved) {
-      base44.auth.updateMe({ kyc_just_approved: false }).then(() => refreshUser?.()).catch(() => {});
+    if (user?.kyc_just_approved && !clearingFlag.current) {
+      clearingFlag.current = true;
+      base44.auth.updateMe({ kyc_just_approved: false }).then(() => refreshUser?.()).catch(() => {}).finally(() => {
+        clearingFlag.current = false;
+      });
     }
-  }, [user?.kyc_just_approved]);
+  }, [user?.kyc_just_approved, refreshUser]);
 
   // Check completion state
   const tasks = getTaskStatuses(kycDocs, user, vehicle);

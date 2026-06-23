@@ -8,12 +8,17 @@ Deno.serve(async (req) => {
 
     const { action, otp, requestId } = await req.json();
 
-    if (!action || !['init', 'confirm'].includes(action)) {
-      return Response.json({ error: 'Action must be "init" or "confirm"' }, { status: 400 });
+    if (!action || !['init', 'confirm', 'resendOtp'].includes(action)) {
+      return Response.json({ error: 'Action must be "init", "confirm", or "resendOtp"' }, { status: 400 });
     }
 
     if (action === 'init') {
       return await initializePersonalOnboarding(base44, user);
+    } else if (action === 'resendOtp') {
+      if (!requestId) {
+        return Response.json({ error: 'requestId required for resendOtp' }, { status: 400 });
+      }
+      return await resendPersonalOtp(base44, user, requestId);
     } else {
       if (!otp || !requestId) {
         return Response.json({ error: 'otp and requestId required for confirm' }, { status: 400 });
@@ -204,6 +209,8 @@ function getSasaPayApiUrl() {
   return `https://${env}.sasapay.app/api/v2`;
 }
 
-function getBaseUrl() {
-  return Deno.env.get('BASE44_APP_URL') || 'https://bodasure.local';
+async function resendPersonalOtp(base44, user, requestId) {
+  // SasaPay uses re-init to generate a new OTP: calling the init endpoint
+  // again with the same user data produces a new requestId + OTP.
+  return await initializePersonalOnboarding(base44, user);
 }
