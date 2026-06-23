@@ -50,6 +50,7 @@ export const adminNav = [
   { label: 'KYC Review', path: '/admin/kyc', icon: FileCheck },
   { label: 'Money Config', path: '/admin/money', icon: Coins },
   { label: 'Announcements', path: '/admin/announcements', icon: Megaphone },
+  { label: 'Reconciliation', path: '/admin/reconciliation', icon: Scale },
   { label: 'Reports', path: '/admin/reports', icon: FileBarChart },
   { label: 'Audit Log', path: '/admin/audit', icon: ScrollText },
   { label: 'Seed Data', path: '/admin/seed', icon: Database },
