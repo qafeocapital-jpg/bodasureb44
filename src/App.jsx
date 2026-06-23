@@ -19,6 +19,9 @@ import Profile from './pages/rider/Profile';
 
 import WalletActivate from './pages/rider/WalletActivate';
 import BikeRegister from './pages/rider/BikeRegister';
+import SaccoRegister from './pages/rider/SaccoRegister';
+import StageApply from './pages/rider/StageApply';
+import MyFleet from './pages/rider/MyFleet';
 
 import Lipisha from './pages/rider/Lipisha';
 import LipaCounty from './pages/rider/LipaCounty';
@@ -44,6 +47,9 @@ import { CountyPeople, CountyReports, CountySettings } from './pages/county/Othe
 import SaccoMembers from './pages/sacco/Members';
 import SaccoBikes from './pages/sacco/Bikes';
 import SaccoSettlements from './pages/sacco/Settlements';
+import SaccoCompliance from './pages/sacco/Compliance';
+import SaccoStages from './pages/sacco/Stages';
+import SaccoApplications from './pages/sacco/Applications';
 import MerchantProducts from './pages/merchant/Products';
 import MerchantPolicies from './pages/merchant/Policies';
 import AgentInvite from './pages/agent/Invite';
@@ -108,6 +114,9 @@ const AuthenticatedApp = () => {
 
         <Route path="/app/wallet/activate" element={<WalletActivate />} />
         <Route path="/app/bikes/register" element={<BikeRegister />} />
+        <Route path="/app/fleet" element={<MyFleet />} />
+        <Route path="/app/groups/register-sacco" element={<SaccoRegister />} />
+        <Route path="/app/account/stage-apply" element={<StageApply />} />
         <Route path="/app/lipisha" element={<Lipisha />} />
         <Route path="/app/lipa-county" element={<LipaCounty />} />
         <Route path="/app/lipa-owner" element={<LipaOwner />} />
@@ -137,6 +146,9 @@ const AuthenticatedApp = () => {
         <Route path="/sacco/dashboard" element={<SaccoDashboard />} />
         <Route path="/sacco/members" element={<SaccoMembers />} />
         <Route path="/sacco/bikes" element={<SaccoBikes />} />
+        <Route path="/sacco/compliance" element={<SaccoCompliance />} />
+        <Route path="/sacco/stages" element={<SaccoStages />} />
+        <Route path="/sacco/applications" element={<SaccoApplications />} />
         <Route path="/sacco/settlements" element={<SaccoSettlements />} />
       </Route>
 

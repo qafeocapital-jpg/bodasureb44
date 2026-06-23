@@ -37,10 +37,18 @@
         "type": "string",
         "enum": [
           "rider",
-          "owner"
+          "owner",
+          "sacco_admin",
+          "stage_admin",
+          "field_agent",
+          "county_admin",
+          "merchant_admin",
+          "super_admin"
         ]
       },
-      "default": []
+      "default": [
+        "rider"
+      ]
     },
     "profile_complete": {
       "type": "boolean",
@@ -90,6 +98,33 @@
       "default": "rider"
     },
     "scope_entity_id": {
+      "type": "string"
+    },
+    "zone_type": {
+      "type": "string",
+      "enum": [
+        "sub_county",
+        "constituency",
+        "ward",
+        "stage",
+        "county"
+      ]
+    },
+    "zone_id": {
+      "type": "string"
+    },
+    "pending_group_id": {
+      "type": "string"
+    },
+    "pending_group_role": {
+      "type": "string",
+      "enum": [
+        "chairperson",
+        "secretary",
+        "treasurer"
+      ]
+    },
+    "group_rejection_reason": {
       "type": "string"
     },
     "avatar_url": {

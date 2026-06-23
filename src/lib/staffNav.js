@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Bike, FileCheck, ShieldAlert,
   Landmark, FileText, Settings, Wallet, Banknote, MessageSquare,
   UserPlus, History, Building2, Database, Coins, FileBarChart,
-  BadgeCheck, Scale, MapPin, ScrollText, Megaphone
+  BadgeCheck, Scale, MapPin, ScrollText, Megaphone, Map, ClipboardList
 } from 'lucide-react';
 
 export const countyNav = [
@@ -20,6 +20,9 @@ export const saccoNav = [
   { label: 'Dashboard', path: '/sacco/dashboard', icon: LayoutDashboard },
   { label: 'Members', path: '/sacco/members', icon: Users },
   { label: 'Bikes', path: '/sacco/bikes', icon: Bike },
+  { label: 'Compliance', path: '/sacco/compliance', icon: BadgeCheck },
+  { label: 'Stages', path: '/sacco/stages', icon: Map },
+  { label: 'Applications', path: '/sacco/applications', icon: ClipboardList },
   { label: 'Settlements', path: '/sacco/settlements', icon: Banknote },
 ];
 

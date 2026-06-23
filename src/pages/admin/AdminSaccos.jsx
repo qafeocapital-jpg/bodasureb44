@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatDate, formatKES } from '@/lib/format';
-import { Building2, Plus, Pencil, Trash2, Loader2, X, Banknote, Users, Clock } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Loader2, X, Banknote, Users, Clock, Check, FileText, ChevronRight } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import SaccoPendingMembers from '@/components/admin/SaccoPendingMembers';
 
@@ -21,6 +21,10 @@ export default function AdminSaccos() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [tab, setTab] = useState('saccos');
+  const [reviewGroup, setReviewGroup] = useState(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showRejectInput, setShowRejectInput] = useState(false);
 
   const [form, setForm] = useState({
     name: '', type: 'sacco', county_id: '', status: 'active', description: '',
@@ -42,6 +46,70 @@ export default function AdminSaccos() {
       setCounties(cs);
     } catch (e) {}
     setLoading(false);
+  }
+
+  async function approveSacco(group) {
+    setReviewing(true);
+    try {
+      // Activate the group
+      await base44.entities.Group.update(group.id, {
+        status: 'active',
+        kyc_status: 'verified',
+        sasapay_account_status: 'AWAITING_KYC_UPLOAD',
+      });
+
+      // Update the submitting user's roles
+      if (group.official_phone) {
+        const users = await base44.entities.User.filter({ phone: group.official_phone });
+        if (users.length > 0) {
+          const u = users[0];
+          const currentRoles = u.roles || ['rider'];
+          const newRoles = currentRoles.includes('sacco_admin') ? currentRoles : [...currentRoles, 'sacco_admin'];
+          await base44.entities.User.update(u.id, {
+            roles: newRoles,
+            scope_entity_id: group.id,
+            pending_group_id: null,
+            group_rejection_reason: null,
+          });
+        }
+      }
+
+      toast({ title: 'SACCO Approved', description: `${group.name} is now active. SasaPay KYC upload triggered.` });
+      setReviewGroup(null);
+      load();
+    } catch (e) {
+      toast({ title: 'Failed to approve', description: e.message, variant: 'destructive' });
+    }
+    setReviewing(false);
+  }
+
+  async function rejectSacco(group, reason) {
+    setReviewing(true);
+    try {
+      await base44.entities.Group.update(group.id, {
+        status: 'inactive',
+        description: `REJECTED: ${reason}`,
+      });
+
+      // Update the submitting user with rejection reason
+      if (group.official_phone) {
+        const users = await base44.entities.User.filter({ phone: group.official_phone });
+        if (users.length > 0) {
+          await base44.entities.User.update(users[0].id, {
+            group_rejection_reason: reason,
+          });
+        }
+      }
+
+      toast({ title: 'SACCO Rejected', description: `${group.name} has been rejected.` });
+      setReviewGroup(null);
+      setShowRejectInput(false);
+      setRejectReason('');
+      load();
+    } catch (e) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
+    setReviewing(false);
   }
 
   function openCreate() {
@@ -125,10 +193,19 @@ export default function AdminSaccos() {
           <Building2 className="w-4 h-4" /> SACCOs
         </button>
         <button
+          onClick={() => setTab('pending_approval')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'pending_approval' ? 'bg-orange-500 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
+        >
+          <Clock className="w-4 h-4" /> Pending Approval
+          {groups.filter(g => g.status === 'pending' && g.source === 'self_registered').length > 0 && (
+            <span className="bg-white/20 rounded-full px-1.5 text-[10px] font-bold">{groups.filter(g => g.status === 'pending' && g.source === 'self_registered').length}</span>
+          )}
+        </button>
+        <button
           onClick={() => setTab('pending')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'pending' ? 'bg-orange-500 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
         >
-          <Clock className="w-4 h-4" /> Pending Members
+          <Users className="w-4 h-4" /> Pending Members
         </button>
       </div>
 
@@ -189,6 +266,139 @@ export default function AdminSaccos() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pending Approval Tab */}
+      {tab === 'pending_approval' && (
+        <div>
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+            </div>
+          ) : groups.filter(g => g.status === 'pending' && g.source === 'self_registered').length === 0 ? (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <Clock className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">No pending SACCO applications</p>
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Type</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Official</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Submitted</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.filter(g => g.status === 'pending' && g.source === 'self_registered').map(g => (
+                    <tr key={g.id} className="border-t border-border hover:bg-accent/50 cursor-pointer" onClick={() => setReviewGroup(g)}>
+                      <td className="px-4 py-3 font-medium">{g.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground capitalize hidden md:table-cell">{g.type}</td>
+                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{g.official_name || '—'}</td>
+                      <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{formatDate(g.created_date)}</td>
+                      <td className="px-4 py-3 text-right"><ChevronRight className="w-4 h-4 text-muted-foreground" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Review Drawer */}
+      {reviewGroup && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setReviewGroup(null)} />
+          <div className="relative w-full max-w-[512px] bg-card rounded-t-3xl pb-8 animate-slide-up max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-card px-5 pt-5 pb-3 border-b border-border flex items-center justify-between">
+              <h3 className="font-heading font-bold text-lg">Review Application</h3>
+              <button onClick={() => setReviewGroup(null)} className="p-1 rounded-lg hover:bg-accent"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              {/* Section 1: Basic Identity */}
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Basic Identity</p>
+                <div className="bg-muted/50 rounded-xl p-3 space-y-1 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Group Name:</span><span className="font-medium">{reviewGroup.name}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Type:</span><span className="font-medium capitalize">{reviewGroup.type}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">County:</span><span className="font-medium">{countyName(reviewGroup.county_id)}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Official Name:</span><span className="font-medium">{reviewGroup.official_name || '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Official Phone:</span><span className="font-medium">{reviewGroup.official_phone || '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Section 2: Financial Identity */}
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Financial Identity</p>
+                <div className="bg-muted/50 rounded-xl p-3 space-y-1 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">KRA PIN:</span><span className="font-medium font-mono">{reviewGroup.kra_pin || '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Reg. Cert. No.:</span><span className="font-medium">{reviewGroup.registration_number || '—'}</span></div>
+                  {reviewGroup.bank_name && <div className="flex justify-between"><span className="text-muted-foreground">Bank:</span><span className="font-medium">{reviewGroup.bank_name}</span></div>}
+                  {reviewGroup.bank_account_number && <div className="flex justify-between"><span className="text-muted-foreground">Acct No:</span><span className="font-medium font-mono">{reviewGroup.bank_account_number}</span></div>}
+                  {reviewGroup.mpesa_till_number && <div className="flex justify-between"><span className="text-muted-foreground">M-Pesa Till:</span><span className="font-medium">{reviewGroup.mpesa_till_number}</span></div>}
+                </div>
+              </div>
+
+              {/* Section 3: Business KYC */}
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Business KYC</p>
+                <div className="bg-muted/50 rounded-xl p-3 space-y-1 text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Nature of Business:</span><span className="font-medium">{reviewGroup.nature_of_business || '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Physical Address:</span><span className="font-medium">{reviewGroup.physical_address || '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Est. Monthly Amount:</span><span className="font-medium">{reviewGroup.estimated_monthly_transaction_amount ? formatKES(reviewGroup.estimated_monthly_transaction_amount * 100) : '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Purpose:</span><span className="font-medium">{reviewGroup.purpose || '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Directors */}
+              {reviewGroup.directors && reviewGroup.directors.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Directors</p>
+                  <div className="space-y-2">
+                    {reviewGroup.directors.map((d, idx) => (
+                      <div key={idx} className="bg-muted/50 rounded-xl p-3 text-sm">
+                        <p className="font-medium">{d.director_name}</p>
+                        <p className="text-xs text-muted-foreground">ID: {d.director_id_number} · Mobile: {d.director_mobile_number}</p>
+                        <p className="text-xs text-muted-foreground">KRA: {d.director_kra_pin || '—'} · Doc: {d.director_document_type}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rejection Input */}
+              {showRejectInput && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Rejection Reason</label>
+                  <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={2} placeholder="Explain why this application is rejected..." className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm resize-none" />
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 sticky bottom-0 bg-card pt-3 border-t border-border">
+                {showRejectInput ? (
+                  <>
+                    <button onClick={() => setShowRejectInput(false)} className="flex-1 border border-border rounded-xl py-3 text-sm font-semibold">Cancel</button>
+                    <button onClick={() => rejectSacco(reviewGroup, rejectReason || 'Does not meet requirements')} disabled={reviewing || !rejectReason} className="flex-1 bg-destructive text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
+                      {reviewing ? 'Rejecting...' : 'Confirm Rejection'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => setShowRejectInput(true)} disabled={reviewing} className="flex-1 border border-destructive/20 text-destructive bg-destructive/5 rounded-xl py-3 text-sm font-semibold disabled:opacity-50">Reject</button>
+                    <button onClick={() => approveSacco(reviewGroup)} disabled={reviewing} className="flex-1 flex items-center justify-center gap-1 bg-success text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
+                      {reviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" /> Approve SACCO</>}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
-import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCircle, ChevronRight, ArrowRight, Lock } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCircle, ChevronRight, ArrowRight, Lock, Layers } from 'lucide-react';
 import { formatPlate } from '@/lib/plate';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import { getOnboardingPhase } from '@/lib/onboarding';
@@ -25,6 +25,7 @@ export default function Home() {
   const [groupMembers, setGroupMembers] = useState([]);
   const [latestAnnouncement, setLatestAnnouncement] = useState(null);
   const [ownerBikes, setOwnerBikes] = useState([]);
+  const [pendingSacco, setPendingSacco] = useState(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lockedTile, setLockedTile] = useState(null);
@@ -72,6 +73,15 @@ export default function Home() {
             : Promise.resolve([]),
           base44.entities.Announcement.filter({ status: 'published' }, '-created_date', 10).catch(() => []),
         ]);
+
+        // Fetch pending SACCO application if any
+        if (user.pending_group_id) {
+          const pending = await base44.entities.Group.get(user.pending_group_id).catch(() => null);
+          if (pending && pending.status === 'pending') setPendingSacco(pending);
+        }
+        if (user.group_rejection_reason) {
+          setPendingSacco({ name: 'Your SACCO Application', status: 'rejected', description: user.group_rejection_reason });
+        }
 
         // 1) Set wallet state if wallet exists (and subscribe for live updates)
         if (wallets.length > 0) {
@@ -193,6 +203,20 @@ export default function Home() {
         )}
       </div>
 
+      {/* Owner Fleet Banner */}
+      {bikes.some(b => b.owner_id === user?.id) && (
+        <div className="px-4 pt-4">
+          <Link to="/app/fleet" className="block bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl p-4 flex items-center gap-3 hover:opacity-90 transition-opacity">
+            <Bike className="w-6 h-6 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-bold">My Fleet</p>
+              <p className="text-xs text-orange-100">Manage your bikes — permits, insurance & earnings</p>
+            </div>
+            <ChevronRight className="w-5 h-5" />
+          </Link>
+        </div>
+      )}
+
       {/* Onboarding Progress Tiles */}
       <div className="px-4 pt-5">
         {user && <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} groupMembers={groupMembers} />}
@@ -278,6 +302,32 @@ export default function Home() {
             <div className="min-w-0">
               <p className="text-sm font-semibold text-primary">{latestAnnouncement.title}</p>
               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{latestAnnouncement.body}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending SACCO Application Banner */}
+      {pendingSacco && (
+        <div className="px-4 pt-4">
+          <div className={`rounded-xl p-4 border ${pendingSacco.status === 'rejected' ? 'bg-destructive/5 border-destructive/20' : 'bg-blue-50 border-blue-200'}`}>
+            <div className="flex items-start gap-3">
+              <Layers className={`w-5 h-5 flex-shrink-0 mt-0.5 ${pendingSacco.status === 'rejected' ? 'text-destructive' : 'text-blue-600'}`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold ${pendingSacco.status === 'rejected' ? 'text-destructive' : 'text-blue-900'}`}>
+                  {pendingSacco.status === 'rejected' ? 'Application Rejected' : 'SACCO Application Under Review'}
+                </p>
+                <p className={`text-xs mt-0.5 ${pendingSacco.status === 'rejected' ? 'text-destructive/80' : 'text-blue-700'}`}>
+                  {pendingSacco.status === 'rejected'
+                    ? pendingSacco.description || pendingSacco.group_rejection_reason || 'Please contact support for details.'
+                    : `Your registration for ${pendingSacco.name} is pending Super Admin approval.`}
+                </p>
+                {pendingSacco.status === 'rejected' && (
+                  <Link to="/app/groups/register-sacco" className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-primary bg-primary/10 rounded-full px-3 py-1">
+                    Resubmit <ChevronRight className="w-3 h-3" />
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>

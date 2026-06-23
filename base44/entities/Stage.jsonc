@@ -23,6 +23,50 @@
     },
     "description": {
       "type": "string"
+    },
+    "leader_id": {
+      "type": "string"
+    },
+    "pending_leader_id": {
+      "type": "string"
+    },
+    "pending_leader_role": {
+      "type": "string",
+      "enum": [
+        "team_leader",
+        "chairperson",
+        "secretary",
+        "treasurer"
+      ]
+    },
+    "pending_leader_note": {
+      "type": "string"
+    },
+    "application_status": {
+      "type": "string",
+      "enum": [
+        "none",
+        "pending_sacco",
+        "pending_county",
+        "approved",
+        "rejected"
+      ],
+      "default": "none"
+    },
+    "application_submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sacco_approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "county_approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rejection_reason": {
+      "type": "string"
     }
   },
   "required": [

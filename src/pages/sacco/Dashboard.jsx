@@ -13,22 +13,23 @@ export default function SaccoDashboard() {
     async function load() {
       if (!user) return;
       try {
-        const countyId = user?.scope_entity_id || user?.county_id;
         const saccoGroupId = user?.scope_entity_id;
-        const [members, bikes, settlements, applications] = await Promise.all([
-          countyId
-            ? base44.entities.User.filter({ county_id: countyId, role: 'rider' })
-            : base44.entities.User.filter({ role: 'rider' }),
-          countyId
-            ? base44.entities.Vehicle.filter({ county_id: countyId })
-            : base44.entities.Vehicle.filter({}),
+        // Fetch members of this SACCO
+        const groupMembers = saccoGroupId
+          ? await base44.entities.GroupMember.filter({ group_id: saccoGroupId, status: 'approved' })
+          : [];
+        const memberUserIds = groupMembers.map(m => m.user_id);
+        const bikes = memberUserIds.length > 0
+          ? await base44.entities.Vehicle.filter({ county_id: user.county_id })
+          : [];
+        const [settlements, applications] = await Promise.all([
           saccoGroupId
             ? base44.entities.Settlement.filter({ entity_type: 'sacco', entity_id: saccoGroupId, status: 'pending' })
             : base44.entities.Settlement.filter({ entity_type: 'sacco', status: 'pending' }),
-          base44.entities.Group.filter({ status: 'pending' }),
+          base44.entities.GroupMember.filter({ group_id: saccoGroupId, status: 'pending' }).catch(() => []),
         ]);
         setStats({
-          members: members.length,
+          members: groupMembers.length,
           bikes: bikes.length,
           dividends: settlements.reduce((sum, s) => sum + (s.amount_cents || 0), 0),
           applications: applications.length,

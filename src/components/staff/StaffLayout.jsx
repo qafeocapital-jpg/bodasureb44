@@ -18,11 +18,11 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
-  const portals = getAccessiblePortals(user?.role);
+  const portals = getAccessiblePortals(user);
   const showSwitcher = portals.length > 1;
 
   useEffect(() => {
-    if (user && !hasPortalAccess(user.role, requiredRole)) {
+    if (user && !hasPortalAccess(user, requiredRole)) {
       toast({
         title: 'Access denied',
         description: 'You do not have permission to access this portal.',
@@ -32,7 +32,7 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
   }, [user]);
 
   if (!user) return null;
-  if (!hasPortalAccess(user.role, requiredRole)) {
+  if (!hasPortalAccess(user, requiredRole)) {
     return <Navigate to="/app" replace />;
   }
 

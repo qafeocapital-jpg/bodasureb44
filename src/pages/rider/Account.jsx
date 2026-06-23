@@ -1,18 +1,31 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { getAccessiblePortals } from '@/lib/portals';
-import { User, FileCheck, Bell, Lock, Headphones, LogOut, ChevronRight, ShieldCheck } from 'lucide-react';
+import { User, FileCheck, Bell, Lock, Headphones, LogOut, ChevronRight, ShieldCheck, Layers, MapPin } from 'lucide-react';
 import { formatPhoneDisplay } from '@/lib/phone';
 import KycLevelBadge from '@/components/ui/KycLevelBadge';
 
 export default function Account() {
   const { user, logout } = useAuth();
-  const portals = getAccessiblePortals(user?.role);
+  const navigate = useNavigate();
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    base44.entities.Vehicle.filter({ owner_id: user.id })
+      .then(bikes => setIsOwner(bikes.length > 0))
+      .catch(() => {});
+  }, [user]);
+
+  const portals = getAccessiblePortals(user, isOwner);
+  // Filter out the rider portal itself since we're already in it
+  const switchablePortals = portals.filter(p => p.path !== '/app');
 
   const menuItems = [
     { label: 'Profile', icon: User, desc: 'Edit your personal details', link: '/app/profile' },
-    { label: 'KYC Documents', icon: FileCheck, desc: 'Upload ID for verification', link: '/app/kyc' },
+    { label: 'KYC Documents', icon: FileCheck, desc: 'Upload ID for verification', link: '/app/profile' },
     { label: 'Alerts & Notifications', icon: Bell, desc: 'Manage your alert preferences', link: '/app/account' },
     { label: 'Security', icon: Lock, desc: 'PIN, password, and security', link: '/app/account' },
     { label: 'Support', icon: Headphones, desc: 'Get help and contact us', link: '/app/support' },
@@ -29,9 +42,9 @@ export default function Account() {
             <User className="w-7 h-7 text-primary" />
           </div>
           <div className="flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <p className="font-heading font-bold text-base">{user?.full_name || 'BodaSure Rider'}</p>
-              {user?.role === 'super_admin' && (
+              {(user?.roles?.includes('super_admin') || user?.role === 'super_admin') && (
                 <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5">
                   <ShieldCheck className="w-3 h-3" /> Super Admin
                 </span>
@@ -61,24 +74,51 @@ export default function Account() {
       </div>
 
       {/* Portal Switcher */}
-      {portals.length > 0 && (
+      {switchablePortals.length > 0 && (
         <div className="mt-6">
-          <h2 className="text-sm font-heading font-bold text-foreground mb-3">My Portals</h2>
+          <h2 className="text-sm font-heading font-bold text-foreground mb-1">My Portals</h2>
+          <p className="text-xs text-muted-foreground mb-3">Switch between your different roles</p>
           <div className="space-y-2">
-            {portals.map((portal, i) => (
-              <Link
+            {switchablePortals.map((portal, i) => (
+              <button
                 key={i}
-                to={portal.path}
-                className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3 hover:bg-accent transition-colors"
+                onClick={() => navigate(portal.path)}
+                className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3 hover:bg-accent transition-colors text-left"
               >
                 <span className={`w-3 h-3 rounded-full ${portal.color}`} />
-                <span className="flex-1 text-sm font-medium">{portal.name}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{portal.name}</p>
+                </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </Link>
+              </button>
             ))}
           </div>
         </div>
       )}
+
+      {/* Apply for roles */}
+      <div className="mt-6">
+        <h2 className="text-sm font-heading font-bold text-foreground mb-1">Opportunities</h2>
+        <p className="text-xs text-muted-foreground mb-3">Register your SACCO or apply for leadership</p>
+        <div className="space-y-2">
+          <Link to="/app/groups/register-sacco" className="w-full flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 hover:bg-blue-100/50 transition-colors">
+            <Layers className="w-5 h-5 text-blue-600" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-900">Register My SACCO / Group</p>
+              <p className="text-xs text-blue-600">Self-register your group for admin review</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-blue-600" />
+          </Link>
+          <Link to="/app/account/stage-apply" className="w-full flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 hover:bg-emerald-100/50 transition-colors">
+            <MapPin className="w-5 h-5 text-emerald-600" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-emerald-900">Apply as Stage Leader</p>
+              <p className="text-xs text-emerald-600">Lead a stage in your area</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-emerald-600" />
+          </Link>
+        </div>
+      </div>
 
       {/* Logout */}
       <button
