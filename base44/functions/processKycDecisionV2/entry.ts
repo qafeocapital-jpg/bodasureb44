@@ -1,5 +1,4 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
-import { getConfiguredProvider, KYC_PROVIDERS, isAutomatedProvider } from '../lib/kycProviders.js';
 
 /**
  * V2: Process KYC Document Decisions with Provider Abstraction

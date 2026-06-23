@@ -35,16 +35,33 @@ Deno.serve(async (req) => {
 
     const b44 = base44.asServiceRole;
 
-    // Fetch recent TransactionLegs (last 500 — covers typical settlement cycle).
-    // Avoids loading the entire legs table into memory (scalability for 1M+ users).
-    const allLegs = await b44.entities.TransactionLeg.filter({}, '-created_date', 500);
+    // Fetch unprocessed TransactionLegs with pagination to avoid missing older legs.
+    const allLegs = [];
+    let skipLegs = 0;
+    const legLimit = 500;
+    while (true) {
+      const batch = await b44.entities.TransactionLeg.filter({}, '-created_date', legLimit, skipLegs);
+      if (batch.length === 0) break;
+      allLegs.push(...batch);
+      if (batch.length < legLimit) break;
+      skipLegs += legLimit;
+    }
 
     if (allLegs.length === 0) {
       return Response.json({ processed: 0, settlements_created: 0, message: 'No transaction legs to process' });
     }
 
-    // Fetch recent settlements (last 500) to know which transaction_ids are already settled
-    const allSettlements = await b44.entities.Settlement.filter({}, '-created_date', 500);
+    // Fetch recent settlements to know which transaction_ids are already settled
+    const allSettlements = [];
+    let skipSettlements = 0;
+    const settleLimit = 500;
+    while (true) {
+      const batch = await b44.entities.Settlement.filter({}, '-created_date', settleLimit, skipSettlements);
+      if (batch.length === 0) break;
+      allSettlements.push(...batch);
+      if (batch.length < settleLimit) break;
+      skipSettlements += settleLimit;
+    }
 
     const settledTxnIds = new Set();
     allSettlements.forEach(s => {

@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     let totalFeeKes = 0;
 
     if (walletId) {
-      const wallets = await base44.entities.Wallet.filter({ id: walletId });
+      const wallets = await base44.asServiceRole.entities.Wallet.filter({ id: walletId });
       if (wallets.length > 0) {
         // Verify wallet belongs to the authenticated user
         if (wallets[0].user_id && wallets[0].user_id !== user.id) {
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
       total_fee_kes: Math.round(totalFeeKes * 100) / 100,
     };
 
-    const txn = await base44.entities.Transaction.create(txnData);
+    const txn = await base44.asServiceRole.entities.Transaction.create(txnData);
 
     return Response.json({
       status: 'pending',

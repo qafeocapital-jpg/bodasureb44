@@ -137,14 +137,10 @@ export default function LipaCounty() {
         const memberships = await base44.entities.GroupMember.filter({ user_id: user.id, status: 'approved' });
         if (memberships.length > 0) {
           const memberGroupIds = memberships.map(m => m.group_id);
-          // Fetch only the rider's groups, not ALL active SACCOs system-wide
-          for (const gid of memberGroupIds) {
-            const group = await base44.entities.Group.get(gid).catch(() => null);
-            if (group && group.type === 'sacco' && group.status === 'active') {
-              saccoGroupId = group.id;
-              break;
-            }
-          }
+          // Batch fetch all rider's groups in one call, then find the active SACCO
+          const allGroups = await base44.entities.Group.filter({ status: 'active' });
+          const saccoGroup = allGroups.find(g => memberGroupIds.includes(g.id) && g.type === 'sacco');
+          if (saccoGroup) saccoGroupId = saccoGroup.id;
         }
 
         await processFeeSplit(res.transaction.id, selectedSchedule.amount_cents, feeRule, {

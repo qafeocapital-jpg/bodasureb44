@@ -89,7 +89,7 @@ export async function mockPayment({ walletId, type, amountCents, counterpartyWal
   });
 
   // 4. Simulate processing delay (STK push / transfer time)
-  await new Promise(resolve => setTimeout(resolve, 1200));
+  await new Promise(resolve => setTimeout(resolve, 300));
 
   // 5. Update to 'completed'
   await base44.entities.Transaction.update(transaction.id, {

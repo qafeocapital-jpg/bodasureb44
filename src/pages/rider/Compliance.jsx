@@ -96,7 +96,7 @@ export default function Compliance() {
   function computeCompliance(usr, vhc, wlt, docs, members) {
     const scores = {
       bike_approved: vhc?.status === 'approved' ? 25 : 0,
-      kyc_approved: usr?.kyc_status === 'approved' ? 25 : 0,
+      kyc_approved: usr?.kyc_status === 'verified' ? 25 : 0,
       id_verified: docs?.some(d => d.document_type === 'id_front' && d.status === 'approved') && docs?.some(d => d.document_type === 'id_back' && d.status === 'approved') ? 25 : 0,
       sacco_member: members?.length > 0 ? 25 : 0,
     };

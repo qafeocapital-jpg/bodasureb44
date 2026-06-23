@@ -105,20 +105,27 @@ Deno.serve(async (req) => {
       failure_reason: newStatus === 'failed' ? (resultDesc || 'Payment failed') : null,
     });
 
-    // If completed, credit the wallet
+    // If completed, credit/debit the wallet
     if (newStatus === 'completed') {
       const isCredit = ['deposit', 'lipisha'].includes(txn.type);
       const snapshots = await base44.asServiceRole.entities.WalletSnapshot.filter({ wallet_id: txn.wallet_id });
-      if (snapshots.length > 0) {
-        const snap = snapshots[0];
-        const newBalance = isCredit
-          ? (snap.balance_cents || 0) + (txn.amount_cents || 0)
-          : (snap.balance_cents || 0) - (txn.amount_cents || 0);
-        await base44.asServiceRole.entities.WalletSnapshot.update(snap.id, {
-          balance_cents: newBalance,
+      let snap = snapshots[0];
+      if (!snap) {
+        // Create snapshot if none exists
+        snap = await base44.asServiceRole.entities.WalletSnapshot.create({
+          wallet_id: txn.wallet_id,
+          balance_cents: 0,
+          currency: 'KES',
           last_synced_at: new Date().toISOString(),
         });
       }
+      const newBalance = isCredit
+        ? (snap.balance_cents || 0) + (txn.amount_cents || 0)
+        : (snap.balance_cents || 0) - (txn.amount_cents || 0);
+      await base44.asServiceRole.entities.WalletSnapshot.update(snap.id, {
+        balance_cents: newBalance,
+        last_synced_at: new Date().toISOString(),
+      });
     }
 
     // Create PaymentEvent for audit/idempotency
