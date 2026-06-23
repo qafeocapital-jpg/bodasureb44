@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { formatKES, getGreeting } from '@/lib/format';
-import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCircle, ChevronRight, ArrowRight, Lock, Layers } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Megaphone, X, Check, HelpCircle, Bike, UserCircle, ChevronRight, ArrowRight, Lock, Layers, ChevronDown } from 'lucide-react';
 import { formatPlate } from '@/lib/plate';
 import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import { getOnboardingPhase } from '@/lib/onboarding';
@@ -29,6 +29,7 @@ export default function Home() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lockedTile, setLockedTile] = useState(null);
+  const [servicesExpanded, setServicesExpanded] = useState(false);
   const [prevKycStatus, setPrevKycStatus] = useState(null);
 
   // Check for Tier 2 celebration on mount and when kyc_status changes
@@ -192,12 +193,18 @@ export default function Home() {
           )}
         </div>
         {walletActive && (
-          <div className="flex gap-2 mt-3">
-            <Link to="/app/lipisha" className="flex-1 bg-white text-primary rounded-xl py-2.5 font-semibold text-xs text-center hover:bg-orange-50 transition-colors">
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <Link to="/app/lipisha" className="bg-white text-primary rounded-xl py-3 font-semibold text-sm text-center hover:bg-orange-50 transition-colors">
               Collect Fare
             </Link>
-            <Link to="/app/lipa-county" className="flex-1 bg-white/15 backdrop-blur-sm text-primary-foreground rounded-xl py-2.5 font-semibold text-xs text-center hover:bg-white/25 transition-colors">
+            <Link to="/app/lipa-county" className="bg-white/15 backdrop-blur-sm text-primary-foreground rounded-xl py-3 font-semibold text-sm text-center hover:bg-white/25 transition-colors">
               Pay County
+            </Link>
+            <Link to="/app/wallet" className="bg-white/15 backdrop-blur-sm text-primary-foreground rounded-xl py-3 font-semibold text-sm text-center hover:bg-white/25 transition-colors">
+              Wallet
+            </Link>
+            <Link to="/app/bikes" className="bg-white/15 backdrop-blur-sm text-primary-foreground rounded-xl py-3 font-semibold text-sm text-center hover:bg-white/25 transition-colors">
+              My Bikes
             </Link>
           </div>
         )}
@@ -367,52 +374,85 @@ export default function Home() {
 
       {/* Icon Grid Sections */}
       <div className="px-4 py-5 space-y-7">
-        {user && riderTileSections.map((section) => (
-          <div key={section.title}>
-            <h2 className="text-sm font-heading font-bold text-foreground mb-3 px-1">{section.title}</h2>
-            <div className="grid grid-cols-4 gap-3">
-              {section.tiles.map((tile) => {
-                const Icon = tile.icon;
-                const isSoon = tile.status === 'soon';
-                const isLocked = tile.requiresTier2 && getKycLevel(user) < 2;
-                const TileElement = isSoon || isLocked ? 'div' : Link;
+        {user && riderTileSections.map((section) => {
+          const isServices = section.title === 'BodaSure Services';
+          const tilesToShow = isServices && !servicesExpanded
+            ? section.tiles.slice(0, 4)
+            : section.tiles;
 
-                const tileConfig = {
-                  to: isSoon || isLocked ? undefined : tile.path,
-                  onClick: isLocked ? () => setLockedTile(tile) : undefined,
-                  className: `flex flex-col items-center gap-1.5 ${(isSoon || isLocked) ? 'cursor-pointer' : 'cursor-pointer'}`,
-                };
+          const renderTile = (tile) => {
+            const Icon = tile.icon;
+            const isSoon = tile.status === 'soon';
+            const isLocked = tile.requiresTier2 && getKycLevel(user) < 2;
+            const TileElement = isSoon || isLocked ? 'div' : Link;
 
-                
+            const tileConfig = {
+              to: isSoon || isLocked ? undefined : tile.path,
+              onClick: isLocked ? () => setLockedTile(tile) : undefined,
+              className: 'flex flex-col items-center gap-1.5 cursor-pointer',
+            };
 
-                return (
-                  <TileElement key={tile.label} {...tileConfig}>
-                    <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-150 ease-out ${
-                      isLocked ? 'bg-slate-100 text-slate-400 active:scale-110' : 
-                      isSoon ? 'bg-slate-100 text-slate-400 active:scale-110' : 
-                      `${tileColors[tile.color]} active:scale-110`
-                    }`}>
-                      <Icon className="w-6 h-6" strokeWidth={2} />
-                      {isLocked && (
-                        <span className="absolute -top-2 -right-2 bg-orange-600 text-white rounded-full p-1">
-                          <Lock className="w-3 h-3" />
-                        </span>
-                      )}
-                      {isSoon && (
-                        <span className="absolute -top-1 -right-1 bg-amber-400 text-[8px] font-bold text-amber-950 rounded-full px-1.5 py-0.5 leading-none">
-                          SOON
-                        </span>
-                      )}
-                    </div>
-                    <span className={`text-[10px] text-center font-medium leading-tight ${isLocked || isSoon ? 'text-slate-400' : 'text-foreground'}`}>
-                      {tile.label}
+            return (
+              <TileElement key={tile.label} {...tileConfig}>
+                <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-150 ease-out ${
+                  isLocked ? 'bg-slate-100 text-slate-400 active:scale-110' :
+                  isSoon ? 'bg-slate-100 text-slate-400 active:scale-110' :
+                  `${tileColors[tile.color]} active:scale-110`
+                }`}>
+                  <Icon className="w-6 h-6" strokeWidth={2} />
+                  {isLocked && (
+                    <span className="absolute -top-2 -right-2 bg-orange-600 text-white rounded-full p-1">
+                      <Lock className="w-3 h-3" />
                     </span>
-                  </TileElement>
-                );
-              })}
+                  )}
+                  {isSoon && (
+                    <span className="absolute -top-1 -right-1 bg-amber-400 text-[8px] font-bold text-amber-950 rounded-full px-1.5 py-0.5 leading-none">
+                      SOON
+                    </span>
+                  )}
+                </div>
+                <span className={`text-[10px] text-center font-medium leading-tight ${isLocked || isSoon ? 'text-slate-400' : 'text-foreground'}`}>
+                  {tile.label}
+                </span>
+              </TileElement>
+            );
+          };
+
+          return (
+            <div key={section.title}>
+              {isServices ? (
+                <button
+                  onClick={() => setServicesExpanded(!servicesExpanded)}
+                  className="flex items-center gap-1.5 w-full mb-3 px-1"
+                >
+                  <h2 className="text-sm font-heading font-bold text-foreground">{section.title}</h2>
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${servicesExpanded ? '' : '-rotate-90'}`} />
+                </button>
+              ) : (
+                <h2 className="text-sm font-heading font-bold text-foreground mb-3 px-1">{section.title}</h2>
+              )}
+              <div className="grid grid-cols-4 gap-3">
+                {tilesToShow.map(renderTile)}
+                {isServices && (
+                  <div
+                    key="more-toggle"
+                    onClick={() => setServicesExpanded(!servicesExpanded)}
+                    className="flex flex-col items-center gap-1.5 cursor-pointer animate-fade-in"
+                  >
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-slate-100 text-slate-500 active:scale-110 transition-transform duration-150">
+                      {servicesExpanded
+                        ? <ChevronDown className="w-6 h-6" />
+                        : <ChevronRight className="w-6 h-6" />}
+                    </div>
+                    <span className="text-[10px] text-center font-medium leading-tight text-slate-500">
+                      {servicesExpanded ? 'Less' : 'More'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 import {
   Wallet, Receipt, HandCoins, Send, FileText,
-  Bike, BadgeCheck, QrCode, UserCheck, MapPin, ShieldCheck, FolderOpen, Wrench,
-  Landmark, History, AlertCircle, CalendarClock, Globe, Bell, Gavel, Award,
-  Users, UserPlus, PiggyBank, BarChart3, MessageCircle, Banknote,
+  Bike, BadgeCheck, QrCode, UserCheck, MapPin, ShieldCheck,
+  Landmark, History, AlertCircle, CalendarClock, Globe, Bell, Gavel,
+  Users, UserPlus, PiggyBank,
   Phone, Wifi, Zap, Droplet, Tv, CreditCard, Gift, Coins,
-  Home, GraduationCap, HeartPulse, Briefcase, ShoppingCart, Fuel,
+  Home, GraduationCap, HeartPulse, Briefcase, Fuel,
   User, FileCheck, Lock, Headphones, CircleHelp, ArrowDownToLine, ArrowUpFromLine
 } from 'lucide-react';
 
@@ -46,8 +46,6 @@ export const riderTileSections = [
       { label: 'Pay Owner', icon: UserCheck, color: 'violet', path: '/app/lipa-owner', status: 'live', requiresTier2: true },
       { label: 'My Stage', icon: MapPin, color: 'amber', path: '/app/stage', status: 'live' },
       { label: 'Insurance', icon: ShieldCheck, color: 'rose', path: '/app/insurance', status: 'live', requiresTier2: true },
-      { label: 'Documents', icon: FolderOpen, color: 'slate', path: null, status: 'soon' },
-      { label: 'Spare Parts', icon: Wrench, color: 'slate', path: null, status: 'soon' },
     ]
   },
   {
@@ -58,9 +56,7 @@ export const riderTileSections = [
       { label: 'Penalties', icon: AlertCircle, color: 'rose', path: '/app/compliance', status: 'live' },
       { label: 'Due Dates', icon: CalendarClock, color: 'amber', path: '/app/compliance', status: 'live' },
       { label: 'My Region', icon: Globe, color: 'teal', path: '/app/account', status: 'live' },
-      { label: 'Notices', icon: Bell, color: 'slate', path: null, status: 'soon' },
       { label: 'Disputes', icon: Gavel, color: 'rose', path: '/app/disputes', status: 'live' },
-      { label: 'Certificates', icon: Award, color: 'slate', path: null, status: 'soon' },
     ]
   },
   {
@@ -70,9 +66,8 @@ export const riderTileSections = [
       { label: 'Members', icon: UserPlus, color: 'green', path: '/app/groups', status: 'live' },
       { label: 'Join Group', icon: UserPlus, color: 'orange', path: '/app/groups', status: 'live' },
       { label: 'Contributions', icon: PiggyBank, color: 'violet', path: '/app/chama', status: 'live', requiresTier2: true },
-      { label: 'Group Stats', icon: BarChart3, color: 'amber', path: '/app/groups', status: 'live' },
-      { label: 'Group Chat', icon: MessageCircle, color: 'slate', path: null, status: 'soon' },
-      { label: 'Group Loan', icon: Banknote, color: 'slate', path: null, status: 'soon' },
+      { label: 'Register SACCO', icon: Landmark, color: 'blue', path: '/app/groups/register-sacco', status: 'live' },
+      { label: 'Stage Leader', icon: MapPin, color: 'green', path: '/app/account/stage-apply', status: 'live' },
     ]
   },
   {
@@ -92,15 +87,6 @@ export const riderTileSections = [
       { label: 'Card', icon: CreditCard, color: 'slate', path: null, status: 'soon' },
       { label: 'Rewards', icon: Gift, color: 'slate', path: null, status: 'soon' },
       { label: 'Fuel Credit', icon: Fuel, color: 'slate', path: null, status: 'soon' },
-    ]
-  },
-  {
-    title: 'Earn More',
-    tiles: [
-      { label: 'Insurance', icon: ShieldCheck, color: 'rose', path: '/app/insurance', status: 'live' },
-      { label: 'Delivery Jobs', icon: Bike, color: 'slate', path: null, status: 'soon' },
-      { label: 'Marketplace', icon: ShoppingCart, color: 'slate', path: null, status: 'soon' },
-      { label: 'Shop', icon: ShoppingCart, color: 'slate', path: null, status: 'soon' },
     ]
   },
   {
