@@ -121,6 +121,7 @@ export default function WalletActivate() {
       // Save profile fields first so sasapayPersonalOnboarding can read them
       await base44.auth.updateMe({
         full_name: fullName,
+        middle_name: identity.middleName,
         national_id: identity.national_id,
         phone: normalizedPhone,
         county_id: identity.county_id,

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatDate } from '@/lib/format';
+import UserProfileDrawer from '@/components/admin/UserProfileDrawer';
 import { Users, UserPlus, Loader2, AlertCircle, X, Shield } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -30,6 +31,11 @@ export default function AdminUsers() {
   const [inviting, setInviting] = useState(false);
   const [changingRole, setChangingRole] = useState(null);
   const [scopeEntities, setScopeEntities] = useState({ counties: [], saccos: [], stages: [], merchants: [] });
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedWallet, setSelectedWallet] = useState(null);
+  const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+  const [selectedCountyName, setSelectedCountyName] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -47,6 +53,33 @@ export default function AdminUsers() {
       setScopeEntities({ counties, saccos, stages, merchants });
     } catch (e) {}
     setLoading(false);
+  }
+
+  async function handleUserClick(u) {
+    setSelectedUser(u);
+    setDrawerOpen(true);
+    setSelectedWallet(null);
+    setSelectedSnapshot(null);
+    setSelectedCountyName('');
+    try {
+      const wallets = await base44.entities.Wallet.filter({ user_id: u.id, entity_type: 'personal' });
+      const wallet = wallets[0] || null;
+      let snapshot = null;
+      if (wallet) {
+        const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: wallet.id });
+        snapshot = snaps[0] || null;
+      }
+      const county = scopeEntities.counties.find(c => c.id === u.county_id);
+      setSelectedWallet(wallet);
+      setSelectedSnapshot(snapshot);
+      setSelectedCountyName(county?.name || '');
+    } catch (e) {
+      console.error('Failed to load wallet:', e);
+    }
+  }
+
+  async function handleLinked() {
+    if (selectedUser) await handleUserClick(selectedUser);
   }
 
   async function handleInvite() {
@@ -164,7 +197,9 @@ export default function AdminUsers() {
                   <tr key={u.id} className="border-t border-border hover:bg-accent/50">
                     <td className="px-4 py-3 font-medium">
                       <div className="flex items-center gap-1">
-                        {u.full_name || '—'}
+                        <button onClick={() => handleUserClick(u)} className="text-orange-500 hover:underline text-left">
+                          {u.full_name || '—'}
+                        </button>
                         {u.id === currentUser?.id && <span className="text-xs text-muted-foreground">(You)</span>}
                         {needsScope && (
                           <span className="flex items-center gap-0.5 text-[10px] font-semibold text-destructive bg-destructive/10 rounded-full px-1.5 py-0.5" title="No scope assigned">
@@ -212,6 +247,16 @@ export default function AdminUsers() {
           {users.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No users found</p>}
         </div>
       )}
+
+      <UserProfileDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        user={selectedUser}
+        wallet={selectedWallet}
+        snapshot={selectedSnapshot}
+        countyName={selectedCountyName}
+        onLinked={handleLinked}
+      />
 
       {/* Invite Modal */}
       {showInvite && (

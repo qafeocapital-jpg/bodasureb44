@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatKES } from '@/lib/format';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Link2, Info } from 'lucide-react';
 import UserProfileDrawer from '@/components/admin/UserProfileDrawer';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function CustomerAccountsTable() {
+  const { toast } = useToast();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [linkingWalletId, setLinkingWalletId] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -65,6 +68,23 @@ export default function CustomerAccountsTable() {
     setDrawerOpen(true);
   }
 
+  async function handleLinkSasapay(row) {
+    if (!row.user?.id) return;
+    setLinkingWalletId(row.wallet.id);
+    try {
+      const res = await base44.functions.invoke('adminLinkSasapayAccount', { userId: row.user.id });
+      if (res.data?.success) {
+        toast({ title: 'SasaPay account linked', description: `Account ${res.data.accountNumber}` });
+        await load();
+      } else {
+        toast({ title: 'Could not link', description: res.data?.message || 'No SasaPay account found for this phone.', variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Failed to search SasaPay', description: e.response?.data?.error || e.message, variant: 'destructive' });
+    }
+    setLinkingWalletId(null);
+  }
+
   const filtered = rows.filter(r => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -86,6 +106,10 @@ export default function CustomerAccountsTable() {
 
   return (
     <>
+      <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+        <Info className="w-3.5 h-3.5 flex-shrink-0" />
+        <span>Showing {rows.length} BodaSure wallet{rows.length !== 1 ? 's' : ''}. SasaPay's platform may contain more records from other merchants — these are not shown here.</span>
+      </div>
       <div className="relative mb-4 max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <input
@@ -121,8 +145,19 @@ export default function CustomerAccountsTable() {
                   {row.user?.full_name || '—'}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{row.user?.phone || '—'}</td>
-                <td className="px-4 py-3 font-mono text-xs text-primary hover:underline">
-                  {row.wallet.sasapay_account_number || row.wallet.account_number || '—'}
+                <td className="px-4 py-3 font-mono text-xs">
+                  {row.wallet.sasapay_account_number || row.wallet.account_number ? (
+                    <span className="text-primary">{row.wallet.sasapay_account_number || row.wallet.account_number}</span>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleLinkSasapay(row); }}
+                      disabled={linkingWalletId === row.wallet.id}
+                      className="text-xs bg-warning text-warning-foreground rounded-lg px-2 py-1 font-semibold flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {linkingWalletId === row.wallet.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
+                      {linkingWalletId === row.wallet.id ? 'Searching...' : 'Link SasaPay'}
+                    </button>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span className={`text-xs font-semibold ${row.wallet.status === 'active' ? 'text-success' : row.wallet.status === 'pending_kyc' ? 'text-warning' : 'text-muted-foreground'}`}>
@@ -150,6 +185,7 @@ export default function CustomerAccountsTable() {
         wallet={selected?.wallet}
         snapshot={selected?.snapshot}
         countyName={selected?.county?.name}
+        onLinked={load}
       />
     </>
   );

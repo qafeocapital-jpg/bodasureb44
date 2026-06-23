@@ -4,7 +4,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { formatKES, formatDateTime, formatDate } from '@/lib/format';
 import { splitFullName } from '@/lib/nameUtils';
-import { Wallet, FileText, Bike, Users, UserCircle, Inbox, ExternalLink } from 'lucide-react';
+import { Wallet, FileText, Bike, Users, UserCircle, Inbox, ExternalLink, AlertTriangle, CheckCircle, XCircle, Link2, Loader2 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 const DOC_TYPE_LABELS = {
   id_front: 'ID (Front)',
@@ -36,17 +37,45 @@ function InfoRow({ label, value }) {
   );
 }
 
-export default function UserProfileDrawer({ open, onOpenChange, user, wallet, snapshot, countyName }) {
+export default function UserProfileDrawer({ open, onOpenChange, user, wallet, snapshot, countyName, onLinked }) {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('personal');
   const [loaded, setLoaded] = useState({});
   const [tabData, setTabData] = useState({});
+  const [linking, setLinking] = useState('idle');
+  const [linkedAccount, setLinkedAccount] = useState('');
+  const [linkError, setLinkError] = useState('');
 
   // Reset when user changes
   useEffect(() => {
     setLoaded({});
     setTabData({});
     setActiveTab('personal');
+    setLinking('idle');
+    setLinkedAccount('');
+    setLinkError('');
   }, [user?.id]);
+
+  async function handleLinkSasapay() {
+    if (!user?.id) return;
+    setLinking('searching');
+    setLinkError('');
+    try {
+      const res = await base44.functions.invoke('adminLinkSasapayAccount', { userId: user.id });
+      if (res.data?.success) {
+        setLinking('success');
+        setLinkedAccount(res.data.accountNumber);
+        toast({ title: 'SasaPay account linked', description: `Account ${res.data.accountNumber}` });
+        if (onLinked) onLinked();
+      } else {
+        setLinking('error');
+        setLinkError(res.data?.message || res.data?.error || 'No SasaPay account found for this phone.');
+      }
+    } catch (e) {
+      setLinking('error');
+      setLinkError(e.response?.data?.error || e.message || 'Failed to search SasaPay.');
+    }
+  }
 
   // Lazy load tab data (personal tab needs no async — data comes from props)
   useEffect(() => {
@@ -137,6 +166,39 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
 
             {/* Wallet & Transactions */}
             <TabsContent value="wallet" className="mt-0 space-y-4">
+              {linking === 'searching' && (
+                <div className="bg-muted/50 border border-border rounded-xl p-4 flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-primary animate-spin flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">Searching SasaPay... this may take up to 30 seconds.</p>
+                </div>
+              )}
+              {linking === 'success' && (
+                <div className="bg-success/10 border border-success/30 rounded-xl p-4 flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-success flex-shrink-0" />
+                  <p className="text-sm font-semibold text-success">Linked to account {linkedAccount}</p>
+                </div>
+              )}
+              {linking === 'error' && (
+                <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 flex items-center gap-3">
+                  <XCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-destructive">Could not link account</p>
+                    <p className="text-xs text-destructive/80">{linkError || 'No SasaPay account found. The user must re-activate their wallet.'}</p>
+                  </div>
+                </div>
+              )}
+              {!wallet?.sasapay_account_number && linking === 'idle' && (
+                <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-warning">Wallet not linked to SasaPay</p>
+                    <p className="text-xs text-muted-foreground">No SasaPay account number found. Search and link an existing account.</p>
+                  </div>
+                  <button onClick={handleLinkSasapay} className="bg-warning text-warning-foreground rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1">
+                    <Link2 className="w-3 h-3" /> Link Now
+                  </button>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-muted/50 rounded-xl p-3">
                   <p className="text-xs text-muted-foreground">Balance</p>
