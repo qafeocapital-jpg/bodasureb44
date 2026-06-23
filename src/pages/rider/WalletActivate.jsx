@@ -6,7 +6,7 @@ import { getOrCreateWallet } from '@/lib/payments';
 import { setWalletPin } from '@/lib/pin';
 import { auditLog } from '@/lib/audit';
 import { splitFullName, joinFullName } from '@/lib/nameUtils';
-import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
+import { normalizePhone, isValidKenyanPhone, formatPhoneDisplay } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
 import CountyPicker from '@/components/rider/CountyPicker';
 import { ChevronLeft, ChevronRight, Check, Shield, KeyRound, Loader2, Smartphone, Lock } from 'lucide-react';
@@ -71,8 +71,8 @@ export default function WalletActivate() {
     }
     setPhoneChecking(true);
     try {
-      const existing = await base44.entities.User.filter({ phone: normalized });
-      setPhoneConflict(existing.some(u => u.id !== user?.id));
+      const res = await base44.functions.invoke('checkPhoneUniqueness', { phone: normalized });
+      setPhoneConflict(res.data?.conflict === true);
     } catch (e) {
       setPhoneConflict(false);
     }
@@ -85,7 +85,6 @@ export default function WalletActivate() {
       setPhoneConflict(false);
       return;
     }
-    setPhoneChecking(true);
     clearTimeout(phoneCheckTimer.current);
     phoneCheckTimer.current = setTimeout(() => checkPhoneUniqueness(normalized), 400);
   }
@@ -105,16 +104,25 @@ export default function WalletActivate() {
       setError('Enter a valid Kenyan phone number (07XX or 01XX).');
       return;
     }
+
     setSaving(true);
     setError('');
     try {
+      // Server-side uniqueness check (defense against race condition + RLS bypass)
+      const checkRes = await base44.functions.invoke('checkPhoneUniqueness', { phone: normalizedPhone });
+      if (checkRes.data?.conflict) {
+        setPhoneConflict(true);
+        setError('This phone number is already linked to a BodaSure account.');
+        setSaving(false);
+        return;
+      }
+
       const fullName = joinFullName(identity.firstName, identity.middleName, identity.lastName);
       // Save profile fields first so sasapayPersonalOnboarding can read them
-      const normalizedPhoneForSave = normalizePhone(identity.phone);
       await base44.auth.updateMe({
         full_name: fullName,
         national_id: identity.national_id,
-        phone: normalizedPhoneForSave || identity.phone,
+        phone: normalizedPhone,
         county_id: identity.county_id,
       });
       await refreshUser();
@@ -293,7 +301,7 @@ export default function WalletActivate() {
               if (phoneConflict) setPhoneConflict(false);
             }}
             onBlur={handlePhoneBlur}
-            error={phoneConflict ? 'This number is already linked to a BodaSure account.' : ''}
+            error={phoneConflict ? 'This number is already linked to a BodaSure account.' : null}
           />
           <div>
             <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
@@ -331,7 +339,7 @@ export default function WalletActivate() {
         <div className="space-y-4">
           <div className="bg-accent rounded-xl p-4 flex items-center gap-3">
             <Shield className="w-5 h-5 text-primary flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">Enter the OTP sent to <span className="font-semibold text-foreground">{identity.phone}</span> by BodaSure Wallet.</p>
+            <p className="text-sm text-muted-foreground">Enter the OTP sent to <span className="font-semibold text-foreground">{formatPhoneDisplay(identity.phone)}</span> by BodaSure Wallet.</p>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Enter OTP Code</label>

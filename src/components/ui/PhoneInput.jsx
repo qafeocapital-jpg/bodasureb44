@@ -23,7 +23,12 @@ export default function PhoneInput({ value, onChange, label = 'Phone Number', er
   }, [value]);
 
   function handleChange(e) {
-    const digits = e.target.value.replace(/\D/g, '');
+    let digits = e.target.value.replace(/\D/g, '');
+    // Strip leading 0 or 254 prefix immediately so input always shows local 9 digits
+    if (digits.startsWith('254')) digits = digits.slice(3);
+    else if (digits.startsWith('0')) digits = digits.slice(1);
+    // Cap at 9 digits
+    if (digits.length > 9) digits = digits.slice(0, 9);
     setLocal(digits);
     const e164 = normalizePhone(digits);
     onChange(e164 || digits);

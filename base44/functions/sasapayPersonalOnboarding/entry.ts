@@ -37,6 +37,18 @@ async function initializePersonalOnboarding(base44, user) {
     throw new Error('Missing required fields: full_name, phone, national_id');
   }
 
+  // Normalize phone to E.164 (254XXXXXXXXX)
+  let phoneDigits = (user.phone || '').replace(/\D/g, '');
+  if (phoneDigits.startsWith('0')) phoneDigits = phoneDigits.slice(1);
+  if (phoneDigits.startsWith('254')) phoneDigits = phoneDigits.slice(3);
+  const normalizedPhone = '254' + phoneDigits;
+
+  // Server-side phone uniqueness check (defense-in-depth against client bypass)
+  const existingUsers = await base44.asServiceRole.entities.User.filter({ phone: normalizedPhone });
+  if (existingUsers.some(u => u.id !== user.id)) {
+    throw new Error('This phone number is already linked to a BodaSure account.');
+  }
+
   const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
   const token = await getSasaPayToken();
 
@@ -48,7 +60,7 @@ async function initializePersonalOnboarding(base44, user) {
 
   // Extract country code and format mobile
   const countryCode = '254';
-  const mobileNumber = user.phone.replace(/^0/, '254').replace(/^254/, '254');
+  const mobileNumber = normalizedPhone;
 
   // Determine document type from stored value (default to 1 for ID card)
   const docTypeMap = { id_card: '1', passport: '2', alien_id: '3' };
