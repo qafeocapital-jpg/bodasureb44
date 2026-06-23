@@ -20,6 +20,15 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
   const location = useLocation();
   const portals = getAccessiblePortals(user);
   const showSwitcher = portals.length > 1;
+  const [flagCount, setFlagCount] = useState(() => {
+    const v = typeof window !== 'undefined' ? sessionStorage.getItem('bodasure_flags_count') : null;
+    return v ? parseInt(v, 10) : 0;
+  });
+
+  useEffect(() => {
+    const v = typeof window !== 'undefined' ? sessionStorage.getItem('bodasure_flags_count') : null;
+    setFlagCount(v ? parseInt(v, 10) : 0);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (user && !hasPortalAccess(user, requiredRole)) {
@@ -57,7 +66,14 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
                 }`
               }
             >
-              <item.icon className="w-5 h-5" />
+              <div className="relative">
+                <item.icon className="w-5 h-5" />
+                {item.path === '/admin/flags' && flagCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 leading-none">
+                    {flagCount > 99 ? '99+' : flagCount}
+                  </span>
+                )}
+              </div>
               {item.label}
             </NavLink>
           ))}
@@ -120,7 +136,14 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
                     }`
                   }
                 >
-                  <item.icon className="w-5 h-5" />
+                  <div className="relative">
+                    <item.icon className="w-5 h-5" />
+                    {item.path === '/admin/flags' && flagCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 leading-none">
+                        {flagCount > 99 ? '99+' : flagCount}
+                      </span>
+                    )}
+                  </div>
                   {item.label}
                 </NavLink>
               ))}

@@ -65,6 +65,10 @@
     "sasapay_kyc_uploaded_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "needs_review": {
+      "type": "boolean",
+      "default": false
     }
   },
   "required": [

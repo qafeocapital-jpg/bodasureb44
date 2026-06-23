@@ -80,6 +80,14 @@
     "owner_invite_sent_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "needs_review": {
+      "type": "boolean",
+      "default": false
+    },
+    "location_flagged": {
+      "type": "boolean",
+      "default": false
     }
   },
   "required": [

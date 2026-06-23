@@ -37,9 +37,9 @@ function InfoRow({ label, value }) {
   );
 }
 
-export default function UserProfileDrawer({ open, onOpenChange, user, wallet, snapshot, countyName, onLinked }) {
+export default function UserProfileDrawer({ open, onOpenChange, user, wallet, snapshot, countyName, onLinked, defaultTab = 'personal' }) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('personal');
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [loaded, setLoaded] = useState({});
   const [tabData, setTabData] = useState({});
   const [linking, setLinking] = useState('idle');
@@ -50,7 +50,7 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
   useEffect(() => {
     setLoaded({});
     setTabData({});
-    setActiveTab('personal');
+    setActiveTab(defaultTab);
     setLinking('idle');
     setLinkedAccount('');
     setLinkError('');

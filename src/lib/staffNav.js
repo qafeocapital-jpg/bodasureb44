@@ -46,6 +46,7 @@ export const stageNav = [
 
 export const adminNav = [
   { label: 'Overview', path: '/admin/overview', icon: LayoutDashboard },
+  { label: 'Flags', path: '/admin/flags', icon: ShieldAlert },
   { label: 'Counties', path: '/admin/counties', icon: Building2 },
   { label: 'SACCOs', path: '/admin/saccos', icon: Building2 },
   { label: 'Wallet Ops', path: '/admin/sasapay', icon: Database },

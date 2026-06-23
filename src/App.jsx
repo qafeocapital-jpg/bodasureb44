@@ -66,6 +66,7 @@ import AdminReconciliation from './pages/admin/Reconciliation';
 import AdminAuditLog from './pages/admin/AuditLog';
 import AdminAnnouncements from './pages/admin/Announcements';
 import AdminSaccos from './pages/admin/AdminSaccos';
+import AdminFlags from './pages/admin/Flags';
 import SeedData from './pages/admin/SeedData';
 import RiderVerify from './pages/public/RiderVerify';
 import Login from './pages/Login';
@@ -187,6 +188,7 @@ const AuthenticatedApp = () => {
       {/* Super Admin Portal (orange) */}
       <Route element={<StaffLayout accent="orange" portalName="Super Admin" navItems={adminNav} requiredRole="super_admin" />}>
         <Route path="/admin/overview" element={<AdminOverview />} />
+        <Route path="/admin/flags" element={<AdminFlags />} />
         <Route path="/admin/counties" element={<AdminCounties />} />
         <Route path="/admin/sasapay" element={<AdminSasaPay />} />
         <Route path="/admin/users" element={<AdminUsers />} />
