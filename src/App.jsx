@@ -64,7 +64,7 @@ import SeedData from './pages/admin/SeedData';
 import RiderVerify from './pages/public/RiderVerify';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -84,6 +84,12 @@ const AuthenticatedApp = () => {
       navigateToLogin();
       return null;
     }
+  }
+
+  // Safety guard: if not loading, no authError, but no user — redirect to login
+  if (!user) {
+    navigateToLogin();
+    return null;
   }
 
   // Render the main app

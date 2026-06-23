@@ -50,8 +50,11 @@ export default function Home() {
 
   useEffect(() => {
     let unsub;
+    let timeoutId;
     async function loadData() {
-      if (!user) return;
+      if (!user) { setLoading(false); return; }
+      // Safety net: clear skeleton after 8s even if API calls hang
+      timeoutId = setTimeout(() => setLoading(false), 8000);
       try {
         const wallets = await base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' });
         const snapshotPromise = wallets.length > 0
@@ -96,11 +99,12 @@ export default function Home() {
         });
         if (visible.length > 0) setLatestAnnouncement(visible[0]);
       } catch (e) {}
-      // 3) Clear loading ALWAYS (was previously skipped for wallet users via early return)
+      // 3) Clear loading ALWAYS
+      clearTimeout(timeoutId);
       setLoading(false);
     }
     loadData();
-    return () => unsub?.();
+    return () => { unsub?.(); clearTimeout(timeoutId); };
   }, [user]);
 
   // Show loading state while checking wallet status
