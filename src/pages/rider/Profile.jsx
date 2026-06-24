@@ -94,7 +94,7 @@ export default function Profile() {
         }
 
         // Issue 4: Smart phase routing using independent phase evaluation
-        const phase = getOnboardingPhase(user, vs, gms);
+        const phase = getOnboardingPhase(user, vs, gms, w);
         setCompletedPhase(phase);
         const targetPhase = location.state?.targetPhase;
         const viewStep = location.state?.viewStep;
@@ -174,7 +174,7 @@ export default function Profile() {
 
   const handleExitReadOnly = () => {
     setReadOnly(false);
-    const phase = getOnboardingPhase(user, vehicles, groupMembers);
+    const phase = getOnboardingPhase(user, vehicles, groupMembers, wallet);
     setCompletedPhase(phase);
     setCurrentPhase(Math.min(phase, 6));
     navigate('/app/profile', { replace: true, state: {} });

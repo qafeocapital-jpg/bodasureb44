@@ -45,7 +45,7 @@ export default function ProgressBar({ currentPhase, completedPhase, onJumpBack, 
                 disabled={!isCompleted}
                 className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all flex-shrink-0 ${
                   isCompleted
-                    ? `bg-primary text-primary-foreground ${isActive ? 'ring-4 ring-primary/20' : 'cursor-pointer hover:scale-110'}`
+                    ? `bg-success text-success-foreground pointer-events-none cursor-default opacity-100`
                     : isActive
                     ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
                     : 'bg-card text-muted-foreground border-2 border-border'
@@ -71,7 +71,7 @@ export default function ProgressBar({ currentPhase, completedPhase, onJumpBack, 
               key={phase.id}
               className={`text-[9px] font-medium text-center transition-colors ${
                 isCompleted
-                  ? 'text-primary'
+                  ? 'text-muted-foreground opacity-50'
                   : isActive
                   ? 'text-primary font-bold'
                   : 'text-muted-foreground/60'

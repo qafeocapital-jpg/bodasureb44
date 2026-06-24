@@ -46,7 +46,25 @@ async function initializePersonalOnboarding(base44, user) {
   // Server-side phone uniqueness check (defense-in-depth against client bypass)
   const existingUsers = await base44.asServiceRole.entities.User.filter({ phone: normalizedPhone });
   if (existingUsers.some(u => u.id !== user.id)) {
-    throw new Error('This phone number is already linked to a BodaSure account.');
+    // Log onboarding error
+    await logOnboardingError(base44, user, 'duplicate_phone', 'Your phone number is already linked to a BodaSure Wallet. Please enter a different number.', normalizedPhone, user.national_id);
+    return Response.json({
+      success: false,
+      error: 'Your phone number is already linked to a BodaSure Wallet. Please enter a different number.',
+      conflictType: 'phone',
+    }, { status: 400 });
+  }
+
+  // Server-side national_id uniqueness check (NEW)
+  const existingIdUsers = await base44.asServiceRole.entities.User.filter({ national_id: user.national_id });
+  if (existingIdUsers.some(u => u.id !== user.id)) {
+    // Log onboarding error
+    await logOnboardingError(base44, user, 'duplicate_id', 'This National ID is already linked to a BodaSure Wallet. Please enter a different ID number.', normalizedPhone, user.national_id);
+    return Response.json({
+      success: false,
+      error: 'This National ID is already linked to a BodaSure Wallet. Please enter a different ID number.',
+      conflictType: 'national_id',
+    }, { status: 400 });
   }
 
   const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
@@ -116,9 +134,31 @@ async function initializePersonalOnboarding(base44, user) {
           message: 'Your BodaSure Wallet account already exists. Set your PIN to continue.',
         });
       }
-      throw new Error('We couldn\'t automatically recover your account. Please contact support with your phone number.');
+      // Recovery failed — log the error and return structured error
+      await logOnboardingError(base44, user, 'recovery_failed', 'We couldn\'t automatically recover your account. Please contact support.', normalizedPhone, user.national_id);
+      return Response.json({
+        success: false,
+        error: 'We couldn\'t automatically recover your account. Please contact support with your phone number.',
+        conflictType: 'unknown',
+      }, { status: 400 });
     }
-    throw new Error(`SasaPay init failed: ${data.message}`);
+    // Map SasaPay errors to BodaSure-branded messages
+    const errorMap = {
+      'sp4000': 'Your account already exists. Please try again or contact support.',
+      'sp4001': 'Invalid phone number. Please enter a valid Kenyan number.',
+      'sp4002': 'Invalid National ID. Please check your ID number.',
+    };
+    const mappedError = Object.keys(errorMap).find(code => errMsg.includes(code.replace('sp', '')))
+      ? errorMap[Object.keys(errorMap).find(code => errMsg.includes(code.replace('sp', '')))]
+      : 'Wallet activation failed. Please try again.';
+    
+    // Log SasaPay error
+    await logOnboardingError(base44, user, 'sasapay_error', mappedError, normalizedPhone, user.national_id);
+    return Response.json({
+      success: false,
+      error: mappedError,
+      conflictType: 'unknown',
+    }, { status: 400 });
   }
 
   // Store requestId on wallet
@@ -251,6 +291,26 @@ async function resendPersonalOtp(base44, user, requestId) {
   // SasaPay uses re-init to generate a new OTP: calling the init endpoint
   // again with the same user data produces a new requestId + OTP.
   return await initializePersonalOnboarding(base44, user);
+}
+
+async function logOnboardingError(base44, user, errorCode, errorMessage, phone, nationalId) {
+  try {
+    await base44.asServiceRole.entities.AuditLog.create({
+      user_id: user.id,
+      action: 'wallet_onboarding_failed',
+      entity_type: 'Wallet',
+      description: `Onboarding error: ${errorCode}`,
+      new_values: {
+        error_code: errorCode,
+        error_message: errorMessage,
+        phone,
+        national_id: nationalId,
+        conflict_type: errorCode === 'duplicate_phone' ? 'phone' : errorCode === 'duplicate_id' ? 'national_id' : 'unknown',
+      },
+    });
+  } catch (e) {
+    console.warn('Failed to log onboarding error:', e.message);
+  }
 }
 
 /**

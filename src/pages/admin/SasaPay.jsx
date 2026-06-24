@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatKES, formatDateTime } from '@/lib/format';
-import { Database, Search, Activity, CheckCircle2, AlertCircle, Receipt, TrendingUp } from 'lucide-react';
+import { Database, Search, Activity, CheckCircle2, AlertCircle, Receipt, TrendingUp, AlertTriangle, ChevronDown } from 'lucide-react';
 import TariffManager from '@/components/admin/TariffManager';
 import RevenueReconciliation from '@/components/admin/RevenueReconciliation';
 import CustomerAccountsTable from '@/components/admin/CustomerAccountsTable';
@@ -11,20 +11,23 @@ export default function AdminSasaPay() {
   const [transactions, setTransactions] = useState([]);
   const [events, setEvents] = useState([]);
   const [wallets, setWallets] = useState([]);
+  const [onboardingErrors, setOnboardingErrors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [expandedRow, setExpandedRow] = useState(null);
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
     try {
-      const [t, e, w] = await Promise.all([
+      const [t, e, w, oe] = await Promise.all([
         base44.entities.Transaction.filter({}, '-created_date', 30),
         base44.entities.PaymentEvent.filter({}, '-created_date', 20),
         base44.entities.Wallet.filter({ entity_type: 'personal' }),
+        base44.entities.AuditLog.filter({ action: 'wallet_onboarding_failed' }, '-created_date', 100),
       ]);
-      setTransactions(t); setEvents(e); setWallets(w);
+      setTransactions(t); setEvents(e); setWallets(w); setOnboardingErrors(oe);
     } catch (e) {}
     setLoading(false);
   }
@@ -33,6 +36,7 @@ export default function AdminSasaPay() {
     { id: 'overview', label: 'Overview', icon: Activity },
     { id: 'transactions', label: 'Transactions', icon: Database },
     { id: 'wallets', label: 'Customer Accounts', icon: CheckCircle2 },
+    { id: 'errors', label: 'Onboarding Errors', icon: AlertTriangle },
     { id: 'tariff', label: 'Tariff Manager', icon: Receipt },
     { id: 'revenue', label: 'Revenue & Reconciliation', icon: TrendingUp },
     { id: 'webhooks', label: 'Webhook Log', icon: AlertCircle },
@@ -57,6 +61,8 @@ export default function AdminSasaPay() {
         <TariffManager />
       ) : tab === 'revenue' ? (
         <RevenueReconciliation />
+      ) : tab === 'errors' ? (
+        <OnboardingErrorsTab errors={onboardingErrors} expandedRow={expandedRow} setExpandedRow={setExpandedRow} />
       ) : loading ? (
         <p className="text-sm text-muted-foreground text-center py-10">Loading...</p>
       ) : tab === 'overview' ? (
@@ -122,6 +128,87 @@ export default function AdminSasaPay() {
             </tbody>
           </table>
           {events.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No webhook events</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OnboardingErrorsTab({ errors, expandedRow, setExpandedRow }) {
+  const conflictTypeMap = {
+    phone: '📱 Duplicate Phone',
+    national_id: '🆔 Duplicate ID',
+    recovery_failed: '🔄 Recovery Failed',
+    sasapay_error: '⚠️ SasaPay Error',
+    unknown: '❓ Unknown Error',
+  };
+
+  return (
+    <div className="space-y-4">
+      {errors.length === 0 ? (
+        <div className="bg-card border border-border rounded-xl p-8 text-center">
+          <CheckCircle2 className="w-12 h-12 text-success mx-auto mb-3" />
+          <p className="text-sm font-medium">No onboarding errors</p>
+          <p className="text-xs text-muted-foreground">All wallet activations are running smoothly.</p>
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Rider Name</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Phone</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">National ID</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Timestamp</th>
+                <th className="w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {errors.map((err, idx) => (
+                <tbody key={err.id}>
+                  <tr className="border-t border-border hover:bg-accent/50">
+                    <td className="px-4 py-3 font-medium">{err.description || `Error ID: ${err.id.substring(0, 8)}`}</td>
+                    <td className="px-4 py-3 font-mono text-xs hidden sm:table-cell">{err.new_values?.phone || '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs hidden md:table-cell">{err.new_values?.national_id || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-destructive/10 text-destructive">
+                        {conflictTypeMap[err.new_values?.conflict_type] || '❓ Unknown'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">{formatDateTime(err.created_date)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => setExpandedRow(expandedRow === idx ? null : idx)}
+                        className="p-1 hover:bg-muted rounded transition-colors"
+                      >
+                        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expandedRow === idx ? 'rotate-180' : ''}`} />
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedRow === idx && (
+                    <tr className="border-t border-border bg-muted/30">
+                      <td colSpan="6" className="px-4 py-4">
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <p className="font-semibold text-foreground mb-1">Error Details</p>
+                            <div className="bg-background rounded p-2 font-mono text-[10px] whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
+                              {JSON.stringify(err.new_values, null, 2)}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">User ID: <span className="font-mono text-foreground">{err.user_id}</span></p>
+                            <p className="text-muted-foreground">Error Code: <span className="font-mono text-foreground">{err.new_values?.error_code}</span></p>
+                            <p className="text-muted-foreground">Message: <span className="text-foreground">{err.new_values?.error_message}</span></p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

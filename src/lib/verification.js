@@ -1,4 +1,5 @@
 export const VERIFICATION_TASKS = [
+  { id: 'wallet', name: 'Activate BodaSure Wallet', short: 'Wallet' },
   { id: 'identity', name: 'Identity Verification', short: 'Identity' },
   { id: 'bike', name: 'Bike Photos', short: 'Bike' },
   { id: 'phone', name: 'Phone OTP', short: 'Phone' },
@@ -6,10 +7,13 @@ export const VERIFICATION_TASKS = [
 ];
 
 /**
- * Compute sub-task statuses from KYC docs, user, and vehicle.
+ * Compute sub-task statuses from KYC docs, user, vehicle, and wallet.
  * @returns Array of { id, status } where status is: not_started | in_progress | submitted | verified
  */
-export function getTaskStatuses(kycDocs = [], user, vehicle) {
+export function getTaskStatuses(kycDocs = [], user, vehicle, wallet) {
+  // Task 0: BodaSure Wallet — always completed by Phase 5 since Phase 0 guarantees tier 1 / active
+  const walletStatus = (wallet?.status === 'active' && wallet?.tier >= 1) ? 'verified' : 'not_started';
+
   // Task 1: Identity Verification (IDAnalyzer DocuPass only)
   // Only consider docs with provider_reference (IDAnalyzer-processed)
   const idFrontProcessed = kycDocs.find(d => d.document_type === 'id_front' && d.provider_reference);
@@ -48,6 +52,7 @@ export function getTaskStatuses(kycDocs = [], user, vehicle) {
     : 'not_started';
 
   return [
+    { id: 'wallet', status: walletStatus },
     { id: 'identity', status: identityStatus },
     { id: 'bike', status: bikeStatus },
     { id: 'phone', status: phoneStatus },

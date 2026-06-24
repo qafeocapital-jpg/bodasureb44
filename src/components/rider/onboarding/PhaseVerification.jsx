@@ -67,7 +67,7 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   }, [wallet?.status, wallet?.tier, user?.phone_verified, refreshUser]);
 
   // Check completion state
-  const tasks = getTaskStatuses(kycDocs, user, vehicle);
+  const tasks = getTaskStatuses(kycDocs, user, vehicle, wallet);
   const submitted = isAllSubmitted(tasks);
 
   useEffect(() => {
@@ -99,38 +99,7 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     );
   }
 
-  // Wallet activation gate — must activate wallet before KYC
-  const walletActive = wallet && wallet.status === 'active' && wallet.tier >= 1;
-  if (!readOnly && !walletActive) {
-    return (
-      <div className="space-y-4">
-        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 text-center">
-          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-            <Wallet className="w-7 h-7 text-primary" />
-          </div>
-          <h3 className="font-heading font-bold text-lg mb-1">Activate Your BodaSure Wallet First</h3>
-          <p className="text-sm text-muted-foreground mb-4">You need an active BodaSure Wallet before completing KYC verification. Activation takes less than a minute.</p>
-          <button onClick={() => navigate('/app/wallet/activate')} className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm">
-            <Wallet className="w-4 h-4" /> Activate Wallet
-          </button>
-        </div>
-        {kycDocs.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-4">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Previously Uploaded Documents</p>
-            <div className="space-y-2">
-              {kycDocs.map(doc => (
-                <div key={doc.id} className="flex items-center justify-between text-xs">
-                  <span className="capitalize">{doc.document_type.replace(/_/g, ' ')}</span>
-                  <span className={`font-semibold ${doc.status === 'approved' ? 'text-success' : doc.status === 'rejected' ? 'text-destructive' : 'text-warning'}`}>{doc.status}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        <button onClick={() => navigate('/app')} className="w-full text-center text-sm text-muted-foreground font-semibold py-2">Go to Dashboard</button>
-      </div>
-    );
-  }
+
 
   // If verification already complete
   if (user?.verification_complete && !readOnly) {
