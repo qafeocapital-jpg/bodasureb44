@@ -171,6 +171,16 @@ async function initializePersonalOnboarding(base44, user) {
     await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
       sasapay_request_id: data.requestId,
     });
+  } else {
+    // No wallet found — log warning but still return success
+    // The wallet will be created at confirm time
+    await base44.asServiceRole.entities.AuditLog.create({
+      user_id: user.id,
+      action: 'wallet_not_found_on_init',
+      entity_type: 'Wallet',
+      description: 'SasaPay init succeeded but no personal wallet found to store requestId. Will be created at confirm step.',
+      new_values: { sasapay_request_id: data.requestId },
+    });
   }
 
   return Response.json({
@@ -215,7 +225,7 @@ async function confirmPersonalOnboarding(base44, user, otp, requestId) {
   }
 
   // Store account details on wallet
-  const wallets = await base44.asServiceRole.entities.Wallet.filter({
+  let wallets = await base44.asServiceRole.entities.Wallet.filter({
     user_id: user.id,
     entity_type: 'personal',
   });
@@ -225,7 +235,20 @@ async function confirmPersonalOnboarding(base44, user, otp, requestId) {
   const accountNumberStr = data.data?.accountNumber != null ? String(data.data.accountNumber) : '';
   const accountStatus = data.data?.accountStatus || 'PENDING';
 
-  if (wallets.length > 0) {
+  if (wallets.length === 0) {
+    // Create personal wallet if missing (edge case: init succeeded but wallet wasn't found)
+    const wallet = await base44.asServiceRole.entities.Wallet.create({
+      user_id: user.id,
+      entity_type: 'personal',
+      sasapay_customer_id: accountNumberStr,
+      sasapay_account_number: accountNumberStr,
+      sasapay_account_status: accountStatus,
+      tier: 1,
+      status: 'active',
+    });
+    wallets = [wallet];
+  } else {
+    // Update existing wallet
     await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
       sasapay_customer_id: accountNumberStr,
       sasapay_account_number: accountNumberStr,

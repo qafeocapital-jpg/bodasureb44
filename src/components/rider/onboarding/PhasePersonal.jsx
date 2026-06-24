@@ -143,24 +143,25 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
       const idTaken = await checkIdUniqueness();
       if (phoneTaken || idTaken) { setSaving(false); return; }
       
-      // Initiate wallet activation FIRST (before saving profile)
-      // This ensures we don't save profile data if wallet init fails
-      const res = await base44.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
-      if (!res.data?.success) {
-        // Wallet activation failed — don't save profile
-        setWalletError(res.data?.error || 'Failed to activate wallet. Please try again.');
-        setSaving(false);
-        return;
-      }
-      
-      // Only save profile AFTER wallet init succeeds
+      // Save profile FIRST (before wallet activation)
+      // If wallet init fails later, the profile is already saved — user can retry
       await base44.auth.updateMe({
         full_name: form.full_name.trim(),
         phone: form.phone,
         national_id: form.national_id.trim(),
         county_id: form.county_id,
+        middle_name: form.middleName,
       });
       await refreshUser();
+      
+      // Initiate wallet activation AFTER profile is saved
+      const res = await base44.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
+      if (!res.data?.success) {
+        // Wallet activation failed, but profile is already saved — let user retry
+        setWalletError(res.data?.error || 'Failed to activate wallet. Please try again.');
+        setSaving(false);
+        return;
+      }
       
       if (res.data?.recovered) {
         // Account recovered — skip OTP, go to PIN
@@ -354,7 +355,7 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
               disabled={!canProceedForm() || saving}
               className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Next <ChevronRight className="w-4 h-4" /></>}
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Activate Wallet <ChevronRight className="w-4 h-4" /></>}
             </button>
           </div>
         </div>

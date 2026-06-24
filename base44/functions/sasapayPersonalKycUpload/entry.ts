@@ -34,10 +34,16 @@ Deno.serve(async (req) => {
       downloadFile(documentImageBackUrl),
     ]);
 
+    // Normalize phone to E.164 (254XXXXXXXXX) for SasaPay
+    let phoneDigits = (user.phone || '').replace(/\D/g, '');
+    if (phoneDigits.startsWith('0')) phoneDigits = phoneDigits.slice(1);
+    if (phoneDigits.startsWith('254')) phoneDigits = phoneDigits.slice(3);
+    const normalizedPhone = '254' + phoneDigits;
+
     // Create FormData with files
     const formData = new FormData();
     formData.append('merchantCode', merchantCode);
-    formData.append('customerMobileNumber', user.phone);
+    formData.append('customerMobileNumber', normalizedPhone);
     formData.append('passportSizePhoto', passportFile, 'selfie.jpg');
     formData.append('documentImageFront', frontFile, 'id_front.jpg');
     formData.append('documentImageBack', backFile, 'id_back.jpg');
