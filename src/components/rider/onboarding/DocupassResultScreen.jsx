@@ -4,10 +4,11 @@ import { CheckCircle, Clock, AlertTriangle, ArrowRight, LifeBuoy, RefreshCw } fr
 
 /**
  * Full-screen DocuPass result screen.
- * outcome: 'accepted' | 'review' | 'rejected'
+ * decision: 'accept' | 'review' | 'reject' (values from IDAnalyzer webhook)
+ * Props: decision, user, kycDocs, attemptCount, onDismiss, onGoToDashboard, onContactSupport
  */
 export default function DocupassResultScreen({
-  outcome,
+  decision,
   user,
   kycDocs,
   attemptCount,
@@ -16,35 +17,21 @@ export default function DocupassResultScreen({
   onContactSupport,
   onRefresh,
 }) {
-  const [polling, setPolling] = useState(false);
+  
 
-  // For 'review': poll for updates every 5s for up to 30s
-  useEffect(() => {
-    if (outcome !== 'review') return;
-    setPolling(true);
-    let attempts = 0;
-    const maxAttempts = 12; // 12 x 5s = 60s — webhook can take 30-60s to fire
-    const timer = setInterval(async () => {
-      attempts++;
-      if (onRefresh) await onRefresh();
-      if (attempts >= maxAttempts) {
-        setPolling(false);
-        clearInterval(timer);
-      }
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [outcome]);
+  // Polling handled by SubTaskIdentity; this component removed to avoid duplicate polling
+  // See issue #L3 fix: only SubTaskIdentity manages the polling loop
 
   // Fire confetti on accepted
   useEffect(() => {
-    if (outcome === 'accepted') {
+    if (decision === 'accept') {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       setTimeout(() => confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } }), 200);
       setTimeout(() => confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } }), 400);
     }
-  }, [outcome]);
+  }, [decision]);
 
-  if (outcome === 'accepted') {
+  if (decision === 'accept') {
     return (
       <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6 animate-fade-in">
         <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mb-4">
@@ -86,7 +73,7 @@ export default function DocupassResultScreen({
     );
   }
 
-  if (outcome === 'review') {
+  if (decision === 'review') {
     return (
       <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6 animate-fade-in">
         <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center mb-4">
@@ -96,13 +83,7 @@ export default function DocupassResultScreen({
         <p className="text-sm text-muted-foreground text-center mb-2 max-w-sm">
           Your verification is being processed by IDAnalyzer. This usually takes a few moments.
         </p>
-        {polling ? (
-          <p className="text-xs text-amber-600 mb-6 flex items-center gap-1">
-            <RefreshCw className="w-3 h-3 animate-spin" /> Checking for updates…
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground mb-6">We'll notify you via SMS once complete.</p>
-        )}
+        <p className="text-xs text-muted-foreground mb-6">We'll notify you via SMS once complete.</p>
 
         <button
           onClick={onGoToDashboard}
@@ -114,7 +95,7 @@ export default function DocupassResultScreen({
     );
   }
 
-  if (outcome === 'rejected') {
+  if (decision === 'reject') {
     const canRetry = attemptCount < 3;
     const rejectedDoc = kycDocs.find(d => d.status === 'rejected' && d.provider_reference);
     const rejectionReason = rejectedDoc?.rejection_reason || 'Verification did not pass. Please ensure your ID is clear and well-lit.';

@@ -17,15 +17,14 @@ export function getTaskStatuses(kycDocs = [], user, vehicle) {
   const selfieProcessed = kycDocs.find(d => d.document_type === 'selfie' && d.provider_reference);
   const processedCount = [idFrontProcessed, idBackProcessed, selfieProcessed].filter(Boolean).length;
   const allThreeProcessed = processedCount === 3;
-  const allThreeApproved = allThreeProcessed &&
-    idFrontProcessed.status === 'approved' &&
-    idBackProcessed.status === 'approved' &&
-    selfieProcessed.status === 'approved';
+  const allThreeApproved = idFrontProcessed?.status === 'approved' &&
+    idBackProcessed?.status === 'approved' &&
+    selfieProcessed?.status === 'approved';
   const anyIdRejected = [idFrontProcessed, idBackProcessed, selfieProcessed].some(d => d?.status === 'rejected');
+  // M5 fix: remove attempt_count-based 'processing' state — let UI component manage in-progress display
   const identityStatus = allThreeApproved ? 'verified'
     : anyIdRejected ? 'rejected'
     : allThreeProcessed ? 'submitted'
-    : (user?.docupass_attempt_count > 0) ? 'processing'
     : 'not_started';
 
   // Task 2: Bike Photos

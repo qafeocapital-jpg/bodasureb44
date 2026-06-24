@@ -26,22 +26,18 @@ Deno.serve(async (req) => {
     // Fetch KYC documents
     const kycDocs = await sr.entities.KycDocument.filter({ user_id: user.id });
 
-    // Fetch vehicle
-    const vehicles = await sr.entities.Vehicle.filter({ rider_id: user.id }, '-created_date', 1);
-    const vehicle = vehicles[0] || null;
+    // Fetch vehicle (M3 fix: remove invalid sort/limit params from filter)
+    const vehicles = await sr.entities.Vehicle.filter({ rider_id: user.id });
+    const vehicle = vehicles.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0] || null;
 
     // Sub-task 1: Identity Verification
-    // IDAnalyzer-approved: all 3 identity docs approved with provider_reference
-    // Or: user.docupass_decision === 'accept' (set by webhook)
-    const hasIdFront = kycDocs.some(d => d.document_type === 'id_front' && d.file_url);
-    const hasIdBack = kycDocs.some(d => d.document_type === 'id_back' && d.file_url);
-    const hasSelfie = kycDocs.some(d => d.document_type === 'selfie' && d.file_url);
-    const identityDocsUploaded = hasIdFront && hasIdBack && hasSelfie;
+    // H3 fix: ONLY allow verification if docupass_decision === 'accept' or all 3 docs are approved with provider_reference
+    // Removed identityDocsUploaded bypass to prevent rejected users from passing
     const identityApproved = fullUser.docupass_decision === 'accept' ||
       ['id_front', 'id_back', 'selfie'].every(type =>
         kycDocs.some(d => d.document_type === type && d.status === 'approved' && d.provider_reference)
       );
-    const identityDone = identityApproved || identityDocsUploaded;
+    const identityDone = identityApproved;
 
     // Sub-task 2: Bike Photos
     const hasBikeFront = kycDocs.some(d => d.document_type === 'bike_front' && d.file_url);

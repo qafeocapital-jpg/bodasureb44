@@ -22,6 +22,12 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
   const [showOutcome, setShowOutcome] = useState(false);
   const [pollAttempts, setPollAttempts] = useState(0);
   const pollTimerRef = useRef(null);
+  const latestUserRef = useRef(user); // H2 fix: track latest user to avoid stale closure
+
+  // Update latestUserRef whenever user changes
+  useEffect(() => {
+    latestUserRef.current = user;
+  }, [user]);
 
   // Only consider IDAnalyzer-processed docs (with provider_reference)
   const idFrontDoc = kycDocs.find(d => d.document_type === 'id_front' && d.provider_reference);
@@ -33,14 +39,14 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
   const attemptCount = user?.docupass_attempt_count || 0;
   const isLocked = attemptCount >= 3 && anyRejected;
 
-  // Detect return from DocuPass (mobile new tab)
+  // Detect return from DocuPass (mobile new tab) — M2 fix: deduplicate polling trigger
   useEffect(() => {
     if (!sessionActive) return;
 
     function handleVisibility() {
       if (document.visibilityState === 'visible') {
         setSessionActive(false);
-        handleReturn();
+        if (!polling) handleReturn(); // M2: only trigger if not already polling
       }
     }
 
@@ -51,7 +57,7 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pageshow', handleVisibility);
     };
-  }, [sessionActive]);
+  }, [sessionActive, polling]);
 
   // Polling effect — start with 3s delay, then poll every 5s for up to 5 min (review state)
   useEffect(() => {
@@ -70,8 +76,8 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
         await onDataChange();
         setPollAttempts(i + 1);
         
-        // Stop if decision is now available (webhook fired)
-        if (user?.docupass_decision) break;
+        // Stop if decision is now available (webhook fired) — use ref to get latest user
+        if (latestUserRef.current?.docupass_decision) break;
         
         // Wait 5s before next poll
         if (i < maxAttempts - 1) {
@@ -91,7 +97,7 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
       mounted = false;
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
-  }, [polling]);
+  }, [polling, onDataChange]);
 
   // Stop polling early if decision is available
   useEffect(() => {
@@ -147,8 +153,11 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
       <DocupassResultScreen
         decision={user.docupass_decision}
         user={user}
+        kycDocs={kycDocs}
         attemptCount={user.docupass_attempt_count || 0}
         onDismiss={handleOutcomeDismiss}
+        onGoToDashboard={() => navigate('/app')}
+        onContactSupport={() => navigate('/app/support')}
         onRefresh={onDataChange}
       />
     );

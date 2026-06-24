@@ -71,8 +71,8 @@ Deno.serve(async (req) => {
     }
 
     if (res.status === 429) {
-      console.warn('[idAnalyzerCallback] Rate limited (429). Silently discarding.');
-      return Response.json({ success: true, message: 'Rate limited — silently discarding' });
+     console.warn('[idAnalyzerCallback] Rate limited (429). Returning 503 for retry.');
+     return Response.json({ error: 'IDAnalyzer rate limited — retrying' }, { status: 503 });
     }
 
     // Return 500 for IDAnalyzer 5xx so they retry per their schedule
@@ -224,15 +224,7 @@ Deno.serve(async (req) => {
     ? (warnings[0]?.description || 'Verification rejected by IDAnalyzer')
     : null;
 
-  // --- 5. Upsert KycDocuments ---
-  const existingDocs = await base44.asServiceRole.entities.KycDocument.filter({ user_id: userId });
-  const docTypes = [
-    { type: 'id_front', url: frontUrl },
-    { type: 'id_back', url: backUrl },
-    { type: 'selfie', url: faceUrl },
-  ];
-
-  // --- Idempotency check (AFTER API re-fetch, keyed off transactionId + decision) ---
+  // --- Idempotency check (BEFORE any DB writes) ---
   try {
     const existing = await base44.asServiceRole.entities.KycDocument.filter({
       provider_reference: transactionId,
@@ -244,6 +236,14 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.warn('[idAnalyzerCallback] Idempotency check failed:', e.message);
   }
+
+  // --- 5. Upsert KycDocuments ---
+  const existingDocs = await base44.asServiceRole.entities.KycDocument.filter({ user_id: userId });
+  const docTypes = [
+    { type: 'id_front', url: frontUrl },
+    { type: 'id_back', url: backUrl },
+    { type: 'selfie', url: faceUrl },
+  ];
 
   const upsertData = {
     status: docStatus,
@@ -341,7 +341,15 @@ Deno.serve(async (req) => {
 
     // Wallet tier upgrade & AuditLog (SYNCHRONOUS before returning 200)
     if (decision === 'accept') {
-      await upgradeWalletTier(base44, userId);
+      const tierUpgradeResult = await upgradeWalletTier(base44, userId);
+      if (!tierUpgradeResult?.success === false) {
+        console.error('[idAnalyzerCallback] Wallet tier upgrade FAILED during KYC approval');
+        await base44.asServiceRole.entities.AuditLog.create({
+          user_id: userId,
+          action: 'wallet_tier_upgrade_failed',
+          description: `Wallet tier upgrade failed during KYC approval: ${tierUpgradeResult?.error || 'unknown error'}`,
+        });
+      }
     }
     await base44.asServiceRole.entities.AuditLog.create({
       user_id: userId,
@@ -376,9 +384,12 @@ async function upgradeWalletTier(base44, userId) {
       await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
         tier: 2, status: 'active',
       });
+      return { success: true };
     }
+    return { success: false, error: 'No personal wallet found' };
   } catch (e) {
     console.warn('[idAnalyzerCallback] Wallet upgrade failed:', e.message);
+    return { success: false, error: e.message };
   }
 }
 

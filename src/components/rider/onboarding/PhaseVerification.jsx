@@ -54,12 +54,14 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     }
   }, [user?.kyc_just_approved, refreshUser]);
 
-  // Auto-verify phone if wallet is active (already verified during activation)
+  // L1 fix: Auto-verify phone via backend function (not client-side updateMe)
   useEffect(() => {
     if (wallet?.status === 'active' && wallet?.tier >= 1 && user && !user.phone_verified) {
-      base44.auth.updateMe({ phone_verified: true }).catch(() => {}).finally(() => {
-        if (refreshUser) refreshUser();
-      });
+      base44.functions.invoke('checkWalletPhoneVerified', { userId: user.id })
+        .then(() => {
+          if (refreshUser) refreshUser();
+        })
+        .catch((e) => console.warn('[PhaseVerification] Phone verification failed:', e.message));
     }
   }, [wallet?.status, wallet?.tier, user?.phone_verified]);
 

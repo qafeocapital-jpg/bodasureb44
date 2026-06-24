@@ -13,6 +13,16 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // H1: Rate-limit guard — prevent excessive session creation
+    if (user.docupass_attempt_count >= 3) {
+      return Response.json({ error: 'Maximum verification attempts reached. Contact support.' }, { status: 429 });
+    }
+
+    // Short-circuit if already verified
+    if (user.kyc_status === 'verified') {
+      return Response.json({ error: 'Already verified', url: null }, { status: 200 });
+    }
+
     await req.json().catch(() => ({}));
 
     const apiKey = Deno.env.get('IDANALYZER_API_KEY');
@@ -52,13 +62,14 @@ Deno.serve(async (req) => {
 
     console.log('[createDocupassSession] Session created:', data.url);
 
-    // Increment attempt count on user
+    // Increment attempt count + store session reference on user (L2: for admin recovery)
     try {
       await base44.auth.updateMe({
         docupass_attempt_count: (user.docupass_attempt_count || 0) + 1,
+        docupass_session_reference: data.reference, // L2: store session ID for admin queries
       });
     } catch (e) {
-      console.warn('[createDocupassSession] Failed to increment attempt count:', e.message);
+      console.warn('[createDocupassSession] Failed to increment attempt count or store session reference:', e.message);
     }
 
     // DocuPass create response returns 'reference' (not 'id') per IDAnalyzer v2 docs
