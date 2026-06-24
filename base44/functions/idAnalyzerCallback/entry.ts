@@ -11,9 +11,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  *   5. Store PDF audit report URL directly from outputFile (no download/upload)
  *   6. Upsert KycDocuments + hydrate User with full extracted identity
  *   7. Auto-set kyc_status, verification_complete, wallet tier on accept
- *   8. Push docs to SasaPay KYC (on accept, if wallet onboarded)
- *   9. SMS notification to rider
- *  10. AuditLog entries
+ *   8. SMS notification to rider
+ *   9. AuditLog entries
  */
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -45,7 +44,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Stale timestamp' }, { status: 401 });
     }
 
-    const expectedHmac = await computeHmac(webhookSecret, `${idaTimestamp}.${rawBody}`);
+    const expectedHmac = await computeHmac(webhookSecret, rawBody);
 
     const candidateSigs = [
       `v1=${expectedHmac}`,
@@ -248,7 +247,7 @@ Deno.serve(async (req) => {
 
   await Promise.all(docTypes.map(async ({ type, url }) => {
     const existing = existingDocs.find(d => d.document_type === type);
-    const recordData = { ...upsertData, file_url: url || (existing?.file_url || '') };
+    const recordData = { ...upsertData, file_url: url || existing?.file_url || null };
     if (existing) {
       await base44.asServiceRole.entities.KycDocument.update(existing.id, recordData);
     } else {
@@ -259,6 +258,11 @@ Deno.serve(async (req) => {
       });
     }
   }));
+
+  // Log warning if all 3 outputImage URLs are empty — indicates IDAnalyzer profile needs 'Return Output Image' enabled
+  if (!frontUrl && !backUrl && !faceUrl) {
+    console.warn('[idAnalyzerCallback] All outputImage URLs are empty — verify IDAnalyzer KYC Profile has "Return Output Image" enabled in settings');
+  }
 
   // --- 6. Hydrate User with essential fields + auto-set verification status ---
   // This is SYNCHRONOUS (before returning 200) because the frontend polls for these fields.
@@ -323,32 +327,28 @@ Deno.serve(async (req) => {
     console.warn('[idAnalyzerCallback] Failed to hydrate user:', e.message);
   }
 
-  // --- Return 200 immediately; wallet upgrade, audit log, SasaPay, SMS are fire-and-forget ---
+  // --- Wallet tier upgrade & AuditLog (SYNCHRONOUS before returning 200) ---
+  try {
+    if (decision === 'accept') {
+      await upgradeWalletTier(base44, userId);
+    }
+    await base44.asServiceRole.entities.AuditLog.create({
+      user_id: userId,
+      action: 'idanalyzer_docupass_completed',
+      entity_type: 'KycDocument',
+      description: `DocuPass ${decision}. Tx: ${transactionId}. Face: ${faceConfidence}, Auth: ${authScore}. Report: ${auditReportUrl ? 'stored' : 'none'}`,
+      new_values: { decision, transactionId, faceConfidence, auditReportUrl },
+    });
+  } catch (e) {
+    console.error('[idAnalyzerCallback] Failed to create wallet/audit:', e.message);
+  }
+
+  // --- SMS notification (fire-and-forget, acceptable to lose) ---
+  sendKycSms(base44, userId, decision).catch(() => {});
+
+  // --- Return 200 immediately ---
   // Per IDAnalyzer docs: "Your endpoint must return HTTP 200 within 10 seconds."
-  const responsePayload = Response.json({ success: true, status: docStatus, decision });
-
-  const tasks = [];
-  // Wallet tier upgrade (fire-and-forget)
-  if (decision === 'accept') {
-    tasks.push(upgradeWalletTier(base44, userId));
-  }
-  // AuditLog (fire-and-forget)
-  tasks.push(base44.asServiceRole.entities.AuditLog.create({
-    user_id: userId,
-    action: 'idanalyzer_docupass_completed',
-    entity_type: 'KycDocument',
-    description: `DocuPass ${decision}. Tx: ${transactionId}. Face: ${faceConfidence}, Auth: ${authScore}. Report: ${auditReportUrl ? 'stored' : 'none'}`,
-    new_values: { decision, transactionId, faceConfidence, auditReportUrl },
-  }).catch(() => {}));
-  // SasaPay KYC push (fire-and-forget)
-  if (decision === 'accept' && frontUrl && backUrl && faceUrl) {
-    tasks.push(pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }));
-  }
-  // SMS notification (fire-and-forget)
-  tasks.push(sendKycSms(base44, userId, decision));
-  Promise.allSettled(tasks).catch(() => {});
-
-  return responsePayload;
+  return Response.json({ success: true, status: docStatus, decision });
 });
 
 // ---------------------------------------------------------------------------
@@ -435,117 +435,7 @@ async function constantTimeEqual(a, b) {
   return diff === 0;
 }
 
-// ---------------------------------------------------------------------------
-// SasaPay KYC push (service-role, fire-and-forget)
-// ---------------------------------------------------------------------------
 
-async function pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }) {
-  try {
-    const wallets = await base44.asServiceRole.entities.Wallet.filter({
-      user_id: userId, entity_type: 'personal',
-    });
-    if (wallets.length === 0) return;
-    const wallet = wallets[0];
-    if (!wallet.sasapay_account_number) return;
-
-    const user = await base44.asServiceRole.entities.User.get(userId);
-    if (!user?.phone) return;
-    const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
-    if (!merchantCode) return;
-
-    const [token, faceFile, frontFile, backFile] = await Promise.all([
-      getSasapayToken(), downloadFile(faceUrl), downloadFile(frontUrl), downloadFile(backUrl),
-    ]);
-
-    const formData = new FormData();
-    formData.append('merchantCode', merchantCode);
-    formData.append('customerMobileNumber', user.phone);
-    formData.append('passportSizePhoto', faceFile, 'selfie.jpg');
-    formData.append('documentImageFront', frontFile, 'id_front.jpg');
-    formData.append('documentImageBack', backFile, 'id_back.jpg');
-
-    const response = await fetch(`${getSasapayApiUrl()}/waas/personal-onboarding/kyc/`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    });
-
-    const respText = await response.text();
-    let data;
-    try { data = JSON.parse(respText); } catch {
-      throw new Error(`SasaPay KYC returned non-JSON (HTTP ${response.status})`);
-    }
-
-    if (data.responseCode !== '0') {
-      throw new Error(`SasaPay KYC failed: ${data.message || data.responseCode}`);
-    }
-
-    await base44.asServiceRole.entities.Wallet.update(wallet.id, {
-      sasapay_account_status: data.data?.accountStatus || 'AWAITING_KYC_UPLOAD',
-      sasapay_kyc_uploaded_at: new Date().toISOString(),
-    });
-
-    await base44.asServiceRole.entities.AuditLog.create({
-      user_id: userId,
-      action: 'sasapay_kyc_uploaded',
-      entity_type: 'Wallet',
-      entity_id: wallet.id,
-      description: `SasaPay KYC auto-uploaded from DocuPass. Status: ${data.data?.accountStatus}`,
-    });
-  } catch (error) {
-    console.error(`[idAnalyzerCallback] SasaPay KYC push failed: ${error.message}`);
-    try {
-      const wallets = await base44.asServiceRole.entities.Wallet.filter({
-        user_id: userId, entity_type: 'personal',
-      });
-      if (wallets.length > 0) {
-        await base44.asServiceRole.entities.Wallet.update(wallets[0].id, { needs_review: true });
-      }
-    } catch {}
-    try {
-      await base44.asServiceRole.entities.AuditLog.create({
-        user_id: userId,
-        action: 'sasapay_kyc_upload_failed',
-        entity_type: 'Wallet',
-        description: `SasaPay KYC auto-upload failed: ${error.message}`,
-      });
-    } catch {}
-  }
-}
-
-async function getSasapayToken() {
-  const clientId = Deno.env.get('SASAPAY_CLIENT_ID');
-  const clientSecret = Deno.env.get('SASAPAY_CLIENT_SECRET');
-  const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
-  const authUrl = `https://${env}.sasapay.app/api/v1/auth/token/?grant_type=client_credentials`;
-  const credentials = btoa(`${clientId}:${clientSecret}`);
-  const response = await fetch(authUrl, {
-    method: 'GET',
-    headers: { 'Authorization': `Basic ${credentials}` },
-  });
-  const text = await response.text();
-  let data;
-  try { data = JSON.parse(text); } catch {
-    throw new Error(`SasaPay auth returned non-JSON (HTTP ${response.status})`);
-  }
-  if (!data.access_token) {
-    throw new Error(`SasaPay auth failed: ${data.detail || data.error}`);
-  }
-  return data.access_token;
-}
-
-function getSasapayApiUrl() {
-  const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
-  return `https://${env}.sasapay.app/api/v2`;
-}
-
-async function downloadFile(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to download file: ${url}`);
-  return new File([await response.arrayBuffer()], 'file', {
-    type: response.headers.get('content-type') || 'image/jpeg',
-  });
-}
 
 // ---------------------------------------------------------------------------
 // SMS notification (fire-and-forget)
