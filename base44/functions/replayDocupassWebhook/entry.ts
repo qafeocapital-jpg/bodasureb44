@@ -1,126 +1,72 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * IDAnalyzer DocuPass webhook handler (v2).
+ * Admin recovery tool: fetches a completed IDAnalyzer DocuPass transaction
+ * by transactionId from the IDAnalyzer vault and processes it through the
+ * same pipeline as idAnalyzerCallback (field extraction, KycDocument upsert,
+ * User hydration, wallet tier upgrade, SasaPay KYC push, SMS, AuditLog).
  *
- * Atomic flow on every docupass_conclusive event:
- *   1. Validate HMAC-SHA256 signature (v1=<hex> format per IDAnalyzer docs)
- *   2. Filter events — only process docupass_conclusive
- *   3. Extract ALL ID fields (per Data Fields doc) with confidence scores
- *   4. Extract face confidence from scores.faceCompare (NOT data.face)
- *   5. Store PDF audit report URL directly from outputFile (no download/upload)
- *   6. Upsert KycDocuments + hydrate User with full extracted identity
- *   7. Auto-set kyc_status, verification_complete, wallet tier on accept
- *   8. Push docs to SasaPay KYC (on accept, if wallet onboarded)
- *   9. SMS notification to rider
- *  10. AuditLog entries
+ * Bypasses signature verification (admin-initiated).
+ * Force-overwrites existing KycDocuments (intentional recovery).
+ *
+ * Requires: super_admin or bodasure_staff role.
+ * Requires: IDANALYZER_API_KEY secret.
  */
 Deno.serve(async (req) => {
-  const base44 = createClientFromRequest(req);
-
-  const rawBody = await req.text();
-
-  // --- 1. HMAC-SHA256 Signature Verification ---
-  const webhookSecret = Deno.env.get('IDANALYZER_WEBHOOK_SECRET');
-  if (!webhookSecret) {
-    return Response.json({ error: 'Webhook secret not configured' }, { status: 500 });
-  }
-
-  const idaSignature = req.headers.get('X-IDA-Signature');
-  const idaTimestamp = req.headers.get('X-IDA-Timestamp');
-  const querySecret = new URL(req.url).searchParams.get('secret');
-
-  let authenticated = false;
-
-  if (idaSignature && idaTimestamp) {
-    const tsNum = parseInt(idaTimestamp, 10);
-    const nowSec = Math.floor(Date.now() / 1000);
-    if (isNaN(tsNum)) {
-      console.warn(`[idAnalyzerCallback] Invalid timestamp header: "${idaTimestamp}"`);
-      return Response.json({ error: 'Invalid timestamp' }, { status: 401 });
-    }
-    const tsDelta = Math.abs(nowSec - tsNum);
-    if (tsDelta > 1800) {
-      console.warn(`[idAnalyzerCallback] Stale timestamp: delta=${tsDelta}s (limit=1800s), received=${idaTimestamp}, now=${nowSec}`);
-      return Response.json({ error: 'Stale timestamp' }, { status: 401 });
-    }
-
-    const expectedHmac = await computeHmac(webhookSecret, `${idaTimestamp}.${rawBody}`);
-
-    const candidateSigs = [
-      `v1=${expectedHmac}`,
-      `sha256=${expectedHmac}`,
-      expectedHmac,
-    ];
-
-    for (const candidate of candidateSigs) {
-      if (await constantTimeEqual(candidate, idaSignature)) {
-        authenticated = true;
-        break;
-      }
-    }
-
-    if (!authenticated) {
-      const recvPrefix = idaSignature.substring(0, 20);
-      const expPrefix = `v1=${expectedHmac.substring(0, 20)}`;
-      console.warn(`[idAnalyzerCallback] Signature mismatch. Received: "${recvPrefix}...", Expected: "${expPrefix}..."`);
-      return Response.json({ error: 'Invalid signature' }, { status: 401 });
-    }
-  } else if (querySecret === webhookSecret) {
-    console.warn('[idAnalyzerCallback] Auth via query-string secret fallback');
-    authenticated = true;
-  } else {
-    console.warn('[idAnalyzerCallback] No signature header or query secret — processing anyway (no-signature fallback). IDAnalyzer profile may have signatures disabled.');
-    authenticated = true;
-  }
-
-  // --- Parse payload ---
-  let payload;
   try {
-    payload = JSON.parse(rawBody);
-  } catch {
-    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (user.role !== 'super_admin' && user.role !== 'bodasure_staff') {
+      return Response.json({ error: 'Forbidden — super_admin or bodasure_staff only' }, { status: 403 });
+    }
 
-  // --- 2. Event filtering ---
-  const eventType = payload.event;
-  if (eventType && eventType !== 'docupass_conclusive') {
-    return Response.json({ success: true, message: `Ignored event: ${eventType}` });
-  }
+    const { transactionId, userId } = await req.json();
+    if (!transactionId || !userId) {
+      return Response.json({ error: 'transactionId and userId are required' }, { status: 400 });
+    }
 
+    const apiKey = Deno.env.get('IDANALYZER_API_KEY');
+    if (!apiKey) return Response.json({ error: 'IDANALYZER_API_KEY not configured' }, { status: 500 });
+
+    console.log(`[replayDocupassWebhook] Fetching transaction ${transactionId} for user ${userId}`);
+
+    const response = await fetch(`https://api2.idanalyzer.com/transaction/${transactionId}`, {
+      headers: { 'X-API-KEY': apiKey },
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[replayDocupassWebhook] IDAnalyzer API error ${response.status}: ${errText}`);
+      return Response.json({ error: `IDAnalyzer API error (${response.status}): ${errText}` }, { status: 502 });
+    }
+
+    const transaction = await response.json();
+    console.log(`[replayDocupassWebhook] Transaction fetched. Decision: ${transaction.decision}`);
+
+    const result = await processTransaction(base44, transaction, userId, user.id);
+    return Response.json(result);
+  } catch (error) {
+    console.error('[replayDocupassWebhook] Error:', error.message);
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Processing pipeline (mirrors idAnalyzerCallback, force-overwrites)
+// ---------------------------------------------------------------------------
+
+async function processTransaction(base44, payload, userId, adminUserId) {
+  const transactionId = payload.transactionId || payload.id || 'unknown';
   const decision = payload.decision;
-  // IDAnalyzer webhook uses transactionId (not id)
-  const transactionId = payload.transactionId || payload.id;
-  const customData = payload.customData;
 
-  if (!transactionId || !decision) {
-    return Response.json({ error: 'Missing required fields: transactionId, decision' }, { status: 400 });
+  if (!decision) {
+    return { success: false, error: 'No decision in transaction response', transactionId };
   }
 
   const statusMap = { accept: 'approved', review: 'pending', reject: 'rejected' };
   const docStatus = statusMap[decision] || 'pending';
 
-  // --- Identify user from customData (what we passed to DocuPass create) ---
-  let userId = customData;
-  if (!userId && payload.reference) userId = payload.reference;
-
-  if (!userId) {
-    return Response.json({ success: true, message: 'No user reference in payload' });
-  }
-
-  // --- Idempotency: key off transactionId + event ---
-  try {
-    const existing = await base44.asServiceRole.entities.KycDocument.filter({
-      provider_reference: transactionId,
-    });
-    if (existing.length > 0) {
-      return Response.json({ success: true, message: 'Already processed (idempotent)' });
-    }
-  } catch (e) {
-    console.warn('[idAnalyzerCallback] Idempotency check failed:', e.message);
-  }
-
-  // --- 3. Extract ALL data fields with confidence (per Data Fields doc) ---
   const data = payload.data || {};
   const outputImage = payload.outputImage || {};
   const warnings = payload.warning || [];
@@ -129,64 +75,46 @@ Deno.serve(async (req) => {
   const backUrl = outputImage.back || '';
   const faceUrl = outputImage.face || '';
 
-  // Correct IDAnalyzer v2 field names per https://developer.idanalyzer.com/help/data-fields
   const fieldDefs = [
-    // Names
     'fullName', 'firstName', 'middleName', 'lastName',
     'firstNameLocal', 'middleNameLocal', 'lastNameLocal', 'fullNameLocal',
-    // Dates
     'dob', 'dob_day', 'dob_month', 'dob_year',
     'expiry', 'expiry_day', 'expiry_month', 'expiry_year',
     'issued', 'issued_day', 'issued_month', 'issued_year',
     'daysToExpiry', 'daysFromIssue',
-    // Personal Information
     'age', 'sex', 'height', 'weight', 'hairColor', 'eyeColor',
     'address1', 'address2', 'postcode', 'placeOfBirth', 'religion',
-    // Document Information
     'documentNumber', 'personalNumber', 'documentSide', 'documentType', 'documentName',
     'internalId', 'issueAuthority',
     'stateFull', 'stateShort',
     'vehicleClass', 'restrictions', 'endorsement',
-    // Country & Nationality (correct v2 names)
     'countryFull', 'countryIso2', 'countryIso3',
     'nationalityFull', 'nationalityIso2', 'nationalityIso3',
-    // Other Data
     'optionalData', 'optionalData2', 'optionalData3', 'optionalData4',
   ];
 
   const fields = {};
   for (const key of fieldDefs) {
     const extracted = extractField(data[key]);
-    if (extracted) {
-      fields[key] = extracted;
-    }
+    if (extracted) fields[key] = extracted;
   }
 
-  // Capture extra fields not in our list (forward compatibility)
   const extraFields = {};
   for (const key of Object.keys(data)) {
     if (!fieldDefs.includes(key) && key !== 'face' && key !== 'authentication' && key !== 'aml') {
       const extracted = extractField(data[key]);
-      if (extracted && extracted.value != null) {
-        extraFields[key] = extracted;
-      }
+      if (extracted && extracted.value != null) extraFields[key] = extracted;
     }
   }
 
-  // Helper: get just the value from a field (avoids storing redundant `values` object)
   function fieldValue(key) {
-    const f = fields[key];
-    return f?.value ?? null;
+    return fields[key]?.value ?? null;
   }
 
-  // --- 4. Face match confidence from scores.faceCompare (NOT data.face) ---
   const scores = payload.scores || {};
   const faceConfidence = scores.faceCompare != null ? scores.faceCompare : null;
-
-  // Face identical: derive from threshold (>= 0.7 = identical match)
   const faceIsIdentical = faceConfidence != null ? faceConfidence >= 0.7 : null;
 
-  // --- Document authentication score (only anti-forgery warnings, not all high-severity) ---
   const ANTI_FORGERY_CODES = new Set([
     'IMAGE_FORGERY', 'FAKE_ID', 'FEATURE_VERIFICATION_FAILED',
     'ARTIFICIAL_IMAGE', 'RECAPTURED_DOCUMENT', 'SCREEN_DETECTED',
@@ -195,12 +123,10 @@ Deno.serve(async (req) => {
   const antiForgeryWarnings = warnings.filter(w => ANTI_FORGERY_CODES.has(w.code));
   const authScore = antiForgeryWarnings.length === 0 ? 1.0 : 0.0;
 
-  // --- OCR quality: ratio of expected fields successfully extracted ---
   const totalFieldDefs = fieldDefs.length;
   const extractedCount = Object.keys(fields).length;
   const matchRate = totalFieldDefs > 0 ? Math.round((extractedCount / totalFieldDefs) * 100) / 100 : null;
 
-  // --- PDF audit report URL from outputFile (no download needed) ---
   const outputFile = payload.outputFile || [];
   const auditReport = outputFile.find(f =>
     (f.name && f.name.toLowerCase().includes('audit')) ||
@@ -209,7 +135,6 @@ Deno.serve(async (req) => {
   );
   const auditReportUrl = auditReport?.fileUrl || null;
 
-  // Build extracted data JSON (strip bounding boxes + redundant values to reduce storage)
   const extractedData = {
     fields,
     extraFields,
@@ -230,7 +155,7 @@ Deno.serve(async (req) => {
     ? (warnings[0]?.description || 'Verification rejected by IDAnalyzer')
     : null;
 
-  // --- 5. Upsert KycDocuments ---
+  // --- Upsert KycDocuments (force-overwrite, skip idempotency) ---
   const existingDocs = await base44.asServiceRole.entities.KycDocument.filter({ user_id: userId });
   const docTypes = [
     { type: 'id_front', url: frontUrl },
@@ -253,28 +178,23 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.KycDocument.update(existing.id, recordData);
     } else {
       await base44.asServiceRole.entities.KycDocument.create({
-        user_id: userId,
-        document_type: type,
-        ...recordData,
+        user_id: userId, document_type: type, ...recordData,
       });
     }
   }));
 
-  // --- 6. Hydrate User with essential fields + auto-set verification status ---
-  // This is SYNCHRONOUS (before returning 200) because the frontend polls for these fields.
-  // Wallet upgrade, AuditLog, SasaPay, SMS are moved to fire-and-forget after returning 200.
+  // --- Hydrate User ---
   let existingNationalId = null;
+  let userUpdate = {};
   try {
-    const user = await base44.asServiceRole.entities.User.get(userId);
-    existingNationalId = user?.national_id || null;
-    const userUpdate = {
+    const targetUser = await base44.asServiceRole.entities.User.get(userId);
+    existingNationalId = targetUser?.national_id || null;
+    userUpdate = {
       docupass_decision: decision,
       id_extracted_data: JSON.stringify(extractedData),
-      // Always mark report as fetched (we looked — URL either exists or doesn't)
       docupass_report_fetched: true,
     };
 
-    // Store key fields individually for querying/display
     if (faceConfidence != null) userUpdate.id_face_confidence = faceConfidence;
     if (faceIsIdentical != null) userUpdate.id_face_identical = faceIsIdentical;
     if (authScore != null) userUpdate.id_authentication_score = authScore;
@@ -287,13 +207,8 @@ Deno.serve(async (req) => {
     if (fieldValue('nationalityFull')) userUpdate.id_nationality = fieldValue('nationalityFull');
     if (fieldValue('expiry')) userUpdate.id_expiry_date = normalizeDate(fieldValue('expiry'));
     if (fieldValue('issued')) userUpdate.id_issued_date = normalizeDate(fieldValue('issued'));
+    if (auditReportUrl) userUpdate.docupass_report_url = auditReportUrl;
 
-    // Store audit report URL directly (no PDF download — optimizes DB for millions of users)
-    if (auditReportUrl) {
-      userUpdate.docupass_report_url = auditReportUrl;
-    }
-
-    // Auto-set verification status based on decision
     if (decision === 'accept') {
       userUpdate.kyc_status = 'verified';
       userUpdate.verification_complete = true;
@@ -320,65 +235,73 @@ Deno.serve(async (req) => {
 
     await base44.asServiceRole.entities.User.update(userId, userUpdate);
   } catch (e) {
-    console.warn('[idAnalyzerCallback] Failed to hydrate user:', e.message);
+    console.warn('[replayDocupassWebhook] Failed to hydrate user:', e.message);
   }
 
-  // --- Return 200 immediately; wallet upgrade, audit log, SasaPay, SMS are fire-and-forget ---
-  // Per IDAnalyzer docs: "Your endpoint must return HTTP 200 within 10 seconds."
-  const responsePayload = Response.json({ success: true, status: docStatus, decision });
-
-  const tasks = [];
-  // Wallet tier upgrade (fire-and-forget)
+  // --- Wallet tier upgrade ---
   if (decision === 'accept') {
-    tasks.push(upgradeWalletTier(base44, userId));
-  }
-  // AuditLog (fire-and-forget)
-  tasks.push(base44.asServiceRole.entities.AuditLog.create({
-    user_id: userId,
-    action: 'idanalyzer_docupass_completed',
-    entity_type: 'KycDocument',
-    description: `DocuPass ${decision}. Tx: ${transactionId}. Face: ${faceConfidence}, Auth: ${authScore}. Report: ${auditReportUrl ? 'stored' : 'none'}`,
-    new_values: { decision, transactionId, faceConfidence, auditReportUrl },
-  }).catch(() => {}));
-  // SasaPay KYC push (fire-and-forget)
-  if (decision === 'accept' && frontUrl && backUrl && faceUrl) {
-    tasks.push(pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }));
-  }
-  // SMS notification (fire-and-forget)
-  tasks.push(sendKycSms(base44, userId, decision));
-  Promise.allSettled(tasks).catch(() => {});
-
-  return responsePayload;
-});
-
-// ---------------------------------------------------------------------------
-// Wallet tier upgrade (fire-and-forget, called after returning 200)
-// ---------------------------------------------------------------------------
-
-async function upgradeWalletTier(base44, userId) {
-  try {
-    const wallets = await base44.asServiceRole.entities.Wallet.filter({
-      user_id: userId, entity_type: 'personal',
-    });
-    if (wallets.length > 0) {
-      await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
-        tier: 2, status: 'active',
+    try {
+      const wallets = await base44.asServiceRole.entities.Wallet.filter({
+        user_id: userId, entity_type: 'personal',
       });
+      if (wallets.length > 0) {
+        await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
+          tier: 2, status: 'active',
+        });
+      }
+    } catch (e) {
+      console.warn('[replayDocupassWebhook] Wallet upgrade failed:', e.message);
     }
-  } catch (e) {
-    console.warn('[idAnalyzerCallback] Wallet upgrade failed:', e.message);
   }
+
+  // --- AuditLog ---
+  try {
+    await base44.asServiceRole.entities.AuditLog.create({
+      user_id: userId,
+      action: 'idanalyzer_docupass_replayed',
+      entity_type: 'KycDocument',
+      description: `DocuPass transaction ${transactionId} manually replayed by admin ${adminUserId}. Decision: ${decision}. Face: ${faceConfidence}, Auth: ${authScore}.`,
+      new_values: { decision, transactionId, faceConfidence, authScore, auditReportUrl },
+    });
+  } catch (e) {
+    console.warn('[replayDocupassWebhook] AuditLog failed:', e.message);
+  }
+
+  // --- SasaPay KYC push (fire-and-forget) ---
+  if (decision === 'accept' && frontUrl && backUrl && faceUrl) {
+    pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }).catch(e =>
+      console.warn('[replayDocupassWebhook] SasaPay push failed:', e.message)
+    );
+  }
+
+  // --- SMS notification (fire-and-forget) ---
+  sendKycSms(base44, userId, decision).catch(e =>
+    console.warn('[replayDocupassWebhook] SMS failed:', e.message)
+  );
+
+  return {
+    success: true,
+    transactionId,
+    decision,
+    docStatus,
+    extractedName: fieldValue('fullName'),
+    nationalId: fieldValue('documentNumber'),
+    dob: fieldValue('dob') ? normalizeDate(fieldValue('dob')) : null,
+    sex: fieldValue('sex'),
+    faceConfidence,
+    faceIsIdentical,
+    authScore,
+    matchRate,
+    auditReportUrl,
+    warnings: warnings.map(w => w.code),
+    processedAt: new Date().toISOString(),
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers (same as idAnalyzerCallback)
 // ---------------------------------------------------------------------------
 
-/**
- * Extract a field value and its confidence from IDAnalyzer v2 payload.
- * Per Data Fields doc: each key holds an ARRAY of {value, confidence, source, index, inputBox, outputBox}.
- * We strip inputBox/outputBox to reduce storage.
- */
 function extractField(field) {
   if (field == null) return null;
   if (typeof field === 'string') return { value: field, confidence: null };
@@ -400,7 +323,6 @@ function extractField(field) {
 
 function normalizeDate(dateStr) {
   if (!dateStr) return null;
-  // IDAnalyzer returns YYYY/MM/DD — convert to YYYY-MM-DD for date field
   const cleaned = String(dateStr).replace(/\//g, '-');
   if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) return cleaned.substring(0, 10);
   const parts = cleaned.split('-');
@@ -410,33 +332,8 @@ function normalizeDate(dateStr) {
   return cleaned.substring(0, 10);
 }
 
-async function computeHmac(secret, message) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
-  return Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-async function constantTimeEqual(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string') return false;
-  if (a.length !== b.length) return false;
-  const enc = new TextEncoder();
-  const aHash = await crypto.subtle.digest('SHA-256', enc.encode(a));
-  const bHash = await crypto.subtle.digest('SHA-256', enc.encode(b));
-  const aArr = new Uint8Array(aHash);
-  const bArr = new Uint8Array(bHash);
-  let diff = 0;
-  for (let i = 0; i < aArr.length; i++) diff |= aArr[i] ^ bArr[i];
-  return diff === 0;
-}
-
 // ---------------------------------------------------------------------------
-// SasaPay KYC push (service-role, fire-and-forget)
+// SasaPay KYC push (same as idAnalyzerCallback)
 // ---------------------------------------------------------------------------
 
 async function pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }) {
@@ -490,26 +387,10 @@ async function pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }) {
       action: 'sasapay_kyc_uploaded',
       entity_type: 'Wallet',
       entity_id: wallet.id,
-      description: `SasaPay KYC auto-uploaded from DocuPass. Status: ${data.data?.accountStatus}`,
+      description: `SasaPay KYC uploaded from replay. Status: ${data.data?.accountStatus}`,
     });
   } catch (error) {
-    console.error(`[idAnalyzerCallback] SasaPay KYC push failed: ${error.message}`);
-    try {
-      const wallets = await base44.asServiceRole.entities.Wallet.filter({
-        user_id: userId, entity_type: 'personal',
-      });
-      if (wallets.length > 0) {
-        await base44.asServiceRole.entities.Wallet.update(wallets[0].id, { needs_review: true });
-      }
-    } catch {}
-    try {
-      await base44.asServiceRole.entities.AuditLog.create({
-        user_id: userId,
-        action: 'sasapay_kyc_upload_failed',
-        entity_type: 'Wallet',
-        description: `SasaPay KYC auto-upload failed: ${error.message}`,
-      });
-    } catch {}
+    console.error(`[replayDocupassWebhook] SasaPay KYC push failed: ${error.message}`);
   }
 }
 
@@ -548,7 +429,7 @@ async function downloadFile(url) {
 }
 
 // ---------------------------------------------------------------------------
-// SMS notification (fire-and-forget)
+// SMS notification (same as idAnalyzerCallback)
 // ---------------------------------------------------------------------------
 
 async function sendKycSms(base44, userId, decision) {
@@ -569,9 +450,9 @@ async function sendKycSms(base44, userId, decision) {
 
     await base44.functions.invoke('sendSms', {
       phone: user.phone, message: body, templateKey,
-      eventType: templateKey, metadata: { decision, userId },
+      eventType: templateKey, metadata: { decision, userId, replay: true },
     });
   } catch (error) {
-    console.error(`[idAnalyzerCallback] SMS send failed: ${error.message}`);
+    console.error(`[replayDocupassWebhook] SMS send failed: ${error.message}`);
   }
 }

@@ -3,7 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDateTime } from '@/lib/format';
 import { auditLog } from '@/lib/audit';
-import { FileCheck, CheckCircle2, XCircle, Clock, Users } from 'lucide-react';
+import { FileCheck, CheckCircle2, XCircle, Clock, Users, Wrench } from 'lucide-react';
+import ManualRecoveryModal from '@/components/admin/ManualRecoveryModal';
 import ComplianceDashboard from '@/components/admin/ComplianceDashboard';
 import VerificationDetailSheet from '@/components/admin/VerificationDetailSheet';
 import VerificationBadge from '@/components/admin/VerificationBadge';
@@ -20,6 +21,7 @@ export default function AdminKyc() {
   const [phase6Riders, setPhase6Riders] = useState([]);
   const [phase6Loading, setPhase6Loading] = useState(false);
   const [detailRiderId, setDetailRiderId] = useState(null);
+  const [showRecovery, setShowRecovery] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -106,6 +108,12 @@ export default function AdminKyc() {
         >
           <Users className="w-4 h-4" /> Phase 6 Submissions
         </button>
+        <button
+          onClick={() => setShowRecovery(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-card border border-border text-muted-foreground hover:bg-accent ml-auto"
+        >
+          <Wrench className="w-4 h-4" /> Manual Recovery
+        </button>
       </div>
 
       {tab === 'dashboard' ? (
@@ -187,6 +195,10 @@ export default function AdminKyc() {
             </div>
           </div>
         </div>
+      )}
+
+      {showRecovery && (
+        <ManualRecoveryModal onClose={() => setShowRecovery(false)} />
       )}
 
       {detailRiderId && (
