@@ -1,0 +1,60 @@
+{
+  "name": "SmsLog",
+  "type": "object",
+  "properties": {
+    "recipient_phone": {
+      "type": "string"
+    },
+    "message_body": {
+      "type": "string"
+    },
+    "template_key": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "otp",
+        "deposit",
+        "withdrawal",
+        "permit_receipt",
+        "p2p_send",
+        "kyc_approved",
+        "kyc_rejected",
+        "bulk"
+      ]
+    },
+    "at_message_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "sent",
+        "delivered",
+        "failed"
+      ],
+      "default": "queued"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "metadata_json": {
+      "type": "string"
+    },
+    "delivered_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "failure_reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "recipient_phone",
+    "message_body",
+    "event_type",
+    "status"
+  ]
+}

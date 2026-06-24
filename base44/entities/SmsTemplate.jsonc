@@ -1,0 +1,49 @@
+{
+  "name": "SmsTemplate",
+  "type": "object",
+  "properties": {
+    "template_key": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "body": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "otp",
+        "deposit",
+        "withdrawal",
+        "permit_receipt",
+        "p2p_send",
+        "kyc_approved",
+        "kyc_rejected",
+        "bulk_custom"
+      ]
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "is_system": {
+      "type": "boolean",
+      "default": false
+    },
+    "last_edited_by": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "template_key",
+    "name",
+    "body",
+    "event_type"
+  ]
+}
