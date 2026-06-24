@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { CreditCard, FileText, User, ChevronLeft, Check, AlertTriangle, Loader2, ShieldCheck, Clock, LifeBuoy } from 'lucide-react';
 import DocupassOverlay from './DocupassOverlay';
+import DocupassResultScreen from '../DocupassResultScreen';
 
 const STEPS = [
   { icon: CreditCard, title: 'ID Front', desc: 'Photograph the front of your National ID' },
@@ -18,6 +19,8 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
   const [sessionActive, setSessionActive] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState('');
+  const [showOutcome, setShowOutcome] = useState(false);
+  const [pollAttempts, setPollAttempts] = useState(0);
   const pollTimerRef = useRef(null);
 
   // Only consider IDAnalyzer-processed docs (with provider_reference)
@@ -50,34 +53,53 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
     };
   }, [sessionActive]);
 
-  // Polling effect
+  // Polling effect — start with 3s delay, then poll every 5s for up to 5 min (review state)
   useEffect(() => {
     if (!polling) return;
 
-    let attempts = 0;
-    const maxAttempts = 12; // 12 x 5s = 60s — webhook may take 30-60s to fire after user completes
+    let mounted = true;
+    const maxAttempts = 60; // 5 minutes (3s initial + 60x5s polling)
 
-    const doPoll = async () => {
-      attempts++;
-      await onDataChange();
-      if (attempts >= maxAttempts) {
+    const startPolling = async () => {
+      // Wait 3s to allow webhook processing
+      await new Promise(r => setTimeout(r, 3000));
+      if (!mounted) return;
+
+      for (let i = 0; i < maxAttempts; i++) {
+        if (!mounted) break;
+        await onDataChange();
+        setPollAttempts(i + 1);
+        
+        // Stop if decision is now available (webhook fired)
+        if (user?.docupass_decision) break;
+        
+        // Wait 5s before next poll
+        if (i < maxAttempts - 1) {
+          await new Promise(r => setTimeout(r, 5000));
+        }
+      }
+      
+      if (mounted) {
         setPolling(false);
+        setPollAttempts(0);
       }
     };
 
-    pollTimerRef.current = setInterval(doPoll, 5000);
+    startPolling();
 
     return () => {
+      mounted = false;
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
   }, [polling]);
 
-  // Stop polling when approved
+  // Stop polling early if decision is available
   useEffect(() => {
-    if (allApproved && polling) {
+    if (polling && (user?.docupass_decision || allApproved)) {
       setPolling(false);
+      setShowOutcome(true);
     }
-  }, [allApproved, polling]);
+  }, [user?.docupass_decision, allApproved, polling]);
 
   async function handleReturn() {
     await onDataChange();
@@ -93,11 +115,8 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
     setLoading(true);
     setError('');
     try {
-      const res = await base44.functions.invoke('createDocupassSession', {
-        redirectUrl: typeof window !== 'undefined' ? window.location.href : undefined,
-      });
+      const res = await base44.functions.invoke('createDocupassSession', {});
       if (res.data?.url) {
-        sessionStorage.setItem('docupass_just_started', 'true');
         setDocupassUrl(res.data.url);
         const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
         if (isMobile) {
@@ -110,51 +129,28 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
         setError(res.data?.error || 'Failed to start verification. Try again.');
       }
     } catch (e) {
-      setError(e.response?.data?.error || e.message || 'Failed to start verification. Try again.');
+      setError(e.response?.data?.error || e.message || 'Failed to start verification. Please check your connection and try again.');
     }
     setLoading(false);
   }
 
-  // === SUCCESS STATE ===
-  if (allApproved) {
+  function handleOutcomeDismiss() {
+    setShowOutcome(false);
+    // Reset for retry
+    setError('');
+    setPollAttempts(0);
+  }
+
+  // === OUTCOME STATE (via DocupassResultScreen) ===
+  if (showOutcome && user?.docupass_decision) {
     return (
-      <div className="space-y-4">
-        <button onClick={onBack} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
-          <ChevronLeft className="w-4 h-4" /> Back to tasks
-        </button>
-
-        <div className="bg-success/5 border border-success/20 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
-              <Check className="w-5 h-5 text-success" />
-            </div>
-            <p className="text-sm font-bold text-success">Identity Verified</p>
-          </div>
-
-          {(user?.id_extracted_name || user?.id_extracted_dob || user?.national_id) && (
-            <div className="space-y-2 mt-3 pt-3 border-t border-success/10">
-              {user?.id_extracted_name && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Full Name</span>
-                  <span className="font-medium">{user.id_extracted_name}</span>
-                </div>
-              )}
-              {user?.id_extracted_dob && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Date of Birth</span>
-                  <span className="font-medium">{user.id_extracted_dob}</span>
-                </div>
-              )}
-              {user?.national_id && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">National ID</span>
-                  <span className="font-medium font-mono">{user.national_id}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      <DocupassResultScreen
+        decision={user.docupass_decision}
+        user={user}
+        attemptCount={user.docupass_attempt_count || 0}
+        onDismiss={handleOutcomeDismiss}
+        onRefresh={onDataChange}
+      />
     );
   }
 
@@ -196,24 +192,16 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
 
       {/* Polling state */}
       {polling && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-2">
-          <Clock className="w-4 h-4 text-blue-600 animate-pulse flex-shrink-0" />
-          <p className="text-xs text-blue-700 font-medium">Processing your verification…</p>
-        </div>
-      )}
-
-      {/* Rejected state */}
-      {anyRejected && !polling && (
-        <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs text-destructive font-medium">Verification failed. Please try again.</p>
-            {idFrontDoc?.rejection_reason && (
-              <p className="text-[10px] text-destructive/70 mt-0.5">{idFrontDoc.rejection_reason}</p>
-            )}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-amber-600 animate-pulse flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-xs text-amber-700 font-medium">Under Review</p>
+            <p className="text-[10px] text-amber-600">We're verifying your identity. This usually takes a few minutes.</p>
           </div>
         </div>
       )}
+
+
 
       {/* Error */}
       {error && (
@@ -224,7 +212,7 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
       )}
 
       {/* CTA */}
-      {!polling && !isLocked && (
+      {!polling && !showOutcome && (
         <button
           onClick={handleStart}
           disabled={loading}
@@ -232,12 +220,12 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
         >
           {loading
             ? <><Loader2 className="w-4 h-4 animate-spin" /> Connecting to secure verification…</>
-            : anyRejected
+            : anyRejected && !isLocked
               ? <><ShieldCheck className="w-4 h-4" /> Try Again</>
               : <><ShieldCheck className="w-4 h-4" /> Start Secure Verification</>}
         </button>
       )}
-      {isLocked && (
+      {isLocked && !showOutcome && (
         <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4 text-center space-y-3">
           <p className="text-xs text-destructive font-medium">Maximum verification attempts reached</p>
           <button

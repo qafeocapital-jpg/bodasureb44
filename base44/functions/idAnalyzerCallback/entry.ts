@@ -70,17 +70,28 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, message: 'Transaction not found — not a genuine webhook' });
     }
 
+    if (res.status === 429) {
+      console.warn('[idAnalyzerCallback] Rate limited (429). Silently discarding.');
+      return Response.json({ success: true, message: 'Rate limited — silently discarding' });
+    }
+
+    // Return 500 for IDAnalyzer 5xx so they retry per their schedule
+    if (res.status >= 500) {
+      console.error(`[idAnalyzerCallback] IDAnalyzer API error ${res.status}. Returning 500 for retry.`);
+      return Response.json({ error: `IDAnalyzer API ${res.status}` }, { status: 500 });
+    }
+
     if (!res.ok) {
       const errData = await res.text();
       console.error(`[idAnalyzerCallback] IDAnalyzer API error ${res.status}: ${errData}`);
-      return Response.json({ success: true, message: `API error ${res.status} — silently discarding` });
+      return Response.json({ error: `Unexpected API error ${res.status}` }, { status: 500 });
     }
 
     payload = await res.json();
     console.log('[idAnalyzerCallback] Successfully re-fetched transaction, decision=' + payload.decision);
   } catch (e) {
     console.error('[idAnalyzerCallback] Failed to fetch transaction:', e.message);
-    return Response.json({ success: true, message: 'Fetch failed — silently discarding' });
+    return Response.json({ error: 'Fetch exception: ' + e.message }, { status: 500 });
   }
 
   // --- Continue with extracted transactionId and decision ---
@@ -99,19 +110,8 @@ Deno.serve(async (req) => {
   if (!userId && payload.reference) userId = payload.reference;
 
   if (!userId) {
+    console.error(`[idAnalyzerCallback] No userId found for transactionId=${transactionId}`);
     return Response.json({ success: true, message: 'No user reference in payload' });
-  }
-
-  // --- Idempotency: key off transactionId + event ---
-  try {
-    const existing = await base44.asServiceRole.entities.KycDocument.filter({
-      provider_reference: transactionId,
-    });
-    if (existing.length > 0) {
-      return Response.json({ success: true, message: 'Already processed (idempotent)' });
-    }
-  } catch (e) {
-    console.warn('[idAnalyzerCallback] Idempotency check failed:', e.message);
   }
 
   // --- 3. Extract ALL data fields with confidence (per Data Fields doc) ---
@@ -232,6 +232,19 @@ Deno.serve(async (req) => {
     { type: 'selfie', url: faceUrl },
   ];
 
+  // --- Idempotency check (AFTER API re-fetch, keyed off transactionId + decision) ---
+  try {
+    const existing = await base44.asServiceRole.entities.KycDocument.filter({
+      provider_reference: transactionId,
+    });
+    // If decision matches, we've already processed this transaction
+    if (existing.length > 0 && existing[0].status === docStatus) {
+      return Response.json({ success: true, message: 'Already processed (idempotent)' });
+    }
+  } catch (e) {
+    console.warn('[idAnalyzerCallback] Idempotency check failed:', e.message);
+  }
+
   const upsertData = {
     status: docStatus,
     provider_name: 'idanalyzer_docupass',
@@ -240,19 +253,26 @@ Deno.serve(async (req) => {
   if (docStatus === 'approved') upsertData.reviewed_at = new Date().toISOString();
   if (rejectionReason) upsertData.rejection_reason = rejectionReason;
 
-  await Promise.all(docTypes.map(async ({ type, url }) => {
-    const existing = existingDocs.find(d => d.document_type === type);
-    const recordData = { ...upsertData, file_url: url || existing?.file_url || null };
-    if (existing) {
-      await base44.asServiceRole.entities.KycDocument.update(existing.id, recordData);
-    } else {
-      await base44.asServiceRole.entities.KycDocument.create({
-        user_id: userId,
-        document_type: type,
-        ...recordData,
-      });
-    }
-  }));
+  // Wrap KycDocument upsert in try-catch; return 500 on error so IDAnalyzer retries
+  try {
+    await Promise.all(docTypes.map(async ({ type, url }) => {
+      const existing = existingDocs.find(d => d.document_type === type);
+      // FIX: fallback file_url to '' (empty string) not null — KycDocument.file_url is required string
+      const recordData = { ...upsertData, file_url: url || existing?.file_url || '' };
+      if (existing) {
+        await base44.asServiceRole.entities.KycDocument.update(existing.id, recordData);
+      } else {
+        await base44.asServiceRole.entities.KycDocument.create({
+          user_id: userId,
+          document_type: type,
+          ...recordData,
+        });
+      }
+    }));
+  } catch (e) {
+    console.error('[idAnalyzerCallback] KycDocument upsert failed:', e.message);
+    return Response.json({ error: 'KycDocument upsert failed: ' + e.message }, { status: 500 });
+  }
 
   // Log warning if all 3 outputImage URLs are empty — indicates IDAnalyzer profile needs 'Return Output Image' enabled
   if (!frontUrl && !backUrl && !faceUrl) {
@@ -261,7 +281,7 @@ Deno.serve(async (req) => {
 
   // --- 6. Hydrate User with essential fields + auto-set verification status ---
   // This is SYNCHRONOUS (before returning 200) because the frontend polls for these fields.
-  // Wallet upgrade, AuditLog, SasaPay, SMS are moved to fire-and-forget after returning 200.
+  // Wrap in try-catch; return 500 on error so IDAnalyzer retries.
   let existingNationalId = null;
   try {
     const user = await base44.asServiceRole.entities.User.get(userId);
@@ -318,12 +338,8 @@ Deno.serve(async (req) => {
     }
 
     await base44.asServiceRole.entities.User.update(userId, userUpdate);
-  } catch (e) {
-    console.warn('[idAnalyzerCallback] Failed to hydrate user:', e.message);
-  }
 
-  // --- Wallet tier upgrade & AuditLog (SYNCHRONOUS before returning 200) ---
-  try {
+    // Wallet tier upgrade & AuditLog (SYNCHRONOUS before returning 200)
     if (decision === 'accept') {
       await upgradeWalletTier(base44, userId);
     }
@@ -335,7 +351,8 @@ Deno.serve(async (req) => {
       new_values: { decision, transactionId, faceConfidence, auditReportUrl },
     });
   } catch (e) {
-    console.error('[idAnalyzerCallback] Failed to create wallet/audit:', e.message);
+    console.error('[idAnalyzerCallback] User hydration or audit failed:', e.message);
+    return Response.json({ error: 'Hydration failed: ' + e.message }, { status: 500 });
   }
 
   // --- SMS notification (fire-and-forget, acceptable to lose) ---
