@@ -21,7 +21,18 @@ export default function SmsTemplatesPage() {
     setLoading(true);
     try {
       const t = await base44.entities.SmsTemplate.filter({});
-      setTemplates(t);
+      if (t.length === 0) {
+        // Seed templates on first load
+        try {
+          await base44.functions.invoke('seedSmsTemplates', {});
+          const seeded = await base44.entities.SmsTemplate.filter({});
+          setTemplates(seeded);
+        } catch (e) {
+          setTemplates(t);
+        }
+      } else {
+        setTemplates(t);
+      }
     } catch (e) {}
     setLoading(false);
   }

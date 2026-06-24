@@ -13,6 +13,7 @@ export const countyNav = [
   { label: 'Enforcement', path: '/county/enforcement', icon: ShieldAlert },
   { label: 'Revenue', path: '/county/revenue', icon: Landmark },
   { label: 'People', path: '/county/people', icon: Users },
+  { label: 'Communications', path: '/county/comms', icon: MessageSquare },
   { label: 'Reports', path: '/county/reports', icon: FileBarChart },
   { label: 'Settings', path: '/county/settings', icon: Settings },
 ];

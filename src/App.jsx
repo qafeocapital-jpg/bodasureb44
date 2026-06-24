@@ -150,6 +150,7 @@ const AuthenticatedApp = () => {
         <Route path="/county/enforcement" element={<CountyEnforcement />} />
         <Route path="/county/revenue" element={<CountyRevenue />} />
         <Route path="/county/people" element={<CountyPeople />} />
+        <Route path="/county/comms" element={<Communications />} />
         <Route path="/county/reports" element={<CountyReports />} />
         <Route path="/county/settings" element={<CountySettings />} />
       </Route>
