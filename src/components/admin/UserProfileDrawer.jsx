@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { formatKES, formatDateTime, formatDate } from '@/lib/format';
 import { splitFullName } from '@/lib/nameUtils';
-import { Wallet, FileText, Bike, Users, UserCircle, Inbox, ExternalLink, AlertTriangle, CheckCircle, XCircle, Link2, Loader2, Shield, Send } from 'lucide-react';
+import { Wallet, FileText, Bike, Users, UserCircle, Inbox, ExternalLink, AlertTriangle, CheckCircle, XCircle, Link2, Loader2, Shield, Send, MessageSquare } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
 import SubmissionsTab from '@/components/admin/drawer-tabs/SubmissionsTab';
@@ -114,6 +114,9 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
           const groupMap = {};
           groups.forEach(g => { if (g) groupMap[g.id] = g; });
           data = { members, groupMap };
+        } else if (tabKey === 'sms') {
+          const logs = await base44.entities.SmsLog.filter({ user_id: user.id }, '-created_date', 50);
+          data = { smsLogs: logs };
         }
         setTabData(prev => ({ ...prev, ...data }));
         setLoaded(prev => ({ ...prev, [tabKey]: true }));
@@ -165,6 +168,7 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
               <TabsTrigger value="vehicles"><Bike className="w-3.5 h-3.5 mr-1 inline" />Bikes</TabsTrigger>
               <TabsTrigger value="groups"><Users className="w-3.5 h-3.5 mr-1 inline" />Groups</TabsTrigger>
               <TabsTrigger value="submissions"><FileText className="w-3.5 h-3.5 mr-1 inline" />Submissions</TabsTrigger>
+              <TabsTrigger value="sms"><MessageSquare className="w-3.5 h-3.5 mr-1 inline" />SMS Logs</TabsTrigger>
               {isSuper && <TabsTrigger value="roles"><Shield className="w-3.5 h-3.5 mr-1 inline" />Roles</TabsTrigger>}
             </TabsList>
           </div>
@@ -344,6 +348,34 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
                 ))
               ) : (
                 <EmptyState icon={Users} message="Not a member of any group" />
+              )}
+            </TabsContent>
+
+            {/* SMS Logs */}
+            <TabsContent value="sms" className="mt-0 space-y-3">
+              {!loaded.sms ? (
+                <p className="text-center text-sm text-muted-foreground py-4">Loading...</p>
+              ) : (tabData.smsLogs?.length || 0) > 0 ? (
+                <div className="space-y-2">
+                  {tabData.smsLogs.map(log => (
+                    <div key={log.id} className="bg-card border border-border rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                            log.status === 'sent' || log.status === 'delivered' ? 'bg-success/10 text-success' :
+                            log.status === 'failed' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'
+                          }`}>{log.status}</span>
+                          <span className="text-xs text-muted-foreground capitalize">{log.event_type}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{formatDateTime(log.created_date)}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground break-words">{log.message_body}</p>
+                      {log.failure_reason && <p className="text-[10px] text-destructive mt-1">Failed: {log.failure_reason}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState icon={MessageSquare} message="No SMS logs for this user" />
               )}
             </TabsContent>
           </div>

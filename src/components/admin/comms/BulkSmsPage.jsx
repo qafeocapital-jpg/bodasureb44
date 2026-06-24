@@ -52,7 +52,9 @@ export default function BulkSmsPage({ countyScope = null }) {
     }
     setSearching(true);
     try {
-      const queryFilter = isCountyScoped ? { county_id: countyScope } : {};
+      const queryFilter = isCountyScoped 
+        ? { county_id: countyScope, staff_type: 'none' } 
+        : { staff_type: 'none' };
       const users = await base44.entities.User.filter(queryFilter);
       const filtered = users.filter(u =>
         u.phone?.includes(query) || u.full_name?.toLowerCase().includes(query.toLowerCase())

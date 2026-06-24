@@ -15,12 +15,13 @@ export default function SmsLogsPage({ countyScope = null }) {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterEventType, setFilterEventType] = useState('');
+  const [filterPhone, setFilterPhone] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     load();
-  }, [filterStatus, filterEventType, startDate, endDate]);
+  }, [filterStatus, filterEventType, filterPhone, startDate, endDate, countyScope]);
 
   async function load() {
     setLoading(true);
@@ -34,8 +35,22 @@ export default function SmsLogsPage({ countyScope = null }) {
         query.created_date.$lte = endDate;
       }
 
-      const l = await base44.entities.SmsLog.filter(query, '-created_date', 200);
-      setLogs(l);
+      let l = await base44.entities.SmsLog.filter(query, '-created_date', 500);
+      
+      // If county scoped, filter by user county
+      if (countyScope) {
+        const scopedUserIds = new Set();
+        const countyUsers = await base44.entities.User.filter({ county_id: countyScope });
+        countyUsers.forEach(u => scopedUserIds.add(u.id));
+        l = l.filter(log => log.user_id && scopedUserIds.has(log.user_id));
+      }
+      
+      // Filter by phone number if provided
+      if (filterPhone) {
+        l = l.filter(log => log.recipient_phone?.includes(filterPhone));
+      }
+      
+      setLogs(l.slice(0, 200));
     } catch (e) {}
     setLoading(false);
   }
@@ -43,60 +58,71 @@ export default function SmsLogsPage({ countyScope = null }) {
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="bg-card border border-border rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Status</label>
-          <select
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-            className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
-          >
-            <option value="">All Statuses</option>
-            <option value="queued">Queued</option>
-            <option value="sent">Sent</option>
-            <option value="delivered">Delivered</option>
-            <option value="failed">Failed</option>
-          </select>
-        </div>
+      <div className="bg-card border border-border rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+       <div>
+         <label className="text-xs font-medium text-muted-foreground">Status</label>
+         <select
+           value={filterStatus}
+           onChange={e => setFilterStatus(e.target.value)}
+           className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
+         >
+           <option value="">All Statuses</option>
+           <option value="queued">Queued</option>
+           <option value="sent">Sent</option>
+           <option value="delivered">Delivered</option>
+           <option value="failed">Failed</option>
+         </select>
+       </div>
 
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Event Type</label>
-          <select
-            value={filterEventType}
-            onChange={e => setFilterEventType(e.target.value)}
-            className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
-          >
-            <option value="">All Events</option>
-            <option value="otp">OTP</option>
-            <option value="deposit">Deposit</option>
-            <option value="withdrawal">Withdrawal</option>
-            <option value="permit_receipt">Permit</option>
-            <option value="p2p_send">P2P Send</option>
-            <option value="kyc_approved">KYC Approved</option>
-            <option value="kyc_rejected">KYC Rejected</option>
-            <option value="bulk">Bulk</option>
-          </select>
-        </div>
+       <div>
+         <label className="text-xs font-medium text-muted-foreground">Event Type</label>
+         <select
+           value={filterEventType}
+           onChange={e => setFilterEventType(e.target.value)}
+           className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
+         >
+           <option value="">All Events</option>
+           <option value="otp">OTP</option>
+           <option value="deposit">Deposit</option>
+           <option value="withdrawal">Withdrawal</option>
+           <option value="permit_receipt">Permit</option>
+           <option value="p2p_send">P2P Send</option>
+           <option value="kyc_approved">KYC Approved</option>
+           <option value="kyc_rejected">KYC Rejected</option>
+           <option value="bulk">Bulk</option>
+         </select>
+       </div>
 
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">From Date</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
-          />
-        </div>
+       <div>
+         <label className="text-xs font-medium text-muted-foreground">Phone Number</label>
+         <input
+           type="text"
+           value={filterPhone}
+           onChange={e => setFilterPhone(e.target.value)}
+           placeholder="e.g., 254705..."
+           className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
+         />
+       </div>
 
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">To Date</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={e => setEndDate(e.target.value)}
-            className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
-          />
-        </div>
+       <div>
+         <label className="text-xs font-medium text-muted-foreground">From Date</label>
+         <input
+           type="date"
+           value={startDate}
+           onChange={e => setStartDate(e.target.value)}
+           className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
+         />
+       </div>
+
+       <div>
+         <label className="text-xs font-medium text-muted-foreground">To Date</label>
+         <input
+           type="date"
+           value={endDate}
+           onChange={e => setEndDate(e.target.value)}
+           className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
+         />
+       </div>
       </div>
 
       {/* Logs Table */}

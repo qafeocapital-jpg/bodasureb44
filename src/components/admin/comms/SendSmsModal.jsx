@@ -59,11 +59,14 @@ export default function SendSmsModal({ open, onOpenChange, userPhone, userName, 
     setSending(true);
     try {
       const finalMessage = mode === 'template' ? substituteVariables(message, variables) : message;
-      const res = await base44.functions.invoke('createSmsCampaign', {
-        audienceType: 'individual',
-        audiencePhone: userPhone,
+      const templateKey = mode === 'template' && selectedTemplate 
+        ? templates.find(t => t.id === selectedTemplate)?.template_key 
+        : null;
+      await base44.functions.invoke('sendSms', {
+        phone: userPhone,
         message: finalMessage,
-        name: `Direct SMS to ${userName}`,
+        templateKey,
+        eventType: 'bulk',
       });
       toast({ title: 'SMS sent', description: `Message delivered to ${userPhone}` });
       onOpenChange(false);
