@@ -93,8 +93,12 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
     setPhoneChecking(true);
     try {
       const res = await base44.functions.invoke('checkPhoneUniqueness', { phone: form.phone });
+      if (res.status === 429) {
+        setPhoneError('Too many checks. Please try again in a moment.');
+        return false; // Don't block form, just inform
+      }
       if (res.data?.conflict) {
-        setPhoneError('Your phone number is already linked to a BodaSure Wallet. Please enter a different number.');
+        setPhoneError('This phone number is already in use. Please try a different one.');
         return true;
       }
       setPhoneError('');
@@ -113,8 +117,12 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
     setIdChecking(true);
     try {
       const res = await base44.functions.invoke('checkNationalIdUniqueness', { national_id: id });
+      if (res.status === 429) {
+        setIdError('Too many checks. Please try again in a moment.');
+        return false; // Don't block form
+      }
       if (res.data?.conflict) {
-        setIdError('This National ID is already linked to a BodaSure Wallet. Please enter a different ID number.');
+        setIdError('This ID number is already in use. Please verify your details.');
         return true;
       }
       setIdError('');
@@ -135,7 +143,17 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
       const idTaken = await checkIdUniqueness();
       if (phoneTaken || idTaken) { setSaving(false); return; }
       
-      // Save profile
+      // Initiate wallet activation FIRST (before saving profile)
+      // This ensures we don't save profile data if wallet init fails
+      const res = await base44.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
+      if (!res.data?.success) {
+        // Wallet activation failed — don't save profile
+        setWalletError(res.data?.error || 'Failed to activate wallet. Please try again.');
+        setSaving(false);
+        return;
+      }
+      
+      // Only save profile AFTER wallet init succeeds
       await base44.auth.updateMe({
         full_name: form.full_name.trim(),
         phone: form.phone,
@@ -144,18 +162,14 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
       });
       await refreshUser();
       
-      // Initiate wallet activation
-      const res = await base44.functions.invoke('sasapayPersonalOnboarding', { action: 'init' });
-      if (res.data?.success) {
-        if (res.data?.recovered) {
-          // Account recovered — skip OTP, go to PIN
-          setStep(2);
-        } else {
-          setRequestId(res.data.requestId);
-          setStep(1); // OTP step
-        }
+      if (res.data?.recovered) {
+        // Account recovered — skip OTP, go to PIN
+        setStep(2);
       } else {
-        setWalletError(res.data?.error || 'Failed to activate wallet. Please try again.');
+        setRequestId(res.data.requestId);
+        // Reset OTP field for fresh entry
+        setOtp('');
+        setStep(1); // OTP step
       }
     } catch (e) {
       setWalletError(e.response?.data?.error || e.message || 'Failed to activate wallet.');
@@ -364,6 +378,7 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
               placeholder="••••••"
               className="w-full mt-1 px-3 py-3 rounded-xl border border-input bg-background text-2xl text-center tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-primary"
             />
+            <p className="text-[10px] text-muted-foreground mt-1.5">Check your phone for the verification code</p>
           </div>
           {walletError && (
             <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 flex items-start gap-2">
@@ -383,6 +398,32 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Verify <ChevronRight className="w-4 h-4" /></>}
             </button>
           </div>
+          <button
+            onClick={async () => {
+              setSaving(true);
+              setWalletError('');
+              try {
+                const res = await base44.functions.invoke('sasapayPersonalOnboarding', {
+                  action: 'resendOtp',
+                  requestId,
+                });
+                if (res.data?.success) {
+                  if (res.data?.requestId) setRequestId(res.data.requestId);
+                  setOtp('');
+                  setWalletError('');
+                } else {
+                  setWalletError(res.data?.error || 'Failed to resend OTP. Try again.');
+                }
+              } catch (e) {
+                setWalletError(e.response?.data?.error || e.message || 'Failed to resend OTP.');
+              }
+              setSaving(false);
+            }}
+            disabled={saving}
+            className="w-full text-sm text-primary font-medium py-2 hover:underline"
+          >
+            Didn't receive code? Resend OTP
+          </button>
         </div>
       )}
 

@@ -25,7 +25,7 @@ export default function AdminSasaPay() {
         base44.entities.Transaction.filter({}, '-created_date', 30),
         base44.entities.PaymentEvent.filter({}, '-created_date', 20),
         base44.entities.Wallet.filter({ entity_type: 'personal' }),
-        base44.entities.AuditLog.filter({ action: 'wallet_onboarding_failed' }, '-created_date', 100),
+        base44.entities.AuditLog.filter({ action: 'wallet_onboarding_failed' }, '-created_date', 50), // Limit to last 50 for performance
       ]);
       setTransactions(t); setEvents(e); setWallets(w); setOnboardingErrors(oe);
     } catch (e) {}

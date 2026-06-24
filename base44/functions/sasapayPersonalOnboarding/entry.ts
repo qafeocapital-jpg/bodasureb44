@@ -47,10 +47,10 @@ async function initializePersonalOnboarding(base44, user) {
   const existingUsers = await base44.asServiceRole.entities.User.filter({ phone: normalizedPhone });
   if (existingUsers.some(u => u.id !== user.id)) {
     // Log onboarding error
-    await logOnboardingError(base44, user, 'duplicate_phone', 'Your phone number is already linked to a BodaSure Wallet. Please enter a different number.', normalizedPhone, user.national_id);
+    await logOnboardingError(base44, user, 'duplicate_phone', 'Phone number already in use.', normalizedPhone, user.national_id);
     return Response.json({
       success: false,
-      error: 'Your phone number is already linked to a BodaSure Wallet. Please enter a different number.',
+      error: 'This phone number is already in use. Please try a different one.',
       conflictType: 'phone',
     }, { status: 400 });
   }
@@ -59,10 +59,10 @@ async function initializePersonalOnboarding(base44, user) {
   const existingIdUsers = await base44.asServiceRole.entities.User.filter({ national_id: user.national_id });
   if (existingIdUsers.some(u => u.id !== user.id)) {
     // Log onboarding error
-    await logOnboardingError(base44, user, 'duplicate_id', 'This National ID is already linked to a BodaSure Wallet. Please enter a different ID number.', normalizedPhone, user.national_id);
+    await logOnboardingError(base44, user, 'duplicate_id', 'ID number already in use.', normalizedPhone, user.national_id);
     return Response.json({
       success: false,
-      error: 'This National ID is already linked to a BodaSure Wallet. Please enter a different ID number.',
+      error: 'This ID number is already in use. Please verify your details.',
       conflictType: 'national_id',
     }, { status: 400 });
   }
@@ -135,28 +135,28 @@ async function initializePersonalOnboarding(base44, user) {
         });
       }
       // Recovery failed — log the error and return structured error
-      await logOnboardingError(base44, user, 'recovery_failed', 'We couldn\'t automatically recover your account. Please contact support.', normalizedPhone, user.national_id);
+      await logOnboardingError(base44, user, 'recovery_failed', 'Account recovery failed. Contact support.', normalizedPhone, user.national_id);
       return Response.json({
         success: false,
-        error: 'We couldn\'t automatically recover your account. Please contact support with your phone number.',
+        error: 'We encountered an issue. Please contact support with your phone number.',
         conflictType: 'unknown',
       }, { status: 400 });
     }
     // Map SasaPay errors to BodaSure-branded messages
     const errorMap = {
-      'sp4000': 'Your account already exists. Please try again or contact support.',
-      'sp4001': 'Invalid phone number. Please enter a valid Kenyan number.',
-      'sp4002': 'Invalid National ID. Please check your ID number.',
+      'sp4000': 'Account already exists',
+      'sp4001': 'Invalid phone number',
+      'sp4002': 'Invalid ID number',
     };
     const mappedError = Object.keys(errorMap).find(code => errMsg.includes(code.replace('sp', '')))
       ? errorMap[Object.keys(errorMap).find(code => errMsg.includes(code.replace('sp', '')))]
-      : 'Wallet activation failed. Please try again.';
+      : 'Wallet activation failed';
     
     // Log SasaPay error
     await logOnboardingError(base44, user, 'sasapay_error', mappedError, normalizedPhone, user.national_id);
     return Response.json({
       success: false,
-      error: mappedError,
+      error: 'We encountered an issue during wallet activation. Please try again.',
       conflictType: 'unknown',
     }, { status: 400 });
   }

@@ -14,7 +14,7 @@ import { VERIFICATION_TASKS, getTaskStatuses, isAllSubmitted, TASK_STATUS_CONFIG
 import TierBenefitsCard from '@/components/rider/TierBenefitsCard';
 import { getKycLevel } from '@/components/ui/KycLevelBadge';
 
-const TASK_ICONS = [CreditCard, Bike, Smartphone, UserCheck];
+const TASK_ICONS = [Wallet, CreditCard, Bike, Smartphone, UserCheck];
 
 export default function PhaseVerification({ user, vehicle, wallet, onCompleted, onBack, readOnly, onExitReadOnly }) {
   const navigate = useNavigate();
