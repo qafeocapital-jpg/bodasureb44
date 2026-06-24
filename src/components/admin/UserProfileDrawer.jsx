@@ -4,8 +4,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { formatKES, formatDateTime, formatDate } from '@/lib/format';
 import { splitFullName } from '@/lib/nameUtils';
-import { Wallet, FileText, Bike, Users, UserCircle, Inbox, ExternalLink, AlertTriangle, CheckCircle, XCircle, Link2, Loader2 } from 'lucide-react';
+import { Wallet, FileText, Bike, Users, UserCircle, Inbox, ExternalLink, AlertTriangle, CheckCircle, XCircle, Link2, Loader2, Shield } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/lib/AuthContext';
+import SubmissionsTab from '@/components/admin/drawer-tabs/SubmissionsTab';
+import RolesTab from '@/components/admin/drawer-tabs/RolesTab';
 
 const DOC_TYPE_LABELS = {
   id_front: 'ID (Front)',
@@ -37,8 +40,10 @@ function InfoRow({ label, value }) {
   );
 }
 
-export default function UserProfileDrawer({ open, onOpenChange, user, wallet, snapshot, countyName, onLinked, defaultTab = 'personal' }) {
+export default function UserProfileDrawer({ open, onOpenChange, user, wallet, snapshot, countyName, onLinked, defaultTab = 'personal', scopeEntities = {} }) {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  const isSuper = currentUser?.roles?.includes('super_admin') || currentUser?.role === 'super_admin';
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [loaded, setLoaded] = useState({});
   const [tabData, setTabData] = useState({});
@@ -143,9 +148,8 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
             <TabsList className="w-full justify-start overflow-x-auto scrollbar-hide">
               <TabsTrigger value="personal"><UserCircle className="w-3.5 h-3.5 mr-1 inline" />Personal</TabsTrigger>
               <TabsTrigger value="wallet"><Wallet className="w-3.5 h-3.5 mr-1 inline" />Wallet</TabsTrigger>
-              <TabsTrigger value="kyc"><FileText className="w-3.5 h-3.5 mr-1 inline" />KYC</TabsTrigger>
-              <TabsTrigger value="vehicles"><Bike className="w-3.5 h-3.5 mr-1 inline" />Bikes</TabsTrigger>
-              <TabsTrigger value="groups"><Users className="w-3.5 h-3.5 mr-1 inline" />Groups</TabsTrigger>
+              <TabsTrigger value="submissions"><FileText className="w-3.5 h-3.5 mr-1 inline" />Submissions</TabsTrigger>
+              {isSuper && <TabsTrigger value="roles"><Shield className="w-3.5 h-3.5 mr-1 inline" />Roles</TabsTrigger>}
             </TabsList>
           </div>
 
@@ -292,6 +296,18 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
                 <EmptyState icon={Bike} message="No vehicles registered" />
               )}
             </TabsContent>
+
+            {/* Submissions */}
+            <TabsContent value="submissions" className="mt-0">
+              <SubmissionsTab user={user} />
+            </TabsContent>
+
+            {/* Roles */}
+            {isSuper && (
+              <TabsContent value="roles" className="mt-0">
+                <RolesTab user={user} scopeEntities={scopeEntities} isSuper={isSuper} onUpdate={onLinked} />
+              </TabsContent>
+            )}
 
             {/* Groups */}
             <TabsContent value="groups" className="mt-0 space-y-3">

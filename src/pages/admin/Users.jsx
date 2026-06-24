@@ -114,36 +114,7 @@ export default function AdminUsers() {
     setInviting(false);
   }
 
-  async function handleRoleChange(userId, newRole) {
-    setChangingRole(userId);
-    try {
-      const updateData = { role: newRole, staff_type: newRole === 'rider' ? 'none' : newRole };
-      // If switching to a non-scoped role, clear scope
-      if (!SCOPED_ROLES.includes(newRole)) {
-        updateData.scope_entity_id = '';
-      }
-      await base44.entities.User.update(userId, updateData);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updateData } : u));
-      toast({ title: 'Role updated' });
-    } catch (e) {
-      toast({ title: 'Failed to update role', description: e.message, variant: 'destructive' });
-    }
-    setChangingRole(null);
-  }
 
-  async function handleScopeChange(userId, scopeEntityId, role) {
-    try {
-      const updateData = { scope_entity_id: scopeEntityId };
-      if ((role === 'county_admin' || role === 'field_agent') && scopeEntityId) {
-        updateData.county_id = scopeEntityId;
-      }
-      await base44.entities.User.update(userId, updateData);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updateData } : u));
-      toast({ title: 'Scope assigned' });
-    } catch (e) {
-      toast({ title: 'Failed to assign scope', description: e.message, variant: 'destructive' });
-    }
-  }
 
   function getScopeOptions(role) {
     if (role === 'county_admin' || role === 'field_agent') return scopeEntities.counties.map(c => ({ value: c.id, label: c.name }));
@@ -210,30 +181,17 @@ export default function AdminUsers() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{u.email}</td>
                     <td className="px-4 py-3">
-                      <select
-                        value={u.role || 'rider'}
-                        onChange={e => handleRoleChange(u.id, e.target.value)}
-                        disabled={changingRole === u.id}
-                        className="text-xs font-semibold rounded-lg border border-input bg-background px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-                      >
-                        {ROLE_OPTIONS.map(r => (
-                          <option key={r.value} value={r.value}>{r.label}</option>
+                      <div className="flex flex-wrap gap-1">
+                        {(u.roles || [u.role].filter(Boolean)).map((role, idx) => (
+                          <span key={idx} className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-1 rounded-full">
+                            {ROLE_OPTIONS.find(r => r.value === role)?.label || role}
+                          </span>
                         ))}
-                      </select>
-                      {changingRole === u.id && <Loader2 className="inline-block w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      {SCOPED_ROLES.includes(u.role) ? (
-                        <select
-                          value={u.scope_entity_id || ''}
-                          onChange={e => handleScopeChange(u.id, e.target.value, u.role)}
-                          className="text-xs rounded-lg border border-input bg-background px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                          <option value="">— No {getScopeLabel(u.role)} —</option>
-                          {scopeOptions.map(o => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                          ))}
-                        </select>
+                      {u.scope_entity_id ? (
+                        <span className="text-xs text-muted-foreground">{getScopeLabel(u.role) || 'N/A'}</span>
                       ) : (
                         <span className="text-xs text-muted-foreground">N/A</span>
                       )}
@@ -256,6 +214,7 @@ export default function AdminUsers() {
         snapshot={selectedSnapshot}
         countyName={selectedCountyName}
         onLinked={handleLinked}
+        scopeEntities={scopeEntities}
       />
 
       {/* Invite Modal */}
