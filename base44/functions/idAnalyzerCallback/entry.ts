@@ -40,8 +40,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid timestamp' }, { status: 401 });
     }
     const tsDelta = Math.abs(nowSec - tsNum);
-    if (tsDelta > 1800) {
-      console.warn(`[idAnalyzerCallback] Stale timestamp: delta=${tsDelta}s (limit=1800s), received=${idaTimestamp}, now=${nowSec}`);
+    if (tsDelta > 300) {
+      console.warn(`[idAnalyzerCallback] Stale timestamp: delta=${tsDelta}s (limit=300s), received=${idaTimestamp}, now=${nowSec}`);
       return Response.json({ error: 'Stale timestamp' }, { status: 401 });
     }
 
@@ -66,12 +66,12 @@ Deno.serve(async (req) => {
       console.warn(`[idAnalyzerCallback] Signature mismatch. Received: "${recvPrefix}...", Expected: "${expPrefix}..."`);
       return Response.json({ error: 'Invalid signature' }, { status: 401 });
     }
-  } else if (querySecret === webhookSecret) {
-    console.warn('[idAnalyzerCallback] Auth via query-string secret fallback');
+  } else if (querySecret && querySecret === webhookSecret) {
+    console.warn('[idAnalyzerCallback] Auth via query-string secret fallback (testing only)');
     authenticated = true;
   } else {
-    console.warn('[idAnalyzerCallback] No signature header or query secret — processing anyway (no-signature fallback). IDAnalyzer profile may have signatures disabled.');
-    authenticated = true;
+    console.warn('[idAnalyzerCallback] Rejected: no valid signature or query secret');
+    return Response.json({ error: 'Authentication required — signature or secret missing' }, { status: 401 });
   }
 
   // --- Parse payload ---

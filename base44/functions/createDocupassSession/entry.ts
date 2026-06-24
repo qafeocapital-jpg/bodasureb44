@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { redirectUrl } = await req.json().catch(() => ({}));
+    await req.json().catch(() => ({}));
 
     const apiKey = Deno.env.get('IDANALYZER_API_KEY');
     if (!apiKey) return Response.json({ error: 'IDANALYZER_API_KEY not configured' }, { status: 500 });
