@@ -3,94 +3,89 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 /**
  * IDAnalyzer DocuPass webhook handler (v2).
  *
+ * Authentication: Fetch transaction directly from IDAnalyzer API (bypasses HMAC verification,
+ * which fails due to Base44 modifying request body bytes in transit).
+ *
  * Atomic flow on every docupass_conclusive event:
- *   1. Validate HMAC-SHA256 signature (v1=<hex> format per IDAnalyzer docs)
- *   2. Filter events — only process docupass_conclusive
- *   3. Extract ALL ID fields (per Data Fields doc) with confidence scores
- *   4. Extract face confidence from scores.faceCompare (NOT data.face)
- *   5. Store PDF audit report URL directly from outputFile (no download/upload)
- *   6. Upsert KycDocuments + hydrate User with full extracted identity
- *   7. Auto-set kyc_status, verification_complete, wallet tier on accept
- *   8. SMS notification to rider
- *   9. AuditLog entries
+ *   1. Extract transactionId from incoming payload
+ *   2. Filter events — only process docupass_conclusive (skip fetch for other events)
+ *   3. Call GET https://api2.idanalyzer.com/transaction/{transactionId} with X-API-KEY
+ *   4. If 404/error, silently discard (not a genuine webhook)
+ *   5. Use re-fetched response as authoritative payload
+ *   6. Extract ALL ID fields (per Data Fields doc) with confidence scores
+ *   7. Extract face confidence from scores.faceCompare (NOT data.face)
+ *   8. Store PDF audit report URL directly from outputFile (no download/upload)
+ *   9. Upsert KycDocuments + hydrate User with full extracted identity
+ *   10. Auto-set kyc_status, verification_complete, wallet tier on accept
+ *   11. SMS notification to rider
+ *   12. AuditLog entries
  */
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
   const rawBody = await req.text();
 
-  // --- 1. HMAC-SHA256 Signature Verification ---
-  const webhookSecret = Deno.env.get('IDANALYZER_WEBHOOK_SECRET');
-  if (!webhookSecret) {
-    return Response.json({ error: 'Webhook secret not configured' }, { status: 500 });
-  }
-
-  const idaSignature = req.headers.get('X-IDA-Signature');
-  const idaTimestamp = req.headers.get('X-IDA-Timestamp');
-  const querySecret = new URL(req.url).searchParams.get('secret');
-
-  let authenticated = false;
-
-  if (idaSignature && idaTimestamp) {
-    const tsNum = parseInt(idaTimestamp, 10);
-    const nowSec = Math.floor(Date.now() / 1000);
-    if (isNaN(tsNum)) {
-      console.warn(`[idAnalyzerCallback] Invalid timestamp header: "${idaTimestamp}"`);
-      return Response.json({ error: 'Invalid timestamp' }, { status: 401 });
-    }
-    const tsDelta = Math.abs(nowSec - tsNum);
-    if (tsDelta > 300) {
-      console.warn(`[idAnalyzerCallback] Stale timestamp: delta=${tsDelta}s (limit=300s), received=${idaTimestamp}, now=${nowSec}`);
-      return Response.json({ error: 'Stale timestamp' }, { status: 401 });
-    }
-
-    const expectedHmac = await computeHmac(webhookSecret, `${idaTimestamp}.${rawBody}`);
-
-    const candidateSigs = [
-      `v1=${expectedHmac}`,
-      `sha256=${expectedHmac}`,
-      expectedHmac,
-    ];
-
-    for (const candidate of candidateSigs) {
-      if (await constantTimeEqual(candidate, idaSignature)) {
-        authenticated = true;
-        break;
-      }
-    }
-
-    if (!authenticated) {
-      const recvPrefix = idaSignature.substring(0, 20);
-      const expPrefix = `v1=${expectedHmac.substring(0, 20)}`;
-      console.warn(`[idAnalyzerCallback] Signature mismatch. Received: "${recvPrefix}...", Expected: "${expPrefix}..."`);
-      return Response.json({ error: 'Invalid signature' }, { status: 401 });
-    }
-  } else if (querySecret && querySecret === webhookSecret) {
-    console.warn('[idAnalyzerCallback] Auth via query-string secret fallback (testing only)');
-    authenticated = true;
-  } else {
-    console.warn('[idAnalyzerCallback] Rejected: no valid signature or query secret');
-    return Response.json({ error: 'Authentication required — signature or secret missing' }, { status: 401 });
-  }
-
-  // --- Parse payload ---
-  let payload;
+  // --- Parse incoming payload (event filtering only) ---
+  let incomingPayload;
   try {
-    payload = JSON.parse(rawBody);
+    incomingPayload = JSON.parse(rawBody);
   } catch {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // --- 2. Event filtering ---
-  const eventType = payload.event;
+  // --- 1. Event filtering — early return for non-conclusive events ---
+  const eventType = incomingPayload.event;
+  console.log('[idAnalyzerCallback] Received event=' + eventType + ', transactionId=' + (incomingPayload.transactionId || 'unknown'));
+  
   if (eventType && eventType !== 'docupass_conclusive') {
     return Response.json({ success: true, message: `Ignored event: ${eventType}` });
   }
 
+  // --- 2. Extract transactionId from incoming payload ---
+  const transactionId = incomingPayload.transactionId || incomingPayload.id;
+  if (!transactionId) {
+    return Response.json({ success: true, message: 'No transactionId in payload' });
+  }
+
+  // --- 3. Fetch authoritative transaction from IDAnalyzer API ---
+  const apiKey = Deno.env.get('IDANALYZER_API_KEY');
+  if (!apiKey) {
+    console.error('[idAnalyzerCallback] IDANALYZER_API_KEY not configured');
+    return Response.json({ error: 'API key not configured' }, { status: 500 });
+  }
+
+  let payload;
+  try {
+    console.log('[idAnalyzerCallback] Re-fetching transaction from IDAnalyzer API: ' + transactionId);
+    const res = await fetch(`https://api2.idanalyzer.com/transaction/${transactionId}`, {
+      method: 'GET',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (res.status === 404) {
+      console.warn('[idAnalyzerCallback] Transaction not found (404). Silently discarding.');
+      return Response.json({ success: true, message: 'Transaction not found — not a genuine webhook' });
+    }
+
+    if (!res.ok) {
+      const errData = await res.text();
+      console.error(`[idAnalyzerCallback] IDAnalyzer API error ${res.status}: ${errData}`);
+      return Response.json({ success: true, message: `API error ${res.status} — silently discarding` });
+    }
+
+    payload = await res.json();
+    console.log('[idAnalyzerCallback] Successfully re-fetched transaction, decision=' + payload.decision);
+  } catch (e) {
+    console.error('[idAnalyzerCallback] Failed to fetch transaction:', e.message);
+    return Response.json({ success: true, message: 'Fetch failed — silently discarding' });
+  }
+
+  // --- Continue with extracted transactionId and decision ---
   const decision = payload.decision;
-  // IDAnalyzer webhook uses transactionId (not id)
-  const transactionId = payload.transactionId || payload.id;
-  const customData = payload.customData;
+  const customData = incomingPayload.customData || payload.customData;
 
   if (!transactionId || !decision) {
     return Response.json({ error: 'Missing required fields: transactionId, decision' }, { status: 400 });
@@ -410,30 +405,7 @@ function normalizeDate(dateStr) {
   return cleaned.substring(0, 10);
 }
 
-async function computeHmac(secret, message) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
-  return Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
 
-async function constantTimeEqual(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string') return false;
-  if (a.length !== b.length) return false;
-  const enc = new TextEncoder();
-  const aHash = await crypto.subtle.digest('SHA-256', enc.encode(a));
-  const bHash = await crypto.subtle.digest('SHA-256', enc.encode(b));
-  const aArr = new Uint8Array(aHash);
-  const bArr = new Uint8Array(bHash);
-  let diff = 0;
-  for (let i = 0; i < aArr.length; i++) diff |= aArr[i] ^ bArr[i];
-  return diff === 0;
-}
 
 
 
