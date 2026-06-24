@@ -59,3 +59,12 @@ export const adminNav = [
   { label: 'Audit Log', path: '/admin/audit', icon: ScrollText },
   { label: 'Seed Data', path: '/admin/seed', icon: Database },
 ];
+
+export const staffAdminNav = [
+  { label: 'Overview', path: '/admin/overview', icon: LayoutDashboard },
+  { label: 'Flags', path: '/admin/flags', icon: ShieldAlert },
+  { label: 'KYC Review', path: '/admin/kyc', icon: FileCheck },
+  { label: 'Announcements', path: '/admin/announcements', icon: Megaphone },
+  { label: 'Reconciliation', path: '/admin/reconciliation', icon: Scale },
+  { label: 'Reports', path: '/admin/reports', icon: FileBarChart },
+];

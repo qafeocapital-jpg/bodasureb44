@@ -185,8 +185,8 @@ const AuthenticatedApp = () => {
         <Route path="/stage/compliance" element={<StageCompliance />} />
       </Route>
 
-      {/* Super Admin Portal (orange) */}
-      <Route element={<StaffLayout accent="orange" portalName="Super Admin" navItems={adminNav} requiredRole="super_admin" />}>
+      {/* Super Admin & BodaSure Staff Portal (orange) */}
+      <Route element={<StaffLayout accent="orange" portalName="Admin" navItems={adminNav} requiredRole={['super_admin', 'bodasure_staff']} />}>
         <Route path="/admin/overview" element={<AdminOverview />} />
         <Route path="/admin/flags" element={<AdminFlags />} />
         <Route path="/admin/counties" element={<AdminCounties />} />

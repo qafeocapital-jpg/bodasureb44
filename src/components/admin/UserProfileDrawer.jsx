@@ -148,6 +148,9 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
             <TabsList className="w-full justify-start overflow-x-auto scrollbar-hide">
               <TabsTrigger value="personal"><UserCircle className="w-3.5 h-3.5 mr-1 inline" />Personal</TabsTrigger>
               <TabsTrigger value="wallet"><Wallet className="w-3.5 h-3.5 mr-1 inline" />Wallet</TabsTrigger>
+              <TabsTrigger value="kyc"><FileText className="w-3.5 h-3.5 mr-1 inline" />KYC</TabsTrigger>
+              <TabsTrigger value="vehicles"><Bike className="w-3.5 h-3.5 mr-1 inline" />Bikes</TabsTrigger>
+              <TabsTrigger value="groups"><Users className="w-3.5 h-3.5 mr-1 inline" />Groups</TabsTrigger>
               <TabsTrigger value="submissions"><FileText className="w-3.5 h-3.5 mr-1 inline" />Submissions</TabsTrigger>
               {isSuper && <TabsTrigger value="roles"><Shield className="w-3.5 h-3.5 mr-1 inline" />Roles</TabsTrigger>}
             </TabsList>
@@ -155,7 +158,7 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
 
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {/* Personal Info */}
-            <TabsContent value="personal" className="mt-0 space-y-3">
+            <TabsContent value="personal" className="mt-0 space-y-3 data-[state=inactive]:hidden">
               <InfoRow label="First Name" value={nameParts.firstName || '—'} />
               <InfoRow label="Middle Name" value={nameParts.middleName || '—'} />
               <InfoRow label="Last Name" value={nameParts.lastName || '—'} />

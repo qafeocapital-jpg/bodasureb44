@@ -30,8 +30,20 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
     setFlagCount(v ? parseInt(v, 10) : 0);
   }, [location.pathname]);
 
+  // Check access for both single role and array of roles
+  const checkAccess = () => {
+    if (!user) return false;
+    const roles = new Set(user.roles || []);
+    if (user.role) roles.add(user.role);
+    if (roles.has('super_admin')) return true;
+    if (Array.isArray(requiredRole)) {
+      return requiredRole.some(r => hasPortalAccess(user, r));
+    }
+    return hasPortalAccess(user, requiredRole);
+  };
+
   useEffect(() => {
-    if (user && !hasPortalAccess(user, requiredRole)) {
+    if (user && !checkAccess()) {
       toast({
         title: 'Access denied',
         description: 'You do not have permission to access this portal.',
@@ -41,7 +53,7 @@ export default function StaffLayout({ accent = 'orange', portalName = 'Portal', 
   }, [user]);
 
   if (!user) return null;
-  if (!hasPortalAccess(user, requiredRole)) {
+  if (!checkAccess()) {
     return <Navigate to="/app" replace />;
   }
 

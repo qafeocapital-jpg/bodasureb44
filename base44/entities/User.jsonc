@@ -43,12 +43,20 @@
           "field_agent",
           "county_admin",
           "merchant_admin",
+          "bodasure_staff",
           "super_admin"
         ]
       },
       "default": [
         "rider"
       ]
+    },
+    "scope_entity_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
     },
     "profile_complete": {
       "type": "boolean",
