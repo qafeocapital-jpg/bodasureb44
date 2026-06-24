@@ -16,6 +16,22 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing phone or message' }, { status: 400 });
     }
 
+    // Sanitize phone number
+    function sanitizePhoneNumber(p) {
+      if (!p || typeof p !== 'string') return null;
+      let sanitized = p.trim();
+      sanitized = sanitized.replace(/\D/g, '');
+      if (!sanitized) return null;
+      if (sanitized.startsWith('254')) return `+${sanitized}`;
+      if (sanitized.startsWith('0')) return `+254${sanitized.substring(1)}`;
+      return `+254${sanitized}`;
+    }
+
+    const formattedPhone = sanitizePhoneNumber(phone);
+    if (!formattedPhone) {
+      return Response.json({ error: 'Invalid phone number format' }, { status: 400 });
+    }
+
     // Send SMS directly via Africa's Talking
     const atUsername = Deno.env.get('AT_USERNAME');
     const atApiKey = Deno.env.get('AT_API_KEY');
@@ -31,7 +47,7 @@ Deno.serve(async (req) => {
       },
       body: new URLSearchParams({
         username: atUsername,
-        to: phone,
+        to: formattedPhone,
         message: message,
       }).toString(),
     });
@@ -43,7 +59,7 @@ Deno.serve(async (req) => {
 
     // Log the SMS
     const log = await base44.asServiceRole.entities.SmsLog.create({
-      recipient_phone: phone,
+      recipient_phone: formattedPhone,
       message_body: message,
       template_key: 'test_sms',
       event_type: 'bulk',
@@ -56,14 +72,14 @@ Deno.serve(async (req) => {
 
     // Verify it was logged
     const logs = await base44.asServiceRole.entities.SmsLog.filter(
-      { recipient_phone: phone },
+      { recipient_phone: formattedPhone },
       '-created_date',
       5
     );
 
     return Response.json({
       success: true,
-      sentTo: phone,
+      sentTo: formattedPhone,
       atMessageId,
       sendStatus,
       logCreated: log.id,

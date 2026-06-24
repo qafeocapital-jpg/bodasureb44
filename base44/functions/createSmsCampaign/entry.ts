@@ -1,5 +1,15 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+function sanitizePhoneNumber(phone) {
+  if (!phone || typeof phone !== 'string') return null;
+  let sanitized = phone.trim();
+  sanitized = sanitized.replace(/\D/g, '');
+  if (!sanitized) return null;
+  if (sanitized.startsWith('254')) return `+${sanitized}`;
+  if (sanitized.startsWith('0')) return `+254${sanitized.substring(1)}`;
+  return `+254${sanitized}`;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -14,27 +24,29 @@ Deno.serve(async (req) => {
     let recipientPhones = [];
 
     if (audienceType === 'individual' && audiencePhone) {
-      recipientPhones = [audiencePhone];
+      const formatted = sanitizePhoneNumber(audiencePhone);
+      if (!formatted) return Response.json({ error: 'Invalid phone number format' }, { status: 400 });
+      recipientPhones = [formatted];
     } else if (audienceType === 'all_riders') {
       const users = countyScope
         ? await base44.asServiceRole.entities.User.filter({ county_id: countyScope })
         : await base44.asServiceRole.entities.User.filter({ staff_type: 'none' });
-      recipientPhones = users.filter(u => u.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (audienceType === 'by_county' && audienceFilterId) {
       const users = await base44.asServiceRole.entities.User.filter({ county_id: audienceFilterId, staff_type: 'none' });
-      recipientPhones = users.filter(u => u.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (audienceType === 'by_sacco' && audienceFilterId) {
       const members = await base44.asServiceRole.entities.GroupMember.filter({ group_id: audienceFilterId });
       const userIds = [...new Set(members.map(m => m.user_id))];
       const users = await Promise.all(
         userIds.map(id => base44.asServiceRole.entities.User.get(id).catch(() => null))
       );
-      recipientPhones = users.filter(u => u?.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u?.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (audienceType === 'by_stage' && audienceFilterId) {
       const stage = await base44.asServiceRole.entities.Stage.get(audienceFilterId);
       if (!stage) return Response.json({ error: 'Stage not found' }, { status: 404 });
       const users = await base44.asServiceRole.entities.User.filter({ county_id: stage.county_id });
-      recipientPhones = users.filter(u => u.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (audienceType === 'by_sub_county' && audienceFilterId) {
       const wards = await base44.asServiceRole.entities.Ward.filter({ sub_county_id: audienceFilterId });
       const wardIds = wards.map(w => w.id);
@@ -44,14 +56,14 @@ Deno.serve(async (req) => {
       const users = await Promise.all(
         riderIds.map(id => base44.asServiceRole.entities.User.get(id).catch(() => null))
       );
-      recipientPhones = users.filter(u => u?.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u?.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (audienceType === 'by_ward' && audienceFilterId) {
       const vehicles = await base44.asServiceRole.entities.Vehicle.filter({ ward_id: audienceFilterId });
       const riderIds = [...new Set(vehicles.map(v => v.rider_id).filter(Boolean))];
       const users = await Promise.all(
         riderIds.map(id => base44.asServiceRole.entities.User.get(id).catch(() => null))
       );
-      recipientPhones = users.filter(u => u?.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u?.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     }
 
     if (recipientPhones.length === 0) {

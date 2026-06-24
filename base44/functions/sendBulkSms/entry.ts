@@ -5,6 +5,16 @@ const getAtBaseUrl = () => {
   return env === 'sandbox' ? 'https://api.sandbox.africastalking.com' : 'https://api.africastalking.com';
 };
 
+function sanitizePhoneNumber(phone) {
+  if (!phone || typeof phone !== 'string') return null;
+  let sanitized = phone.trim();
+  sanitized = sanitized.replace(/\D/g, '');
+  if (!sanitized) return null;
+  if (sanitized.startsWith('254')) return `+${sanitized}`;
+  if (sanitized.startsWith('0')) return `+254${sanitized.substring(1)}`;
+  return `+254${sanitized}`;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -17,26 +27,27 @@ Deno.serve(async (req) => {
     // Resolve all recipient phones based on campaign audience
     let recipientPhones = [];
     if (campaign.audience_type === 'individual' && campaign.audience_phone) {
-      recipientPhones = [campaign.audience_phone];
+      const formatted = sanitizePhoneNumber(campaign.audience_phone);
+      if (formatted) recipientPhones = [formatted];
     } else if (campaign.audience_type === 'all_riders') {
       const users = campaign.county_scope_id
         ? await base44.asServiceRole.entities.User.filter({ county_id: campaign.county_scope_id, staff_type: 'none' })
         : await base44.asServiceRole.entities.User.filter({ staff_type: 'none' });
-      recipientPhones = users.filter(u => u.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (campaign.audience_type === 'by_county' && campaign.audience_filter_id) {
       const users = await base44.asServiceRole.entities.User.filter({ county_id: campaign.audience_filter_id, staff_type: 'none' });
-      recipientPhones = users.filter(u => u.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (campaign.audience_type === 'by_sacco' && campaign.audience_filter_id) {
       const members = await base44.asServiceRole.entities.GroupMember.filter({ group_id: campaign.audience_filter_id });
       const userIds = [...new Set(members.map(m => m.user_id))];
       const users = await Promise.all(
         userIds.map(id => base44.asServiceRole.entities.User.get(id).catch(() => null))
       );
-      recipientPhones = users.filter(u => u?.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u?.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (campaign.audience_type === 'by_stage' && campaign.audience_filter_id) {
       const stage = await base44.asServiceRole.entities.Stage.get(campaign.audience_filter_id);
       const users = await base44.asServiceRole.entities.User.filter({ county_id: stage.county_id, staff_type: 'none' });
-      recipientPhones = users.filter(u => u.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (campaign.audience_type === 'by_sub_county' && campaign.audience_filter_id) {
       const wards = await base44.asServiceRole.entities.Ward.filter({ sub_county_id: campaign.audience_filter_id });
       const wardIds = wards.map(w => w.id);
@@ -46,14 +57,14 @@ Deno.serve(async (req) => {
       const users = await Promise.all(
         riderIds.map(id => base44.asServiceRole.entities.User.get(id).catch(() => null))
       );
-      recipientPhones = users.filter(u => u?.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u?.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     } else if (campaign.audience_type === 'by_ward' && campaign.audience_filter_id) {
       const vehicles = await base44.asServiceRole.entities.Vehicle.filter({ ward_id: campaign.audience_filter_id });
       const riderIds = [...new Set(vehicles.map(v => v.rider_id).filter(Boolean))];
       const users = await Promise.all(
         riderIds.map(id => base44.asServiceRole.entities.User.get(id).catch(() => null))
       );
-      recipientPhones = users.filter(u => u?.phone).map(u => u.phone);
+      recipientPhones = users.filter(u => u?.phone).map(u => sanitizePhoneNumber(u.phone)).filter(Boolean);
     }
 
     let sentCount = 0;

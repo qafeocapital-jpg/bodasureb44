@@ -12,6 +12,16 @@ function generateOtp() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
+function sanitizePhoneNumber(phone) {
+  if (!phone || typeof phone !== 'string') return null;
+  let sanitized = phone.trim();
+  sanitized = sanitized.replace(/\D/g, '');
+  if (!sanitized) return null;
+  if (sanitized.startsWith('254')) return `+${sanitized}`;
+  if (sanitized.startsWith('0')) return `+254${sanitized.substring(1)}`;
+  return `+254${sanitized}`;
+}
+
 function generateSaltBase64() {
   const arr = new Uint8Array(16);
   crypto.getRandomValues(arr);
@@ -71,6 +81,11 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'No phone number on file' }, { status: 400 });
     }
 
+    const formattedPhone = sanitizePhoneNumber(user.phone);
+    if (!formattedPhone) {
+      return Response.json({ error: 'Invalid phone number format' }, { status: 400 });
+    }
+
     const atApiKey = Deno.env.get('AT_API_KEY');
     const atUsername = Deno.env.get('AT_USERNAME');
     if (!atApiKey || !atUsername) {
@@ -86,7 +101,7 @@ Deno.serve(async (req) => {
 
       const body = new URLSearchParams();
       body.append('username', atUsername);
-      body.append('to', user.phone);
+      body.append('to', formattedPhone);
       body.append('message', smsMessage);
 
       const response = await fetch(`${atBaseUrl}/version1/messaging`, {
@@ -106,9 +121,9 @@ Deno.serve(async (req) => {
       const atData = await response.json();
       const messageId = atData.SMSMessageData?.Recipients?.[0]?.messageId;
 
-      // Log the SMS
+      // Log the SMS (with formatted phone)
       await base44.asServiceRole.entities.SmsLog.create({
-        recipient_phone: user.phone,
+        recipient_phone: formattedPhone,
         message_body: smsMessage,
         template_key: 'otp',
         event_type: 'otp',

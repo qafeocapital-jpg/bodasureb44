@@ -3,7 +3,19 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 /**
  * Send a transactional SMS via Africa's Talking.
  * Logs the message in SmsLog entity for delivery tracking.
+ * Phone numbers are sanitized to +254[number] format automatically.
  */
+
+// Phone number sanitization
+function sanitizePhoneNumber(phone) {
+  if (!phone || typeof phone !== 'string') return null;
+  let sanitized = phone.trim();
+  sanitized = sanitized.replace(/\D/g, '');
+  if (!sanitized) return null;
+  if (sanitized.startsWith('254')) return `+${sanitized}`;
+  if (sanitized.startsWith('0')) return `+254${sanitized.substring(1)}`;
+  return `+254${sanitized}`;
+}
 
 Deno.serve(async (req) => {
   try {
@@ -14,6 +26,11 @@ Deno.serve(async (req) => {
     const { phone, message, templateKey, eventType, metadata = {} } = await req.json();
     if (!phone || !message || !eventType) {
       return Response.json({ error: 'Missing required fields: phone, message, eventType' }, { status: 400 });
+    }
+
+    const formattedPhone = sanitizePhoneNumber(phone);
+    if (!formattedPhone) {
+      return Response.json({ error: 'Invalid phone number format' }, { status: 400 });
     }
 
     const atUsername = Deno.env.get('AT_USERNAME');
@@ -36,7 +53,7 @@ Deno.serve(async (req) => {
       },
       body: new URLSearchParams({
         username: atUsername,
-        to: phone,
+        to: formattedPhone,
         message: message,
       }).toString(),
     });
@@ -52,9 +69,9 @@ Deno.serve(async (req) => {
     const atMessageId = recipients[0]?.messageId || null;
     const status = recipients[0]?.status === 'Success' ? 'sent' : 'failed';
 
-    // Log the SMS in SmsLog
+    // Log the SMS in SmsLog (with formatted phone)
     await base44.asServiceRole.entities.SmsLog.create({
-      recipient_phone: phone,
+      recipient_phone: formattedPhone,
       message_body: message,
       template_key: templateKey || null,
       event_type: eventType,
@@ -69,7 +86,7 @@ Deno.serve(async (req) => {
       success: true,
       messageId: atMessageId,
       status: status,
-      phone: phone,
+      phone: formattedPhone,
     });
   } catch (error) {
     console.error('sendSms error:', error);
