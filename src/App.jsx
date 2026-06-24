@@ -9,7 +9,7 @@ import ScrollToTop from './components/ScrollToTop';
 import { Navigate } from 'react-router-dom';
 import RiderLayout from './components/rider/RiderLayout';
 import StaffLayout from './components/staff/StaffLayout';
-import { countyNav, saccoNav, merchantNav, agentNav, stageNav, adminNav } from './lib/staffNav';
+import { countyNav, saccoNav, merchantNav, agentNav, stageNav, adminNav, commsNav } from './lib/staffNav';
 import Home from './pages/rider/Home';
 import Wallet from './pages/rider/Wallet';
 import Bikes from './pages/rider/Bikes';
@@ -67,6 +67,7 @@ import AdminAuditLog from './pages/admin/AuditLog';
 import AdminAnnouncements from './pages/admin/Announcements';
 import AdminSaccos from './pages/admin/AdminSaccos';
 import AdminFlags from './pages/admin/Flags';
+import Communications from './pages/admin/Communications';
 import SeedData from './pages/admin/SeedData';
 import RiderVerify from './pages/public/RiderVerify';
 import Login from './pages/Login';
@@ -198,6 +199,10 @@ const AuthenticatedApp = () => {
         <Route path="/admin/reconciliation" element={<AdminReconciliation />} />
         <Route path="/admin/audit" element={<AdminAuditLog />} />
         <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+        <Route path="/admin/comms" element={<Communications />} />
+        <Route path="/admin/comms/templates" element={<Communications />} />
+        <Route path="/admin/comms/bulk" element={<Communications />} />
+        <Route path="/admin/comms/logs" element={<Communications />} />
         <Route path="/admin/saccos" element={<AdminSaccos />} />
         <Route path="/admin/seed" element={<SeedData />} />
       </Route>

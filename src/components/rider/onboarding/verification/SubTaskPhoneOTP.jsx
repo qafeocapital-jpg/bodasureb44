@@ -67,12 +67,12 @@ export default function SubTaskPhoneOTP({ user, onDataChange, onBack }) {
         <div className="bg-success/5 border border-success/20 rounded-xl p-4 text-center">
           <Check className="w-8 h-8 mx-auto text-success mb-2" />
           <p className="text-sm font-semibold text-success">Phone Verified!</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Your phone number has been confirmed</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Your phone number has been confirmed via BodaSure Wallet activation</p>
         </div>
       ) : !otpSent ? (
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground text-center">
-            We'll send a 4-digit code to <span className="font-semibold">{user?.email}</span> to verify your account.
+            We'll send a 4-digit code via SMS to <span className="font-semibold">{user?.phone ? user.phone : 'your phone'}</span> to verify your account.
           </p>
           <button
             onClick={handleSendOtp}

@@ -66,18 +66,57 @@ Deno.serve(async (req) => {
       otp_attempts: 0,
     });
 
-    // Send OTP via email
-    try {
-      await base44.asServiceRole.integrations.Core.SendEmail({
-        to: user.email,
-        subject: 'BodaSure — Your Verification Code',
-        body: `<p>Hello ${user.full_name || ''},</p><p>Your BodaSure verification code is: <strong style="font-size:24px;letter-spacing:4px">${otpCode}</strong></p><p>This code expires in 5 minutes.</p><p>If you didn't request this, please ignore this email.</p>`,
-      });
-    } catch (emailErr) {
-      return Response.json({ error: 'Failed to send OTP email: ' + emailErr.message }, { status: 500 });
+    // Send OTP via SMS
+    if (!user.phone) {
+      return Response.json({ error: 'No phone number on file' }, { status: 400 });
     }
 
-    return Response.json({ success: true, sentVia: 'email' });
+    const atApiKey = Deno.env.get('AT_API_KEY');
+    const atUsername = Deno.env.get('AT_USERNAME');
+    if (!atApiKey || !atUsername) {
+      return Response.json({ error: 'SMS not configured' }, { status: 500 });
+    }
+
+    const smsMessage = `Your BodaSure code: ${otpCode}. Valid 5 mins. Do not share.`;
+
+    try {
+      const body = new URLSearchParams();
+      body.append('username', atUsername);
+      body.append('to', user.phone);
+      body.append('message', smsMessage);
+
+      const response = await fetch('https://api.africastalking.com/version1/messaging', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'apiKey': atApiKey,
+        },
+        body,
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`AT error: ${err}`);
+      }
+
+      const atData = await response.json();
+      const messageId = atData.SMSMessageData?.Recipients?.[0]?.messageId;
+
+      // Log the SMS
+      await base44.asServiceRole.entities.SmsLog.create({
+        recipient_phone: user.phone,
+        message_body: smsMessage,
+        template_key: 'otp',
+        event_type: 'otp',
+        at_message_id: messageId,
+        status: 'sent',
+        user_id: user.id,
+      });
+    } catch (smsErr) {
+      return Response.json({ error: 'Failed to send OTP SMS: ' + smsErr.message }, { status: 500 });
+    }
+
+    return Response.json({ success: true, sentVia: 'sms' });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

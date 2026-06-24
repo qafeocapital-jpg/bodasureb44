@@ -54,6 +54,15 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     }
   }, [user?.kyc_just_approved, refreshUser]);
 
+  // Auto-verify phone if wallet is active (already verified during activation)
+  useEffect(() => {
+    if (wallet?.status === 'active' && wallet?.tier >= 1 && user && !user.phone_verified) {
+      base44.auth.updateMe({ phone_verified: true }).catch(() => {}).finally(() => {
+        if (refreshUser) refreshUser();
+      });
+    }
+  }, [wallet?.status, wallet?.tier, user?.phone_verified]);
+
   // Check completion state
   const tasks = getTaskStatuses(kycDocs, user, vehicle);
   const submitted = isAllSubmitted(tasks);
