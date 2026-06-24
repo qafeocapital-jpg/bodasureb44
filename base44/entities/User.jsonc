@@ -197,6 +197,38 @@
       "type": "string",
       "format": "date"
     },
+    "id_extracted_data": {
+      "type": "string"
+    },
+    "id_sex": {
+      "type": "string"
+    },
+    "id_expiry_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "id_issued_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "id_address": {
+      "type": "string"
+    },
+    "id_nationality": {
+      "type": "string"
+    },
+    "id_country": {
+      "type": "string"
+    },
+    "id_face_identical": {
+      "type": "boolean"
+    },
+    "id_authentication_score": {
+      "type": "number"
+    },
+    "id_match_rate": {
+      "type": "number"
+    },
     "kyc_just_approved": {
       "type": "boolean",
       "default": false
@@ -212,6 +244,10 @@
         "review",
         "reject"
       ]
+    },
+    "docupass_verified_at": {
+      "type": "string",
+      "format": "date-time"
     },
     "id_face_confidence": {
       "type": "number"

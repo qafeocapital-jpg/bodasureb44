@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatDateTime } from '@/lib/format';
-import { Loader2, ImageIcon, ShieldCheck, AlertTriangle, Car } from 'lucide-react';
+import { Loader2, ImageIcon, ShieldCheck, AlertTriangle, Car, ChevronDown, ChevronUp, Fingerprint, MapPin, Calendar, FileText, User, Globe, Activity, ScanLine } from 'lucide-react';
 import SignalBadge from '@/components/admin/flags/SignalBadge';
 import ConfidenceBar from '@/components/admin/flags/ConfidenceBar';
 import ImageLightbox from '@/components/admin/flags/ImageLightbox';
@@ -49,11 +49,25 @@ const DECISION_CONFIG = {
   reject: { label: 'Rejected', color: 'red', icon: AlertTriangle },
 };
 
+function DataRow({ icon: Icon, label, value, mono }) {
+  if (value == null || value === '') return null;
+  return (
+    <div className="flex justify-between items-center text-xs py-0.5">
+      <span className="text-muted-foreground flex items-center gap-1.5">
+        {Icon && <Icon className="w-3 h-3" />}
+        {label}
+      </span>
+      <span className={`font-medium ${mono ? 'font-mono' : ''}`}>{value}</span>
+    </div>
+  );
+}
+
 export default function SubmissionsTab({ user }) {
   const [loading, setLoading] = useState(false);
   const [kycDocs, setKycDocs] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [lightbox, setLightbox] = useState(null);
+  const [showRawData, setShowRawData] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -78,21 +92,31 @@ export default function SubmissionsTab({ user }) {
     return <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>;
   }
 
-  // Section 1: Only IDAnalyzer docs for identity
   const idAnalyzerDocs = kycDocs.filter(d =>
     d.provider_name === 'idanalyzer_docupass' && IDENTITY_DOCS.includes(d.document_type)
   );
+  const legacyIdentityDocs = kycDocs.filter(d =>
+    !d.provider_name && IDENTITY_DOCS.includes(d.document_type)
+  );
   const vehicleDocs = kycDocs.filter(d => VEHICLE_DOCS.includes(d.document_type));
 
-  // Decision: from user field or derived from doc statuses
   const decision = user?.docupass_decision || deriveDecision(idAnalyzerDocs);
   const decisionConfig = decision ? DECISION_CONFIG[decision] : null;
   const faceConfidence = user?.id_face_confidence;
+  const faceIdentical = user?.id_face_identical;
+  const authScore = user?.id_authentication_score;
+  const matchRate = user?.id_match_rate;
 
-  // Rejection warnings
+  let extractedData = null;
+  try {
+    extractedData = user?.id_extracted_data ? JSON.parse(user.id_extracted_data) : null;
+  } catch {}
+
   const rejectionWarnings = idAnalyzerDocs
     .filter(d => d.rejection_reason)
     .map(d => ({ type: d.document_type, reason: d.rejection_reason }));
+
+  const hasLegacyOnly = idAnalyzerDocs.length === 0 && legacyIdentityDocs.length > 0;
 
   return (
     <div className="space-y-5">
@@ -114,6 +138,11 @@ export default function SubmissionsTab({ user }) {
                   {decisionConfig.label}
                 </SignalBadge>
               </div>
+            )}
+
+            {/* Verification timestamp */}
+            {user?.docupass_verified_at && (
+              <DataRow icon={Calendar} label="Verified At" value={formatDateTime(user.docupass_verified_at)} />
             )}
 
             {/* Document Images */}
@@ -152,43 +181,92 @@ export default function SubmissionsTab({ user }) {
               })}
             </div>
 
-            {/* Extracted Fields */}
-            {(user?.id_extracted_name || user?.id_extracted_dob || user?.national_id) && (
-              <div className="space-y-2 pt-2 border-t border-border">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Extracted Data</p>
-                {user?.id_extracted_name && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Full Name</span>
-                    <span className="font-medium font-mono">{user.id_extracted_name}</span>
-                  </div>
-                )}
-                {user?.id_extracted_dob && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Date of Birth</span>
-                    <span className="font-medium font-mono">{user.id_extracted_dob}</span>
-                  </div>
-                )}
-                {user?.national_id && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">National ID</span>
-                    <span className="font-medium font-mono">{user.national_id}</span>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Extracted Identity Data */}
+            <div className="space-y-2 pt-2 border-t border-border">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                <FileText className="w-3 h-3" /> Extracted Identity Data
+              </p>
+              <DataRow icon={User} label="Full Name" value={user?.id_extracted_name || extractedData?.fullName} mono />
+              <DataRow icon={Calendar} label="Date of Birth" value={user?.id_extracted_dob || extractedData?.dob} />
+              <DataRow icon={User} label="Gender" value={user?.id_sex || extractedData?.sex} />
+              <DataRow icon={Calendar} label="Age" value={extractedData?.age} />
+              <DataRow icon={FileText} label="National ID" value={user?.national_id || extractedData?.documentNumber} mono />
+              <DataRow icon={FileText} label="Document Type" value={extractedData?.documentType} />
+              <DataRow icon={Calendar} label="ID Issue Date" value={user?.id_issued_date} />
+              <DataRow icon={Calendar} label="ID Expiry Date" value={user?.id_expiry_date} />
+              <DataRow icon={MapPin} label="Address" value={user?.id_address || [extractedData?.address1, extractedData?.address2, extractedData?.postcode].filter(Boolean).join(', ')} />
+              <DataRow icon={Globe} label="Country" value={user?.id_country || extractedData?.country} />
+              <DataRow icon={Globe} label="Nationality" value={user?.id_nationality || extractedData?.nationality} />
+              <DataRow icon={FileText} label="Issuing Authority" value={extractedData?.issuingAuthority} />
+              <DataRow icon={FileText} label="Internal ID" value={extractedData?.internalId} mono />
+            </div>
 
-            {/* Face Match Confidence */}
-            {faceConfidence != null && (
-              <div className="space-y-1.5 pt-2 border-t border-border">
-                <div className="flex justify-between items-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Face Match Confidence</p>
-                  <span className="text-xs font-medium">{faceConfidenceLabel(faceConfidence)}</span>
+            {/* Biometric Verification */}
+            <div className="space-y-2 pt-2 border-t border-border">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                <Fingerprint className="w-3 h-3" /> Biometric Verification
+              </p>
+              {faceConfidence != null && (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Face Match Confidence</span>
+                    <span className="text-xs font-medium">{faceConfidenceLabel(faceConfidence)}</span>
+                  </div>
+                  <ConfidenceBar value={faceConfidence} color={faceConfidenceColor(faceConfidence)} />
                 </div>
-                <ConfidenceBar value={faceConfidence} color={faceConfidenceColor(faceConfidence)} />
+              )}
+              {faceIdentical != null && (
+                <DataRow icon={Fingerprint} label="Face Identical" value={faceIdentical ? 'Yes' : 'No'} />
+              )}
+            </div>
+
+            {/* Document Authentication */}
+            {authScore != null && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                  <ScanLine className="w-3 h-3" /> Document Authentication
+                </p>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Authenticity Score</span>
+                    <span className="text-xs font-medium">{authScore >= 0.5 ? 'Authentic' : 'Suspicious'}</span>
+                  </div>
+                  <ConfidenceBar value={authScore} color={authScore >= 0.5 ? 'green' : 'red'} />
+                </div>
               </div>
             )}
 
-            {/* Rejection Warnings */}
+            {/* OCR Quality */}
+            {matchRate != null && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                  <Activity className="w-3 h-3" /> OCR Quality
+                </p>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Data Extraction Rate</span>
+                    <span className="text-xs font-medium">{matchRate >= 0.7 ? 'Good' : matchRate >= 0.4 ? 'Fair' : 'Poor'}</span>
+                  </div>
+                  <ConfidenceBar value={matchRate} color={matchRate >= 0.7 ? 'green' : matchRate >= 0.4 ? 'amber' : 'red'} />
+                </div>
+              </div>
+            )}
+
+            {/* AML Flags */}
+            {extractedData?.aml && extractedData.aml.length > 0 && (
+              <div className="space-y-1.5 pt-2 border-t border-border">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-destructive flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> AML / Sanctions Flags ({extractedData.aml.length})
+                </p>
+                {extractedData.aml.slice(0, 3).map((aml, i) => (
+                  <div key={i} className="text-[10px] text-destructive bg-destructive/10 rounded px-2 py-1">
+                    {aml.fullname?.[0] || 'Unknown'} — {aml.note?.[0] || aml.program?.[0] || 'Flagged'}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Warnings */}
             {rejectionWarnings.length > 0 && (
               <div className="space-y-1.5 pt-2 border-t border-border">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Warnings</p>
@@ -210,6 +288,47 @@ export default function SubmissionsTab({ user }) {
                 <span className="font-mono text-muted-foreground">{idAnalyzerDocs[0].provider_reference}</span>
               </div>
             )}
+
+            {/* Raw Data Toggle */}
+            {extractedData && (
+              <div className="pt-2 border-t border-border">
+                <button
+                  onClick={() => setShowRawData(!showRawData)}
+                  className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
+                >
+                  {showRawData ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  {showRawData ? 'Hide' : 'Show'} Raw Extraction Data
+                </button>
+                {showRawData && (
+                  <pre className="mt-2 text-[9px] bg-muted rounded-lg p-2 overflow-x-auto max-h-48 font-mono">
+                    {JSON.stringify(extractedData, null, 2)}
+                  </pre>
+                )}
+              </div>
+            )}
+          </div>
+        ) : hasLegacyOnly ? (
+          <div className="border border-amber-200 bg-amber-50 rounded-xl p-4 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-amber-700">Legacy Documents Detected</p>
+                <p className="text-[10px] text-amber-600 mt-1">
+                  {legacyIdentityDocs.length} identity document(s) were uploaded through the old manual flow (pre-IDAnalyzer).
+                  These lack biometric verification, OCR extraction, and document authentication.
+                </p>
+                <p className="text-[10px] text-amber-600 mt-1">
+                  The rider must complete DocuPass verification to get full identity extraction and auto-approval.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1 pt-1">
+              {legacyIdentityDocs.map(doc => (
+                <span key={doc.id} className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">
+                  {DOC_TYPE_LABELS[doc.document_type]}: {doc.status}
+                </span>
+              ))}
+            </div>
           </div>
         ) : (
           <p className="text-xs text-muted-foreground bg-muted rounded-lg p-4 text-center">

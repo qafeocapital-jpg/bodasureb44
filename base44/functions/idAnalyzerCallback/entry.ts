@@ -6,20 +6,19 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * Atomic flow on every docupass_conclusive event:
  *   1. Validate HMAC signature (or query-string secret fallback)
  *   2. Filter events — only process docupass_conclusive
- *   3. Upsert KycDocuments + hydrate User with extracted identity
- *   4. Push docs to SasaPay KYC (on accept, if wallet onboarded)
- *   5. SMS notification to rider
- *   6. AuditLog entries
- *
- * Returns HTTP 200 quickly for non-retryable cases; 401/500 for retryable ones.
+ *   3. Extract ALL ID fields (52+) + face + authentication + AML
+ *   4. Upsert KycDocuments + hydrate User with full extracted identity
+ *   5. Auto-set kyc_status, verification_complete, wallet tier on accept
+ *   6. Push docs to SasaPay KYC (on accept, if wallet onboarded)
+ *   7. SMS notification to rider
+ *   8. AuditLog entries
  */
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
-  // --- 0. Read raw body BEFORE parsing (needed for HMAC) ---
   const rawBody = await req.text();
 
-  // --- 1. Authentication: HMAC signature (with query-secret fallback) ---
+  // --- 1. Authentication ---
   const webhookSecret = Deno.env.get('IDANALYZER_WEBHOOK_SECRET');
   if (!webhookSecret) {
     return Response.json({ error: 'Webhook secret not configured' }, { status: 500 });
@@ -32,21 +31,17 @@ Deno.serve(async (req) => {
   let authenticated = false;
 
   if (idaSignature && idaTimestamp) {
-    // HMAC verification: v1=HEX(HMAC_SHA256(secret, timestamp + '.' + rawBody))
     const expectedSig = await computeHmac(webhookSecret, `${idaTimestamp}.${rawBody}`);
     const tsNum = parseInt(idaTimestamp, 10);
     const nowSec = Math.floor(Date.now() / 1000);
     if (isNaN(tsNum) || Math.abs(nowSec - tsNum) > 300) {
-      console.warn('[idAnalyzerCallback] Stale or invalid timestamp, rejecting');
       return Response.json({ error: 'Stale timestamp' }, { status: 401 });
     }
     authenticated = await constantTimeEqual(expectedSig, idaSignature);
     if (!authenticated) {
-      console.warn('[idAnalyzerCallback] HMAC signature mismatch, rejecting');
       return Response.json({ error: 'Invalid signature' }, { status: 401 });
     }
   } else if (querySecret === webhookSecret) {
-    // Backward-compat fallback for testing
     authenticated = true;
   }
 
@@ -65,11 +60,10 @@ Deno.serve(async (req) => {
   // --- 2. Event filtering ---
   const eventType = payload.event || payload.type;
   if (eventType && eventType !== 'docupass_conclusive') {
-    // Idempotent 200 for non-conclusive events (new/delete/update)
     return Response.json({ success: true, message: `Ignored event: ${eventType}` });
   }
 
-  const decision = payload.decision; // accept | review | reject
+  const decision = payload.decision;
   const transactionId = payload.id || payload.transactionId;
   const customData = payload.customData;
 
@@ -82,13 +76,11 @@ Deno.serve(async (req) => {
 
   // --- Identify user ---
   let userId = customData;
-  // Fallback: some v2 payloads nest it differently
   if (!userId && payload.reference) userId = payload.reference;
   if (!userId && payload.user_reference) userId = payload.user_reference;
 
   if (!userId) {
-    console.warn(`[idAnalyzerCallback] No user (customData) for transaction ${transactionId}`);
-    return Response.json({ success: true, message: 'No user reference, silently accepted' });
+    return Response.json({ success: true, message: 'No user reference' });
   }
 
   // --- Idempotency check ---
@@ -97,27 +89,98 @@ Deno.serve(async (req) => {
       provider_reference: transactionId,
     });
     if (existing.length > 0 && existing.some(d => d.status === 'approved')) {
-      console.log(`[idAnalyzerCallback] Transaction ${transactionId} already processed, skipping`);
       return Response.json({ success: true, message: 'Already processed' });
     }
   } catch (e) {
-    console.warn('[idAnalyzerCallback] Idempotency check failed (continuing):', e.message);
+    console.warn('[idAnalyzerCallback] Idempotency check failed:', e.message);
   }
 
-  // --- 3. Extract document image URLs + identity data ---
-  const data = payload.data || {};
-  const outputImage = payload.outputImage || {};
+  // --- 3. Extract ALL data fields ---
+  // DocuPass v2 callback wraps data in "data", Core API uses "result"
+  const data = payload.data || payload.result || {};
+  const outputImage = payload.outputImage || payload.output_image || {};
+  const faceData = payload.face || data.face || {};
+  const authentication = payload.authentication || data.authentication || {};
+  const warnings = payload.warning || payload.warnings || [];
 
-  const frontUrl = outputImage.front || '';
-  const backUrl = outputImage.back || '';
-  const faceUrl = outputImage.face || '';
+  const frontUrl = outputImage.front || outputImage.frontUrl || '';
+  const backUrl = outputImage.back || outputImage.backUrl || '';
+  const faceUrl = outputImage.face || outputImage.faceUrl || '';
 
+  // Extract all standard ID fields
   const fullName = extractValue(data.fullName);
+  const firstName = extractValue(data.firstName);
+  const lastName = extractValue(data.lastName);
+  const middleName = extractValue(data.middleName);
   const dob = extractValue(data.dob);
+  const age = extractValue(data.age);
+  const sex = extractValue(data.sex);
   const documentNumber = extractValue(data.documentNumber);
+  const internalId = extractValue(data.internalId);
+  const expiry = extractValue(data.expiry);
+  const issued = extractValue(data.issued);
+  const address1 = extractValue(data.address1);
+  const address2 = extractValue(data.address2);
+  const postcode = extractValue(data.postcode);
+  const country = extractValue(data.country);
+  const nationality = extractValue(data.nationality);
+  const documentType = extractValue(data.documentType) || extractValue(data.type);
+  const issuingAuthority = extractValue(data.issuingAuthority);
+  const placeOfBirth = extractValue(data.placeOfBirth);
+  const mrz = extractValue(data.mrz);
+
+  // Face verification data
+  let faceConfidence = null;
+  let faceIsIdentical = null;
+  if (faceData) {
+    if (typeof faceData === 'number') {
+      faceConfidence = faceData;
+    } else if (Array.isArray(faceData) && faceData[0]) {
+      faceConfidence = typeof faceData[0] === 'object' ? (faceData[0].confidence ?? faceData[0].value) : faceData[0];
+    } else if (typeof faceData === 'object') {
+      faceConfidence = faceData.confidence ?? faceData.value;
+      faceIsIdentical = faceData.isIdentical ?? faceData.is_identical ?? null;
+    }
+  }
+  if (faceConfidence != null && faceConfidence > 1) faceConfidence = faceConfidence / 100;
+
+  // Document authentication
+  let authScore = null;
+  if (authentication) {
+    if (typeof authentication === 'number') authScore = authentication;
+    else if (typeof authentication === 'object') authScore = authentication.score ?? authentication.value ?? null;
+  }
+
+  // OCR match rate
+  const matchRate = extractValue(data.matchRate) || payload.matchRate || payload.matchrate || null;
+
+  // AML matches
+  const amlMatches = payload.aml || data.aml || [];
+
+  // Build comprehensive extracted data JSON
+  const extractedData = {
+    fullName, firstName, lastName, middleName,
+    dob, age, sex,
+    documentNumber, internalId, documentType, issuingAuthority,
+    expiry, issued,
+    address1, address2, postcode, country, nationality, placeOfBirth,
+    face: { confidence: faceConfidence, isIdentical: faceIsIdentical },
+    authentication: { score: authScore },
+    matchRate,
+    mrz,
+    aml: amlMatches,
+    warnings: warnings.map(w => ({
+      code: w.code || w.name,
+      description: w.description || w.message,
+      severity: w.severity,
+    })),
+    transactionId,
+    decision,
+    rawPayloadKeys: Object.keys(data),
+  };
 
   const rejectionReason = decision === 'reject'
-    ? (payload.warning?.[0]?.description || payload.warning?.[0]?.message || 'Verification rejected')
+    ? (warnings[0]?.description || warnings[0]?.message || 'Verification rejected')
     : null;
 
   // --- 4. BodaSure DB upsert ---
@@ -150,66 +213,89 @@ Deno.serve(async (req) => {
     }
   }));
 
-  // --- Hydrate user identity data (store decision + face confidence always; extracted fields on accept) ---
+  // --- Hydrate user with ALL extracted data + auto-set verification status ---
   try {
     const user = await base44.asServiceRole.entities.User.get(userId);
-    const userUpdate = { docupass_decision: decision };
+    const userUpdate = {
+      docupass_decision: decision,
+      id_extracted_data: JSON.stringify(extractedData),
+    };
 
-    // Extract face confidence from various possible payload paths
-    let faceConfidence = null;
-    const faceField = data.face;
-    if (faceField) {
-      if (typeof faceField === 'number') faceConfidence = faceField;
-      else if (Array.isArray(faceField) && faceField[0]) {
-        faceConfidence = typeof faceField[0] === 'object' ? (faceField[0].confidence ?? faceField[0].value) : faceField[0];
-      } else if (typeof faceField === 'object') {
-        faceConfidence = faceField.confidence ?? faceField.value;
-      }
-    }
-    if (faceConfidence != null) {
-      if (faceConfidence > 1) faceConfidence = faceConfidence / 100;
-      userUpdate.id_face_confidence = faceConfidence;
-    }
+    // Store key fields individually for querying/display
+    if (faceConfidence != null) userUpdate.id_face_confidence = faceConfidence;
+    if (faceIsIdentical != null) userUpdate.id_face_identical = faceIsIdentical;
+    if (authScore != null) userUpdate.id_authentication_score = authScore;
+    if (matchRate != null) userUpdate.id_match_rate = matchRate;
+    if (sex) userUpdate.id_sex = sex;
+    if (address1) userUpdate.id_address = [address1, address2, postcode].filter(Boolean).join(', ');
+    if (country) userUpdate.id_country = country;
+    if (nationality) userUpdate.id_nationality = nationality;
+    if (expiry) userUpdate.id_expiry_date = normalizeDate(expiry);
+    if (issued) userUpdate.id_issued_date = normalizeDate(issued);
 
+    // Auto-set verification status based on decision
     if (decision === 'accept') {
+      userUpdate.kyc_status = 'verified';
+      userUpdate.verification_complete = true;
+      userUpdate.phone_verified = true;
+      userUpdate.docupass_verified_at = new Date().toISOString();
+      userUpdate.wallet_tier = 2;
+      userUpdate.kyc_just_approved = true;
+
       if (fullName) userUpdate.id_extracted_name = fullName;
-      if (dob) userUpdate.id_extracted_dob = dob;
+      if (dob) userUpdate.id_extracted_dob = normalizeDate(dob);
       if (documentNumber && !user?.national_id) userUpdate.national_id = documentNumber;
+      if (dob) userUpdate.date_of_birth = normalizeDate(dob);
+
+      // Upgrade wallet to Tier 2
+      try {
+        const wallets = await base44.asServiceRole.entities.Wallet.filter({
+          user_id: userId,
+          entity_type: 'personal',
+        });
+        if (wallets.length > 0) {
+          await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
+            tier: 2,
+            status: 'active',
+          });
+        }
+      } catch (e) {
+        console.warn('[idAnalyzerCallback] Wallet upgrade failed:', e.message);
+      }
+    } else if (decision === 'reject') {
+      userUpdate.kyc_status = 'rejected';
+      userUpdate.verification_complete = false;
+    } else if (decision === 'review') {
+      userUpdate.kyc_status = 'pending';
+      userUpdate.verification_complete = false;
     }
+
     await base44.asServiceRole.entities.User.update(userId, userUpdate);
   } catch (e) {
     console.warn('[idAnalyzerCallback] Failed to hydrate user:', e.message);
   }
 
-  // --- 7a. AuditLog: DocuPass completion ---
+  // --- AuditLog: DocuPass completion ---
   try {
     await base44.asServiceRole.entities.AuditLog.create({
       user_id: userId,
       action: 'idanalyzer_docupass_completed',
       entity_type: 'KycDocument',
-      description: `DocuPass verification ${decision}. Transaction: ${transactionId}`,
-      new_values: { decision, transactionId, docStatus },
+      description: `DocuPass verification ${decision}. Transaction: ${transactionId}. Face confidence: ${faceConfidence}, Auth score: ${authScore}`,
+      new_values: extractedData,
     });
   } catch (e) {
-    console.warn('[idAnalyzerCallback] AuditLog (completion) failed:', e.message);
+    console.warn('[idAnalyzerCallback] AuditLog failed:', e.message);
   }
 
   // --- Return 200 immediately; SasaPay + SMS are fire-and-forget ---
   const responsePayload = Response.json({ success: true, status: docStatus, decision });
 
-  // Fire-and-forget: SasaPay push + SMS notification
-  // These run after the response is returned; errors don't affect the webhook.
   const tasks = [];
-
-  // --- 5. SasaPay auto-push (on accept only) ---
   if (decision === 'accept' && frontUrl && backUrl && faceUrl) {
     tasks.push(pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }));
   }
-
-  // --- 6. SMS notification ---
   tasks.push(sendKycSms(base44, userId, decision));
-
-  // Don't await — return 200 to IDAnalyzer immediately
   Promise.allSettled(tasks).catch(() => {});
 
   return responsePayload;
@@ -219,23 +305,33 @@ Deno.serve(async (req) => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Extract first value from v2 data field (array of { value }) */
 function extractValue(field) {
-  if (!field) return null;
-  if (Array.isArray(field)) return field[0]?.value || null;
+  if (field == null) return null;
+  if (Array.isArray(field)) return field[0]?.value || field[0] || null;
   if (typeof field === 'string') return field;
+  if (typeof field === 'number') return field;
   return field.value || null;
 }
 
-/** Compute HMAC-SHA256 hex digest using Web Crypto */
+function normalizeDate(dateStr) {
+  if (!dateStr) return null;
+  // IDAnalyzer returns dates in various formats: YYYY/MM/DD, YYYY-MM-DD, DD/MM/YYYY
+  const cleaned = String(dateStr).replace(/\//g, '-');
+  // Try YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) return cleaned.substring(0, 10);
+  // Try DD-MM-YYYY → YYYY-MM-DD
+  const parts = cleaned.split('-');
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return cleaned.substring(0, 10);
+}
+
 async function computeHmac(secret, message) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
+    'raw', enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
   const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
   return Array.from(new Uint8Array(sig))
@@ -243,15 +339,12 @@ async function computeHmac(secret, message) {
     .join('');
 }
 
-/** Constant-time string comparison */
 async function constantTimeEqual(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
   if (a.length !== b.length) return false;
   const enc = new TextEncoder();
-  const aBuf = enc.encode(a);
-  const bBuf = enc.encode(b);
-  const aHash = await crypto.subtle.digest('SHA-256', aBuf);
-  const bHash = await crypto.subtle.digest('SHA-256', bBuf);
+  const aHash = await crypto.subtle.digest('SHA-256', enc.encode(a));
+  const bHash = await crypto.subtle.digest('SHA-256', enc.encode(b));
   const aArr = new Uint8Array(aHash);
   const bArr = new Uint8Array(bHash);
   let diff = 0;
@@ -260,49 +353,27 @@ async function constantTimeEqual(a, b) {
 }
 
 // ---------------------------------------------------------------------------
-// SasaPay KYC push (inlined from sasapayPersonalKycUpload, service-role)
+// SasaPay KYC push (service-role)
 // ---------------------------------------------------------------------------
 
 async function pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }) {
   try {
-    // (a) Find personal wallet
     const wallets = await base44.asServiceRole.entities.Wallet.filter({
-      user_id: userId,
-      entity_type: 'personal',
+      user_id: userId, entity_type: 'personal',
     });
-    if (wallets.length === 0) {
-      console.warn(`[idAnalyzerCallback] No wallet for user ${userId}, skipping SasaPay push`);
-      return;
-    }
+    if (wallets.length === 0) return;
     const wallet = wallets[0];
+    if (!wallet.sasapay_account_number) return;
 
-    // (b) Check wallet has sasapay_account_number
-    if (!wallet.sasapay_account_number) {
-      console.warn(`[idAnalyzerCallback] Wallet ${wallet.id} not onboarded to SasaPay, skipping KYC push`);
-      return;
-    }
-
-    // (c) Get user phone + merchant code
     const user = await base44.asServiceRole.entities.User.get(userId);
-    if (!user?.phone) {
-      console.warn(`[idAnalyzerCallback] User ${userId} has no phone, cannot push to SasaPay`);
-      return;
-    }
+    if (!user?.phone) return;
     const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
-    if (!merchantCode) {
-      console.warn('[idAnalyzerCallback] SASAPAY_MERCHANT_CODE not set, skipping push');
-      return;
-    }
+    if (!merchantCode) return;
 
-    // (d) Fetch token + download images in parallel
     const [token, faceFile, frontFile, backFile] = await Promise.all([
-      getSasapayToken(),
-      downloadFile(faceUrl),
-      downloadFile(frontUrl),
-      downloadFile(backUrl),
+      getSasapayToken(), downloadFile(faceUrl), downloadFile(frontUrl), downloadFile(backUrl),
     ]);
 
-    // (e) Build multipart form
     const formData = new FormData();
     formData.append('merchantCode', merchantCode);
     formData.append('customerMobileNumber', user.phone);
@@ -318,9 +389,7 @@ async function pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }) {
 
     const respText = await response.text();
     let data;
-    try {
-      data = JSON.parse(respText);
-    } catch {
+    try { data = JSON.parse(respText); } catch {
       throw new Error(`SasaPay KYC returned non-JSON (HTTP ${response.status})`);
     }
 
@@ -328,43 +397,29 @@ async function pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }) {
       throw new Error(`SasaPay KYC failed: ${data.message || data.responseCode}`);
     }
 
-    // (f) Update wallet status
     await base44.asServiceRole.entities.Wallet.update(wallet.id, {
       sasapay_account_status: data.data?.accountStatus || 'AWAITING_KYC_UPLOAD',
       sasapay_kyc_uploaded_at: new Date().toISOString(),
     });
 
-    // AuditLog: SasaPay success
     await base44.asServiceRole.entities.AuditLog.create({
       user_id: userId,
       action: 'sasapay_kyc_uploaded',
       entity_type: 'Wallet',
       entity_id: wallet.id,
       description: `SasaPay KYC auto-uploaded from DocuPass. Status: ${data.data?.accountStatus}`,
-      new_values: {
-        sasapay_account_status: data.data?.accountStatus,
-        sasapay_kyc_uploaded_at: new Date().toISOString(),
-      },
+      new_values: { sasapay_account_status: data.data?.accountStatus },
     });
-
-    console.log(`[idAnalyzerCallback] SasaPay KYC push success for user ${userId}`);
   } catch (error) {
-    console.error(`[idAnalyzerCallback] SasaPay KYC push failed for user ${userId}:`, error.message);
-
-    // Flag wallet for admin review
+    console.error(`[idAnalyzerCallback] SasaPay KYC push failed: ${error.message}`);
     try {
       const wallets = await base44.asServiceRole.entities.Wallet.filter({
-        user_id: userId,
-        entity_type: 'personal',
+        user_id: userId, entity_type: 'personal',
       });
       if (wallets.length > 0) {
         await base44.asServiceRole.entities.Wallet.update(wallets[0].id, { needs_review: true });
       }
-    } catch {
-      // non-critical
-    }
-
-    // AuditLog: SasaPay failure
+    } catch {}
     try {
       await base44.asServiceRole.entities.AuditLog.create({
         user_id: userId,
@@ -372,9 +427,7 @@ async function pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }) {
         entity_type: 'Wallet',
         description: `SasaPay KYC auto-upload failed: ${error.message}`,
       });
-    } catch {
-      // non-critical
-    }
+    } catch {}
   }
 }
 
@@ -390,9 +443,7 @@ async function getSasapayToken() {
   });
   const text = await response.text();
   let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
+  try { data = JSON.parse(text); } catch {
     throw new Error(`SasaPay auth returned non-JSON (HTTP ${response.status})`);
   }
   if (!data.access_token) {
@@ -421,38 +472,24 @@ async function downloadFile(url) {
 async function sendKycSms(base44, userId, decision) {
   try {
     const user = await base44.asServiceRole.entities.User.get(userId);
-    if (!user?.phone) {
-      console.warn(`[idAnalyzerCallback] No phone for user ${userId}, skipping SMS`);
-      return;
-    }
+    if (!user?.phone) return;
 
     const templateKey = decision === 'accept' ? 'kyc_approved' : decision === 'reject' ? 'kyc_rejected' : null;
-    const eventType = decision === 'accept' ? 'kyc_approved' : 'kyc_rejected';
-    if (!templateKey) return; // review → no SMS
+    if (!templateKey) return;
 
-    // Fetch template body
     const templates = await base44.asServiceRole.entities.SmsTemplate.filter({
-      template_key: templateKey,
-      is_active: true,
+      template_key: templateKey, is_active: true,
     });
-    if (templates.length === 0) {
-      console.warn(`[idAnalyzerCallback] SMS template '${templateKey}' not found`);
-      return;
-    }
+    if (templates.length === 0) return;
 
     let body = templates[0].body;
     body = body.replace('{name}', user.id_extracted_name || user.full_name || 'Rider');
 
     await base44.functions.invoke('sendSms', {
-      phone: user.phone,
-      message: body,
-      templateKey,
-      eventType,
-      metadata: { decision, userId },
+      phone: user.phone, message: body, templateKey,
+      eventType: templateKey, metadata: { decision, userId },
     });
-
-    console.log(`[idAnalyzerCallback] SMS (${templateKey}) sent to user ${userId}`);
   } catch (error) {
-    console.error(`[idAnalyzerCallback] SMS send failed for user ${userId}:`, error.message);
+    console.error(`[idAnalyzerCallback] SMS send failed: ${error.message}`);
   }
 }
