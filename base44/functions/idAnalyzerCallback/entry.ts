@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Stale timestamp' }, { status: 401 });
     }
 
-    const expectedHmac = await computeHmac(webhookSecret, rawBody);
+    const expectedHmac = await computeHmac(webhookSecret, `${idaTimestamp}.${rawBody}`);
 
     const candidateSigs = [
       `v1=${expectedHmac}`,
