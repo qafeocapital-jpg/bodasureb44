@@ -1,19 +1,23 @@
 import { Fragment } from 'react';
-import { Check, Clock, Circle } from 'lucide-react';
+import { Check, Clock, Circle, XCircle, Loader2 } from 'lucide-react';
 import { VERIFICATION_TASKS } from '@/lib/verification';
 
 const STATUS_ICON = {
   not_started: Circle,
   in_progress: Clock,
+  processing: Loader2,
   submitted: Check,
   verified: Check,
+  rejected: XCircle,
 };
 
 const STATUS_COLOR = {
   not_started: 'bg-muted text-muted-foreground border-border',
   in_progress: 'bg-amber-50 text-amber-600 border-amber-200',
+  processing: 'bg-amber-50 text-amber-600 border-amber-200',
   submitted: 'bg-blue-50 text-blue-600 border-blue-200',
   verified: 'bg-success/10 text-success border-success/20',
+  rejected: 'bg-destructive/10 text-destructive border-destructive/20',
 };
 
 export default function VerificationMiniStepper({ tasks, activeIndex, onSelect }) {

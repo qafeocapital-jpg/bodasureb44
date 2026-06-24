@@ -38,11 +38,6 @@ export default function Profile() {
   const [docupassOutcome, setDocupassOutcome] = useState(null);
   const [group, setGroup] = useState(null);
 
-  // Reset initialization when user changes
-  useEffect(() => {
-    setHasInitialized(false);
-  }, [user?.id]);
-
   useEffect(() => {
     async function load() {
       if (!user?.id || hasInitialized) return;

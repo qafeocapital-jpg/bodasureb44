@@ -69,8 +69,7 @@ export function isAllSubmitted(tasks = []) {
  */
 export function getVerificationLevel(user) {
   if (!user) return 'unverified';
-  if (user.kyc_status === 'verified') return 'verified';
-  if (user.verification_complete) return 'submitted';
+  if (user.kyc_status === 'verified' || user.verification_complete) return 'verified';
   if (user.phone_verified) return 'partial';
   return 'unverified';
 }

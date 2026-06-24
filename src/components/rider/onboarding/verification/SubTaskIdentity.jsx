@@ -20,9 +20,10 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
   const [error, setError] = useState('');
   const pollTimerRef = useRef(null);
 
-  const idFrontDoc = kycDocs.find(d => d.document_type === 'id_front');
-  const idBackDoc = kycDocs.find(d => d.document_type === 'id_back');
-  const selfieDoc = kycDocs.find(d => d.document_type === 'selfie');
+  // Only consider IDAnalyzer-processed docs (with provider_reference)
+  const idFrontDoc = kycDocs.find(d => d.document_type === 'id_front' && d.provider_reference);
+  const idBackDoc = kycDocs.find(d => d.document_type === 'id_back' && d.provider_reference);
+  const selfieDoc = kycDocs.find(d => d.document_type === 'selfie' && d.provider_reference);
 
   const allApproved = idFrontDoc?.status === 'approved' && idBackDoc?.status === 'approved' && selfieDoc?.status === 'approved';
   const anyRejected = [idFrontDoc, idBackDoc, selfieDoc].some(d => d?.status === 'rejected');
