@@ -118,28 +118,16 @@ async function initializePersonalOnboarding(base44, user) {
 
   if (data.responseCode !== '0') {
     console.error('[init] SasaPay non-success response:', JSON.stringify(data));
-    // Recovery: user already has a SasaPay wallet from a prior partial attempt
-    // (e.g. confirm succeeded but wallet update failed). Look up the existing
-    // account and fast-track them to PIN setup — no OTP needed.
+    // Hard-block: wallet already exists for this phone/ID in SasaPay
     const errMsg = (data.message || '').toLowerCase();
-    const shouldRecover = errMsg.includes('already has a wallet') || errMsg.includes('already exists');
-    if (shouldRecover) {
-      const recovered = await recoverExistingSasaPayAccount(base44, user, token);
-      if (recovered) {
-        return Response.json({
-          success: true,
-          recovered: true,
-          requestId: 'recovered',
-          accountNumber: recovered.accountNumber,
-          message: 'Your BodaSure Wallet account already exists. Set your PIN to continue.',
-        });
-      }
-      // Recovery failed — log the error and return structured error
-      await logOnboardingError(base44, user, 'recovery_failed', 'Account recovery failed. Contact support.', normalizedPhone, user.national_id);
+    const isDuplicate = errMsg.includes('already has a wallet') || errMsg.includes('already exists');
+    if (isDuplicate) {
+      // Log the blocked attempt for Admin dashboard
+      await logOnboardingError(base44, user, 'duplicate_sasapay_wallet', 'Wallet already exists in SasaPay. User must use different credentials.', normalizedPhone, user.national_id);
       return Response.json({
         success: false,
-        error: 'We encountered an issue. Please contact support with your phone number.',
-        conflictType: 'unknown',
+        error: 'This phone number is already registered with BodaSure Wallet. Please use a different phone number or contact support.',
+        conflictType: 'phone_exists_in_sasapay',
       }, { status: 400 });
     }
     // Map SasaPay errors to BodaSure-branded messages
@@ -337,149 +325,4 @@ async function logOnboardingError(base44, user, errorCode, errorMessage, phone, 
   } catch (e) {
     console.warn('Failed to log onboarding error:', e.message);
   }
-}
-
-/**
- * FIX 2: Recovery path — when SasaPay says "User already has a wallet with
- * this merchant", the account was created in a prior attempt but the BodaSure
- * wallet record was never updated (e.g. confirm returned an integer
- * accountNumber that failed validation). This looks up the existing SasaPay
- * customer via the Get Customers endpoint, matches by phone or name, then
- * updates the wallet to tier 1 / active so the user can proceed to set PIN.
- */
-async function recoverExistingSasaPayAccount(base44, user, token) {
-  const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
-  const nameParts = user.full_name.trim().split(/\s+/);
-  const firstName = (nameParts[0] || '').toLowerCase();
-  const lastName = (nameParts[nameParts.length - 1] || '').toLowerCase();
-
-  let phoneDigits = (user.phone || '').replace(/\D/g, '');
-  if (phoneDigits.startsWith('0')) phoneDigits = phoneDigits.slice(1);
-  if (phoneDigits.startsWith('254')) phoneDigits = phoneDigits.slice(3);
-  const localPhone = phoneDigits; // 9 digits e.g. 712345678
-
-  // Page through the merchant's customer list and match by phone or name.
-  // SasaPay returns links.next with http:// (not https://) which causes auth
-  // failures on redirects, so we construct page URLs manually with HTTPS.
-  const baseUrl = `${getSasaPayApiUrl()}/waas/customers/?merchant_code=${encodeURIComponent(merchantCode)}`;
-  let total_pages = 1;
-  let page = 1;
-
-  while (page <= total_pages && page <= 10) {
-    let listData;
-    try {
-      const listRes = await fetch(`${baseUrl}&page=${page}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      listData = JSON.parse(await listRes.text());
-    } catch (listErr) {
-      break;
-    }
-
-    // Update total pages from the first response
-    if (page === 1 && listData.pages) {
-      total_pages = listData.pages;
-    }
-
-    const customers = listData.results?.customers || [];
-    for (const c of customers) {
-      const displayName = (c.client?.display_name || '').toLowerCase();
-      const mobile = (c.client?.mobile_number || '').replace(/\D/g, '');
-      const phoneMatch = mobile && (
-        mobile === localPhone ||
-        mobile.endsWith(localPhone) ||
-        localPhone.endsWith(mobile)
-      );
-      const nameMatch = firstName && lastName &&
-        displayName.includes(firstName) && displayName.includes(lastName);
-
-      if (phoneMatch || nameMatch) {
-        const accountNumber = String(c.account_number || '');
-        if (!accountNumber) continue;
-
-        // Fetch the account status from the customer-details endpoint
-        let accountStatus = 'ACTIVE';
-        try {
-          const detailsRes = await fetch(`${getSasaPayApiUrl()}/waas/customer-details/`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              merchantCode,
-              accountNumber,
-              countryCode: '254',
-            }),
-          });
-          const detailsData = JSON.parse(await detailsRes.text());
-          if (detailsData.data?.profile?.account_status) {
-            accountStatus = detailsData.data.profile.account_status;
-          }
-        } catch { /* default to ACTIVE */ }
-
-        // Update or create the BodaSure wallet with recovered details
-         let wallets = await base44.asServiceRole.entities.Wallet.filter({
-           user_id: user.id,
-           entity_type: 'personal',
-         });
-
-         if (wallets.length === 0) {
-           // Create personal wallet if missing (edge case recovery)
-           const wallet = await base44.asServiceRole.entities.Wallet.create({
-             user_id: user.id,
-             entity_type: 'personal',
-             sasapay_customer_id: accountNumber,
-             sasapay_account_number: accountNumber,
-             sasapay_account_status: accountStatus,
-             tier: 1,
-             status: 'active',
-           });
-           wallets = [wallet];
-
-           await base44.asServiceRole.entities.AuditLog.create({
-             user_id: user.id,
-             action: 'sasapay_personal_onboarding_recovered_wallet_created',
-             entity_type: 'Wallet',
-             entity_id: wallet.id,
-             description: `SasaPay personal account recovered and wallet created: ${accountNumber}`,
-             new_values: {
-               sasapay_account_number: accountNumber,
-               sasapay_account_status: accountStatus,
-               tier: 1,
-               status: 'active',
-             },
-           });
-         } else {
-           await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
-             sasapay_customer_id: accountNumber,
-             sasapay_account_number: accountNumber,
-             sasapay_account_status: accountStatus,
-             tier: 1,
-             status: 'active',
-           });
-
-           await base44.asServiceRole.entities.AuditLog.create({
-             user_id: user.id,
-             action: 'sasapay_personal_onboarding_recovered',
-             entity_type: 'Wallet',
-             entity_id: wallets[0].id,
-             description: `SasaPay personal account recovered after partial failure: ${accountNumber}`,
-             new_values: {
-               sasapay_account_number: accountNumber,
-               sasapay_account_status: accountStatus,
-               tier: 1,
-               status: 'active',
-             },
-           });
-         }
-
-         return { accountNumber, accountStatus };
-      }
-    }
-
-    page++;
-  }
-
-  return null;
 }
