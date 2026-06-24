@@ -221,7 +221,10 @@ async function confirmPersonalOnboarding(base44, user, otp, requestId) {
   }
 
   if (data.responseCode !== '0') {
-    throw new Error(`SasaPay confirmation failed: ${data.message}`);
+    return Response.json({
+      success: false,
+      error: data.message || 'OTP verification failed. Check your code and try again.',
+    }, { status: 400 });
   }
 
   // Store account details on wallet
@@ -415,36 +418,63 @@ async function recoverExistingSasaPayAccount(base44, user, token) {
           }
         } catch { /* default to ACTIVE */ }
 
-        // Update the BodaSure wallet with recovered details
-        const wallets = await base44.asServiceRole.entities.Wallet.filter({
-          user_id: user.id,
-          entity_type: 'personal',
-        });
-        if (wallets.length > 0) {
-          await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
-            sasapay_customer_id: accountNumber,
-            sasapay_account_number: accountNumber,
-            sasapay_account_status: accountStatus,
-            tier: 1,
-            status: 'active',
-          });
+        // Update or create the BodaSure wallet with recovered details
+         let wallets = await base44.asServiceRole.entities.Wallet.filter({
+           user_id: user.id,
+           entity_type: 'personal',
+         });
 
-          await base44.asServiceRole.entities.AuditLog.create({
-            user_id: user.id,
-            action: 'sasapay_personal_onboarding_recovered',
-            entity_type: 'Wallet',
-            entity_id: wallets[0].id,
-            description: `SasaPay personal account recovered after partial failure: ${accountNumber}`,
-            new_values: {
-              sasapay_account_number: accountNumber,
-              sasapay_account_status: accountStatus,
-              tier: 1,
-              status: 'active',
-            },
-          });
-        }
+         if (wallets.length === 0) {
+           // Create personal wallet if missing (edge case recovery)
+           const wallet = await base44.asServiceRole.entities.Wallet.create({
+             user_id: user.id,
+             entity_type: 'personal',
+             sasapay_customer_id: accountNumber,
+             sasapay_account_number: accountNumber,
+             sasapay_account_status: accountStatus,
+             tier: 1,
+             status: 'active',
+           });
+           wallets = [wallet];
 
-        return { accountNumber, accountStatus };
+           await base44.asServiceRole.entities.AuditLog.create({
+             user_id: user.id,
+             action: 'sasapay_personal_onboarding_recovered_wallet_created',
+             entity_type: 'Wallet',
+             entity_id: wallet.id,
+             description: `SasaPay personal account recovered and wallet created: ${accountNumber}`,
+             new_values: {
+               sasapay_account_number: accountNumber,
+               sasapay_account_status: accountStatus,
+               tier: 1,
+               status: 'active',
+             },
+           });
+         } else {
+           await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
+             sasapay_customer_id: accountNumber,
+             sasapay_account_number: accountNumber,
+             sasapay_account_status: accountStatus,
+             tier: 1,
+             status: 'active',
+           });
+
+           await base44.asServiceRole.entities.AuditLog.create({
+             user_id: user.id,
+             action: 'sasapay_personal_onboarding_recovered',
+             entity_type: 'Wallet',
+             entity_id: wallets[0].id,
+             description: `SasaPay personal account recovered after partial failure: ${accountNumber}`,
+             new_values: {
+               sasapay_account_number: accountNumber,
+               sasapay_account_status: accountStatus,
+               tier: 1,
+               status: 'active',
+             },
+           });
+         }
+
+         return { accountNumber, accountStatus };
       }
     }
 

@@ -44,23 +44,27 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { walletId, pin } = body;
+    const { pin } = body;
 
-    if (!walletId || !pin) {
-      return Response.json({ error: 'Missing walletId or pin' }, { status: 400 });
+    if (!pin) {
+      return Response.json({ error: 'Missing pin' }, { status: 400 });
     }
     if (!/^\d{4}$/.test(pin)) {
       return Response.json({ error: 'PIN must be 4 digits' }, { status: 400 });
     }
 
-    const wallets = await base44.asServiceRole.entities.Wallet.filter({ id: walletId });
+    // Auto-lookup personal wallet by authenticated user
+    const wallets = await base44.asServiceRole.entities.Wallet.filter({
+      user_id: user.id,
+      entity_type: 'personal',
+    });
     if (wallets.length === 0) {
-      return Response.json({ error: 'Wallet not found' }, { status: 404 });
+      return Response.json({ error: 'Personal wallet not found. Complete wallet activation first.' }, { status: 404 });
     }
 
     const wallet = wallets[0];
 
-    // Verify wallet belongs to the authenticated user
+    // Verify wallet belongs to the authenticated user (defense-in-depth)
     if (wallet.user_id !== user.id) {
       return Response.json({ error: 'Unauthorized' }, { status: 403 });
     }
