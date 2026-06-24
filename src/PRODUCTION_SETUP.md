@@ -147,7 +147,7 @@ The identity verification flow uses IDAnalyzer's **DocuPass** hosted verificatio
 The following secrets must be set (already configured ✅):
 - `IDANALYZER_API_KEY` — IDAnalyzer v2 API key
 - `IDANALYZER_PROFILE_ID` — KYC Profile ID from the IDAnalyzer portal (**must be a valid 32-char profile ID**)
-- `IDANALYZER_WEBHOOK_SECRET` — Shared secret for webhook validation
+- `IDANALYZER_WEBHOOK_SECRET` — Webhook signing secret (from portal API Keys page, used for HMAC verification)
 - `BASE44_APP_URL` — App URL for constructing webhook callback URLs
 
 ### KYC Profile Setup (IDAnalyzer Portal)
@@ -156,10 +156,13 @@ In the [IDAnalyzer Portal](https://portal2.idanalyzer.com/), create or edit a KY
 
 **General Tab:**
 - Webhook URL: `{BASE44_APP_URL}/api/fn/idAnalyzerCallback?secret={IDANALYZER_WEBHOOK_SECRET}`
+  - The `secret` query param is a backward-compat fallback for testing. Production uses HMAC signature verification (X-IDA-Signature + X-IDA-Timestamp headers).
+- Webhook Signing Secret: Copy the secret from the portal **API Keys** page and set it as the `IDANALYZER_WEBHOOK_SECRET` secret in Base44.
 
 **DocuPass Tab:**
 - Mode: ID verification + Face verification (mode 0)
-- Enable DocuPass audit report (optional)
+- **Enable "Save Output Images"** — REQUIRED so the webhook receives `outputImage.front`, `outputImage.back`, `outputImage.face` CDN URLs. Without this, document image URLs won't be available for SasaPay KYC push.
+- Enable "DocuPass Audit Report" (nice-to-have for compliance records)
 - Redirect URLs: `{BASE44_APP_URL}/app/account` (users return here after completing verification)
 - Company Name: BodaSure (shown in footer)
 
@@ -171,15 +174,28 @@ In the [IDAnalyzer Portal](https://portal2.idanalyzer.com/), create or edit a KY
 
 After saving, copy the **Profile ID** (32-character hex string) and set it as the `IDANALYZER_PROFILE_ID` secret in the Base44 dashboard.
 
-### How It Works
+### How It Works (Atomic KYC Flow)
 
 1. Rider clicks "Start Secure Verification" in the identity sub-task
 2. `createDocupassSession` backend function creates a DocuPass session with `customData = user.id`
 3. DocuPass URL opens in a new tab (mobile) or iframe overlay (desktop)
 4. IDAnalyzer guides the user through ID capture + active liveness check
-5. On completion, IDAnalyzer sends a webhook to `idAnalyzerCallback`
-6. The callback upserts KycDocument records (id_front, id_back, selfie) and auto-fills the user's profile (name, DOB, national ID)
+5. On completion, IDAnalyzer sends a `docupass_conclusive` webhook to `idAnalyzerCallback`
+6. The callback:
+   - Validates HMAC signature (or query-secret fallback)
+   - Upserts all 3 KycDocument records (id_front, id_back, selfie) with CDN image URLs + status
+   - Hydrates the user's profile (name, DOB, national ID) from extracted identity data
+   - **Auto-pushes documents to SasaPay KYC** (on `accept` decision only) using the IDAnalyzer image URLs — no manual step required
+   - Sends an SMS notification to the rider (approved/rejected templates)
+   - Creates AuditLog entries for the completion + SasaPay outcome
 7. The frontend polls for status updates and shows success/rejection
+
+**Error handling tiers:**
+- HMAC failure → HTTP 401 (IDAnalyzer retries — intentional)
+- Unknown event type → HTTP 200 (silent accept, idempotency)
+- Missing user → HTTP 200 + console.warn (don't retry)
+- DB failure → HTTP 500 (IDAnalyzer retries — intentional)
+- SasaPay failure → HTTP 200 + AuditLog + `needs_review` flag (don't retry webhook)
 
 ---
 
