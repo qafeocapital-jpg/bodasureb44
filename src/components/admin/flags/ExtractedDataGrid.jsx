@@ -1,7 +1,7 @@
-import { User, Calendar, FileText, MapPin, Globe } from 'lucide-react';
+import { User, FileText, MapPin, Globe } from 'lucide-react';
 
 /**
- * Confidence badge thresholds per PRD:
+ * Confidence badge thresholds:
  *   >=0.95 green, 0.80-0.94 amber, <0.80 red
  */
 function confidenceColor(c) {
@@ -49,66 +49,104 @@ function SectionHeader({ icon: Icon, title }) {
   );
 }
 
+// Field names match IDAnalyzer v2 API Data Fields doc:
+// https://developer.idanalyzer.com/help/data-fields
 const SECTION_CONFIG = [
   {
-    title: 'Identity',
+    title: 'Names',
     icon: User,
     fields: [
       { key: 'fullName', label: 'Full Name' },
       { key: 'firstName', label: 'First Name' },
-      { key: 'lastName', label: 'Last Name' },
       { key: 'middleName', label: 'Middle Name' },
-      { key: 'dob', label: 'Date of Birth' },
-      { key: 'age', label: 'Age' },
-      { key: 'dayOfBirth', label: 'Day of Birth' },
-      { key: 'monthOfBirth', label: 'Month of Birth' },
-      { key: 'yearOfBirth', label: 'Year of Birth' },
-      { key: 'sex', label: 'Gender' },
-      { key: 'placeOfBirth', label: 'Place of Birth' },
-      { key: 'personalNumber', label: 'Personal Number' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'firstNameLocal', label: 'First Name (Local)' },
+      { key: 'middleNameLocal', label: 'Middle Name (Local)' },
+      { key: 'lastNameLocal', label: 'Last Name (Local)' },
+      { key: 'fullNameLocal', label: 'Full Name (Local)' },
     ],
   },
   {
-    title: 'Document',
+    title: 'Dates',
     icon: FileText,
     fields: [
-      { key: 'documentName', label: 'Document Name' },
-      { key: 'documentType', label: 'Document Type' },
-      { key: 'documentSide', label: 'Document Side' },
-      { key: 'documentNumber', label: 'Document Number' },
-      { key: 'internalId', label: 'Internal ID' },
-      { key: 'issuingAuthority', label: 'Issuing Authority' },
-      { key: 'issued', label: 'Date of Issue' },
-      { key: 'daysFromIssue', label: 'Days From Issue' },
+      { key: 'dob', label: 'Date of Birth' },
+      { key: 'dob_day', label: 'DOB Day' },
+      { key: 'dob_month', label: 'DOB Month' },
+      { key: 'dob_year', label: 'DOB Year' },
+      { key: 'age', label: 'Age' },
       { key: 'expiry', label: 'Expiry Date' },
-      { key: 'mrz', label: 'MRZ' },
+      { key: 'expiry_day', label: 'Expiry Day' },
+      { key: 'expiry_month', label: 'Expiry Month' },
+      { key: 'expiry_year', label: 'Expiry Year' },
+      { key: 'daysToExpiry', label: 'Days to Expiry' },
+      { key: 'issued', label: 'Date of Issue' },
+      { key: 'issued_day', label: 'Issue Day' },
+      { key: 'issued_month', label: 'Issue Month' },
+      { key: 'issued_year', label: 'Issue Year' },
+      { key: 'daysFromIssue', label: 'Days from Issue' },
     ],
   },
   {
-    title: 'Address / Location',
+    title: 'Personal Information',
+    icon: User,
+    fields: [
+      { key: 'sex', label: 'Gender' },
+      { key: 'height', label: 'Height' },
+      { key: 'weight', label: 'Weight' },
+      { key: 'hairColor', label: 'Hair Color' },
+      { key: 'eyeColor', label: 'Eye Color' },
+      { key: 'placeOfBirth', label: 'Place of Birth' },
+      { key: 'religion', label: 'Religion' },
+    ],
+  },
+  {
+    title: 'Address',
     icon: MapPin,
     fields: [
-      { key: 'address1', label: 'Address 1 (District, Division, Location)' },
-      { key: 'address2', label: 'Address 2 (Sub-Location)' },
+      { key: 'address1', label: 'Address Line 1' },
+      { key: 'address2', label: 'Address Line 2' },
       { key: 'postcode', label: 'Postcode' },
-      { key: 'district', label: 'District' },
-      { key: 'division', label: 'Division' },
-      { key: 'location', label: 'Location' },
-      { key: 'subLocation', label: 'Sub-Location' },
     ],
   },
   {
-    title: 'Nationality & Country',
+    title: 'Document Information',
+    icon: FileText,
+    fields: [
+      { key: 'documentNumber', label: 'Document Number' },
+      { key: 'personalNumber', label: 'Personal Number' },
+      { key: 'documentSide', label: 'Document Side' },
+      { key: 'documentType', label: 'Document Type' },
+      { key: 'documentName', label: 'Document Name' },
+      { key: 'internalId', label: 'Internal ID' },
+      { key: 'issueAuthority', label: 'Issuing Authority' },
+      { key: 'stateFull', label: 'State/Region' },
+      { key: 'stateShort', label: 'State Code' },
+      { key: 'vehicleClass', label: 'Vehicle Class' },
+      { key: 'restrictions', label: 'Restrictions' },
+      { key: 'endorsement', label: 'Endorsement' },
+    ],
+  },
+  {
+    title: 'Country & Nationality',
     icon: Globe,
     fields: [
-      { key: 'country', label: 'Issued Country' },
-      { key: 'issuedCountryIso2', label: 'ISO2' },
-      { key: 'issuedCountryIso3', label: 'ISO3' },
-      { key: 'nationality', label: 'Nationality' },
+      { key: 'countryFull', label: 'Country' },
+      { key: 'countryIso2', label: 'Country ISO2' },
+      { key: 'countryIso3', label: 'Country ISO3' },
+      { key: 'nationalityFull', label: 'Nationality' },
       { key: 'nationalityIso2', label: 'Nationality ISO2' },
       { key: 'nationalityIso3', label: 'Nationality ISO3' },
-      { key: 'optionalData1', label: 'Optional Data 1' },
+    ],
+  },
+  {
+    title: 'Other Data',
+    icon: FileText,
+    fields: [
+      { key: 'optionalData', label: 'Optional Data 1' },
       { key: 'optionalData2', label: 'Optional Data 2' },
+      { key: 'optionalData3', label: 'Optional Data 3' },
+      { key: 'optionalData4', label: 'Optional Data 4' },
     ],
   },
 ];
@@ -125,7 +163,12 @@ export default function ExtractedDataGrid({ extractedData }) {
 
   const fields = extractedData.fields || extractedData.values || {};
   const hasAnyField = SECTION_CONFIG.some(section =>
-    section.fields.some(f => fields[f.key] && (fields[f.key].value != null || (typeof fields[f.key] === 'string' && fields[f.key])))
+    section.fields.some(f => {
+      const val = fields[f.key];
+      if (!val) return false;
+      if (typeof val === 'object') return val.value != null && val.value !== '';
+      return val != null && val !== '';
+    })
   );
 
   if (!hasAnyField) return null;
@@ -154,7 +197,6 @@ export default function ExtractedDataGrid({ extractedData }) {
           </div>
         );
       })}
-      {/* Extra fields from the payload we didn't explicitly list */}
       {extractedData.extraFields && Object.keys(extractedData.extraFields).length > 0 && (
         <div>
           <SectionHeader icon={FileText} title="Additional Fields" />

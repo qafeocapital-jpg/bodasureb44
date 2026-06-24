@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { X, Check, XCircle, Loader2, Phone, CreditCard, Bike, UserCircle, ShieldCheck, AlertTriangle } from 'lucide-react';
+import PdfReportCard from '@/components/admin/flags/PdfReportCard';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { getTaskStatuses, TASK_STATUS_CONFIG, VERIFICATION_TASKS } from '@/lib/verification';
 import { useToast } from '@/components/ui/use-toast';
@@ -224,6 +225,9 @@ export default function VerificationDetailSheet({ riderId, onClose, canApprove =
               )}
             </div>
           )}
+
+          {/* PDF Audit Report — View PDF button opens IDAnalyzer-hosted URL */}
+          <PdfReportCard user={rider} />
 
           {/* ID and Bike info */}
           <div className="grid grid-cols-2 gap-3">

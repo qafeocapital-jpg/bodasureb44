@@ -291,6 +291,9 @@ export default function SubmissionsTab({ user }) {
                 )}
               </div>
             )}
+
+            {/* PDF Audit Report — View PDF button opens IDAnalyzer-hosted URL */}
+            <PdfReportCard user={user} />
           </div>
         ) : hasLegacyOnly ? (
           <div className="border border-amber-200 bg-amber-50 rounded-xl p-4 space-y-2">

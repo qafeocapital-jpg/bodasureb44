@@ -55,7 +55,7 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
     if (!polling) return;
 
     let attempts = 0;
-    const maxAttempts = 6; // 6 x 5s = 30s
+    const maxAttempts = 12; // 12 x 5s = 60s — webhook may take 30-60s to fire after user completes
 
     const doPoll = async () => {
       attempts++;

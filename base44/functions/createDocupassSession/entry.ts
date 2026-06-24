@@ -61,7 +61,8 @@ Deno.serve(async (req) => {
       console.warn('[createDocupassSession] Failed to increment attempt count:', e.message);
     }
 
-    return Response.json({ url: data.url, docupassId: data.id });
+    // DocuPass create response returns 'reference' (not 'id') per IDAnalyzer v2 docs
+    return Response.json({ url: data.url, docupassId: data.reference });
   } catch (error) {
     console.error('createDocupassSession error:', error);
     return Response.json({ error: error.message }, { status: 500 });
