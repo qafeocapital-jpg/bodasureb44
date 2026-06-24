@@ -55,6 +55,7 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   }, [user?.kyc_just_approved, refreshUser]);
 
   // L1 fix: Auto-verify phone via backend function (not client-side updateMe)
+  // C2 fix: Add refreshUser to dependency array
   useEffect(() => {
     if (wallet?.status === 'active' && wallet?.tier >= 1 && user && !user.phone_verified) {
       base44.functions.invoke('checkWalletPhoneVerified', { userId: user.id })
@@ -63,7 +64,7 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
         })
         .catch((e) => console.warn('[PhaseVerification] Phone verification failed:', e.message));
     }
-  }, [wallet?.status, wallet?.tier, user?.phone_verified]);
+  }, [wallet?.status, wallet?.tier, user?.phone_verified, refreshUser]);
 
   // Check completion state
   const tasks = getTaskStatuses(kycDocs, user, vehicle);

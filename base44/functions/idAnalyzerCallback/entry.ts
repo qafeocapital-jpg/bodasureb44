@@ -110,8 +110,20 @@ Deno.serve(async (req) => {
   if (!userId && payload.reference) userId = payload.reference;
 
   if (!userId) {
-    console.error(`[idAnalyzerCallback] No userId found for transactionId=${transactionId}`);
-    return Response.json({ success: true, message: 'No user reference in payload' });
+   console.error(`[idAnalyzerCallback] No userId found for transactionId=${transactionId}`);
+   return Response.json({ success: true, message: 'No user reference in payload' });
+  }
+
+  // H5 fix: Validate userId is a real user before hydration (prevents identity theft)
+  try {
+   const userExists = await base44.asServiceRole.entities.User.get(userId);
+   if (!userExists) {
+     console.error(`[idAnalyzerCallback] Invalid userId (not found): ${userId}`);
+     return Response.json({ error: 'User not found' }, { status: 400 });
+   }
+  } catch (e) {
+   console.error(`[idAnalyzerCallback] Failed to validate userId: ${e.message}`);
+   return Response.json({ error: 'User validation failed' }, { status: 500 });
   }
 
   // --- 3. Extract ALL data fields with confidence (per Data Fields doc) ---
@@ -340,15 +352,18 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.User.update(userId, userUpdate);
 
     // Wallet tier upgrade & AuditLog (SYNCHRONOUS before returning 200)
+    // C1 fix: Return 500 on tier upgrade failure to trigger IDAnalyzer retry
     if (decision === 'accept') {
       const tierUpgradeResult = await upgradeWalletTier(base44, userId);
-      if (!tierUpgradeResult?.success === false) {
+      if (tierUpgradeResult?.success === false) {
         console.error('[idAnalyzerCallback] Wallet tier upgrade FAILED during KYC approval');
         await base44.asServiceRole.entities.AuditLog.create({
           user_id: userId,
           action: 'wallet_tier_upgrade_failed',
           description: `Wallet tier upgrade failed during KYC approval: ${tierUpgradeResult?.error || 'unknown error'}`,
         });
+        // Return 500 to trigger IDAnalyzer retry
+        return Response.json({ error: 'Wallet tier upgrade failed' }, { status: 500 });
       }
     }
     await base44.asServiceRole.entities.AuditLog.create({
@@ -423,14 +438,42 @@ function extractField(field) {
 
 function normalizeDate(dateStr) {
   if (!dateStr) return null;
-  // IDAnalyzer returns YYYY/MM/DD — convert to YYYY-MM-DD for date field
+  // L10 fix: Validate ISO 8601 date format and ranges
   const cleaned = String(dateStr).replace(/\//g, '-');
-  if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) return cleaned.substring(0, 10);
+  
+  // Try YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) {
+    const result = cleaned.substring(0, 10);
+    if (isValidDate(result)) return result;
+    return null;
+  }
+  
+  // Try DD-MM-YYYY → YYYY-MM-DD
   const parts = cleaned.split('-');
   if (parts.length === 3 && parts[2].length === 4) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    const result = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    if (isValidDate(result)) return result;
+    return null;
   }
-  return cleaned.substring(0, 10);
+  
+  return null;
+}
+
+function isValidDate(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  if (!year || !month || !day) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  // Further validate based on month
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) {
+    daysInMonth[1] = 29;
+  }
+  if (day > daysInMonth[month - 1]) return false;
+  // Sanity check: not in future, not before 1900
+  const now = new Date();
+  if (year > now.getFullYear() || year < 1900) return false;
+  return true;
 }
 
 

@@ -35,13 +35,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Enforce mandatory webhook secret
+    // Enforce mandatory webhook secret (C3 fix: constant-time comparison)
     const webhookSecret = Deno.env.get('SASAPAY_WEBHOOK_SECRET');
     if (!webhookSecret) {
       return Response.json({ error: 'Webhook secret not configured' }, { status: 500 });
     }
-    const providedSecret = new URL(req.url).searchParams.get('secret');
-    if (providedSecret !== webhookSecret) {
+    const providedSecret = new URL(req.url).searchParams.get('secret') || '';
+    
+    // Constant-time comparison to prevent timing attacks
+    const secretMatch = providedSecret.length === webhookSecret.length && 
+      providedSecret.split('').every((c, i) => c === webhookSecret[i]);
+    
+    if (!secretMatch) {
       return Response.json({ error: 'Invalid webhook secret' }, { status: 401 });
     }
 
@@ -82,20 +87,30 @@ Deno.serve(async (req) => {
     const isSuccess = resultCodeStr === '0' || body.Paid === true;
     const newStatus = isSuccess ? 'completed' : resultCodeStr && resultCodeStr !== '0' ? 'failed' : 'pending';
 
-    // Amount validation: verify the webhook amount matches the transaction
+    // Amount validation: verify the webhook amount matches the transaction (M8 fix: required validation)
     const paidAmount = body.TransAmount || body.PaidAmount || body.RequestedAmount;
-    if (paidAmount && txn.amount_cents) {
-      const paidCents = Math.round(parseFloat(paidAmount) * 100);
-      if (paidCents !== txn.amount_cents) {
-        await base44.asServiceRole.entities.PaymentEvent.create({
-          transaction_id: txn.id,
-          event_type: 'sasapay_webhook',
-          reference: checkoutRequestId,
-          payload: { ...body, error: 'amount_mismatch', expected: txn.amount_cents, received: paidCents },
-          processed: false,
-        });
-        return Response.json({ error: 'Amount mismatch' }, { status: 400 });
-      }
+    if (!paidAmount || !txn.amount_cents) {
+      // M8: Require paidAmount to prevent zero-amount fraud
+      await base44.asServiceRole.entities.PaymentEvent.create({
+        transaction_id: txn.id,
+        event_type: 'sasapay_webhook',
+        reference: checkoutRequestId,
+        payload: { ...body, error: 'missing_amount', received: paidAmount },
+        processed: false,
+      });
+      return Response.json({ error: 'Missing or invalid amount' }, { status: 400 });
+    }
+    
+    const paidCents = Math.round(parseFloat(paidAmount) * 100);
+    if (paidCents !== txn.amount_cents) {
+      await base44.asServiceRole.entities.PaymentEvent.create({
+        transaction_id: txn.id,
+        event_type: 'sasapay_webhook',
+        reference: checkoutRequestId,
+        payload: { ...body, error: 'amount_mismatch', expected: txn.amount_cents, received: paidCents },
+        processed: false,
+      });
+      return Response.json({ error: 'Amount mismatch' }, { status: 400 });
     }
 
     // Update transaction status
