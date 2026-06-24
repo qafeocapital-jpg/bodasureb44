@@ -30,11 +30,18 @@ Deno.serve(async (req) => {
     const vehicles = await sr.entities.Vehicle.filter({ rider_id: user.id }, '-created_date', 1);
     const vehicle = vehicles[0] || null;
 
-    // Sub-task 1: Identity Verification (id_front + id_back + selfie)
+    // Sub-task 1: Identity Verification
+    // IDAnalyzer-approved: all 3 identity docs approved with provider_reference
+    // Or: user.docupass_decision === 'accept' (set by webhook)
     const hasIdFront = kycDocs.some(d => d.document_type === 'id_front' && d.file_url);
     const hasIdBack = kycDocs.some(d => d.document_type === 'id_back' && d.file_url);
     const hasSelfie = kycDocs.some(d => d.document_type === 'selfie' && d.file_url);
-    const identityDone = hasIdFront && hasIdBack && hasSelfie;
+    const identityDocsUploaded = hasIdFront && hasIdBack && hasSelfie;
+    const identityApproved = fullUser.docupass_decision === 'accept' ||
+      ['id_front', 'id_back', 'selfie'].every(type =>
+        kycDocs.some(d => d.document_type === type && d.status === 'approved' && d.provider_reference)
+      );
+    const identityDone = identityApproved || identityDocsUploaded;
 
     // Sub-task 2: Bike Photos
     const hasBikeFront = kycDocs.some(d => d.document_type === 'bike_front' && d.file_url);
@@ -59,8 +66,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Set verification_complete
-    await sr.entities.User.update(user.id, { verification_complete: true });
+    // Set verification_complete + kyc_status
+    const updateData = { verification_complete: true };
+    if (identityApproved && !fullUser.kyc_status || fullUser.kyc_status === 'unverified') {
+      updateData.kyc_status = 'verified';
+    }
+    await sr.entities.User.update(user.id, updateData);
 
     // Note: SasaPay personal onboarding is handled during WalletActivate (2-step progressive onboarding).
     // Verification completion only marks the user as verified — wallet activation happens separately.

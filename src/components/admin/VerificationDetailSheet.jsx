@@ -143,6 +143,88 @@ export default function VerificationDetailSheet({ riderId, onClose, canApprove =
             </div>
           </div>
 
+          {/* IDAnalyzer Extracted Data */}
+          {rider.docupass_decision && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+                  IDAnalyzer Verification
+                </p>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  rider.docupass_decision === 'accept' ? 'bg-success/10 text-success'
+                  : rider.docupass_decision === 'reject' ? 'bg-destructive/10 text-destructive'
+                  : 'bg-warning/10 text-warning'
+                }`}>
+                  {rider.docupass_decision}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                {rider.id_extracted_name && (
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase">Full Name</p>
+                    <p className="text-xs font-medium">{rider.id_extracted_name}</p>
+                  </div>
+                )}
+                {rider.id_extracted_dob && (
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase">Date of Birth</p>
+                    <p className="text-xs font-medium">{rider.id_extracted_dob}</p>
+                  </div>
+                )}
+                {rider.national_id && (
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase">National ID</p>
+                    <p className="text-xs font-medium font-mono">{rider.national_id}</p>
+                  </div>
+                )}
+                {rider.id_sex && (
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase">Gender</p>
+                    <p className="text-xs font-medium">{rider.id_sex}</p>
+                  </div>
+                )}
+                {rider.id_expiry_date && (
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase">ID Expiry</p>
+                    <p className="text-xs font-medium">{rider.id_expiry_date}</p>
+                  </div>
+                )}
+                {rider.id_country && (
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase">Country</p>
+                    <p className="text-xs font-medium">{rider.id_country}</p>
+                  </div>
+                )}
+                {rider.id_address && (
+                  <div className="col-span-2">
+                    <p className="text-[9px] text-muted-foreground uppercase">Address</p>
+                    <p className="text-xs font-medium">{rider.id_address}</p>
+                  </div>
+                )}
+              </div>
+              {rider.id_face_confidence != null && (
+                <div className="flex items-center gap-2 pt-1 border-t border-primary/10">
+                  <span className="text-[10px] text-muted-foreground">Face Match:</span>
+                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${rider.id_face_confidence >= 0.7 ? 'bg-success' : 'bg-warning'}`}
+                      style={{ width: `${Math.round(rider.id_face_confidence * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-semibold">
+                    {Math.round(rider.id_face_confidence * 100)}%
+                  </span>
+                  {rider.id_face_identical != null && (
+                    <span className={`text-[9px] ${rider.id_face_identical ? 'text-success' : 'text-destructive'}`}>
+                      ({rider.id_face_identical ? 'Identical' : 'Not Identical'})
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ID and Bike info */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-muted/50 rounded-lg p-3">
