@@ -1,8 +1,13 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-const getAtBaseUrl = () => {
+const getAtCredentials = () => {
   const env = Deno.env.get('AT_ENVIRONMENT');
-  return env === 'sandbox' ? 'https://api.sandbox.africastalking.com' : 'https://api.africastalking.com';
+  const isProd = env === 'production';
+  return {
+    username: isProd ? Deno.env.get('AT_USERNAME_PRODUCTION') : Deno.env.get('AT_USERNAME'),
+    apiKey: isProd ? Deno.env.get('AT_API_KEY_PRODUCTION') : Deno.env.get('AT_API_KEY'),
+    baseUrl: isProd ? 'https://api.africastalking.com' : 'https://api.sandbox.africastalking.com',
+  };
 };
 
 function sanitizePhoneNumber(phone) {
@@ -71,20 +76,22 @@ Deno.serve(async (req) => {
     let failedCount = 0;
     let batchesProcessed = 0;
 
+    const { username, apiKey, baseUrl } = getAtCredentials();
+
     // Process in batches of 1000
     for (let i = 0; i < recipientPhones.length; i += 1000) {
       const batch = recipientPhones.slice(i, i + 1000);
       const toPhones = batch.join(',');
 
       try {
-        const atResponse = await fetch(`${getAtBaseUrl()}/version1/messaging`, {
+        const atResponse = await fetch(`${baseUrl}/version1/messaging`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'apiKey': Deno.env.get('AT_API_KEY'),
+            'apiKey': apiKey,
           },
           body: new URLSearchParams({
-            username: Deno.env.get('AT_USERNAME'),
+            username: username,
             to: toPhones,
             message: campaign.message_body,
           }).toString(),

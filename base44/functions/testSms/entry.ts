@@ -33,10 +33,11 @@ Deno.serve(async (req) => {
     }
 
     // Send SMS directly via Africa's Talking
-    const atUsername = Deno.env.get('AT_USERNAME');
-    const atApiKey = Deno.env.get('AT_API_KEY');
     const atEnv = Deno.env.get('AT_ENVIRONMENT');
-    const atBaseUrl = atEnv === 'sandbox' ? 'https://api.sandbox.africastalking.com' : 'https://api.africastalking.com';
+    const isProd = atEnv === 'production';
+    const atUsername = isProd ? Deno.env.get('AT_USERNAME_PRODUCTION') : Deno.env.get('AT_USERNAME');
+    const atApiKey = isProd ? Deno.env.get('AT_API_KEY_PRODUCTION') : Deno.env.get('AT_API_KEY');
+    const atBaseUrl = isProd ? 'https://api.africastalking.com' : 'https://api.sandbox.africastalking.com';
 
     const response = await fetch(`${atBaseUrl}/version1/messaging`, {
       method: 'POST',

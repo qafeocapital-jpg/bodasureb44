@@ -33,15 +33,22 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid phone number format' }, { status: 400 });
     }
 
-    const atUsername = Deno.env.get('AT_USERNAME');
-    const atApiKey = Deno.env.get('AT_API_KEY');
+    // Get Africa's Talking config (sandbox or production)
+    const isProd = Deno.env.get('AT_ENVIRONMENT') === 'production';
+    const atUsername = isProd
+      ? (Deno.env.get('AT_USERNAME_PRODUCTION') || Deno.env.get('AT_USERNAME'))
+      : Deno.env.get('AT_USERNAME');
+    const atApiKey = isProd
+      ? (Deno.env.get('AT_API_KEY_PRODUCTION') || Deno.env.get('AT_API_KEY'))
+      : Deno.env.get('AT_API_KEY');
+    
     if (!atUsername || !atApiKey) {
       return Response.json({ error: 'Africa\'s Talking credentials not configured' }, { status: 500 });
     }
 
-    // Resolve AT base URL from environment
-    const atEnv = Deno.env.get('AT_ENVIRONMENT');
-    const atBaseUrl = atEnv === 'sandbox' ? 'https://api.sandbox.africastalking.com' : 'https://api.africastalking.com';
+    const atBaseUrl = isProd 
+      ? 'https://api.africastalking.com' 
+      : 'https://api.sandbox.africastalking.com';
 
     // Send SMS via Africa's Talking
     const response = await fetch(`${atBaseUrl}/version1/messaging`, {

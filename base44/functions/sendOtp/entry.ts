@@ -86,8 +86,15 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid phone number format' }, { status: 400 });
     }
 
-    const atApiKey = Deno.env.get('AT_API_KEY');
-    const atUsername = Deno.env.get('AT_USERNAME');
+    // Get Africa's Talking config (sandbox or production)
+    const isProd = Deno.env.get('AT_ENVIRONMENT') === 'production';
+    const atApiKey = isProd
+      ? (Deno.env.get('AT_API_KEY_PRODUCTION') || Deno.env.get('AT_API_KEY'))
+      : Deno.env.get('AT_API_KEY');
+    const atUsername = isProd
+      ? (Deno.env.get('AT_USERNAME_PRODUCTION') || Deno.env.get('AT_USERNAME'))
+      : Deno.env.get('AT_USERNAME');
+    
     if (!atApiKey || !atUsername) {
       return Response.json({ error: 'SMS not configured' }, { status: 500 });
     }
@@ -95,9 +102,9 @@ Deno.serve(async (req) => {
     const smsMessage = `Your BodaSure code: ${otpCode}. Valid 5 mins. Do not share.`;
 
     try {
-      // Resolve AT base URL from environment
-      const atEnv = Deno.env.get('AT_ENVIRONMENT');
-      const atBaseUrl = atEnv === 'sandbox' ? 'https://api.sandbox.africastalking.com' : 'https://api.africastalking.com';
+      const atBaseUrl = isProd 
+        ? 'https://api.africastalking.com' 
+        : 'https://api.sandbox.africastalking.com';
 
       const body = new URLSearchParams();
       body.append('username', atUsername);
