@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatDateTime, formatDate } from '@/lib/format';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 
 const STATUS_COLORS = {
   queued: 'bg-gray-500/10 text-gray-700 border-gray-500/30',
@@ -18,6 +18,7 @@ export default function SmsLogsPage({ countyScope = null }) {
   const [filterPhone, setFilterPhone] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [expandedIds, setExpandedIds] = useState(new Set());
 
   useEffect(() => {
     load();
@@ -25,6 +26,7 @@ export default function SmsLogsPage({ countyScope = null }) {
 
   async function load() {
     setLoading(true);
+    setExpandedIds(new Set());
     try {
       let query = {};
       if (filterStatus) query.status = filterStatus;
@@ -53,6 +55,16 @@ export default function SmsLogsPage({ countyScope = null }) {
       setLogs(l.slice(0, 200));
     } catch (e) {}
     setLoading(false);
+  }
+
+  function toggleExpanded(logId) {
+    const newSet = new Set(expandedIds);
+    if (newSet.has(logId)) {
+      newSet.delete(logId);
+    } else {
+      newSet.add(logId);
+    }
+    setExpandedIds(newSet);
   }
 
   return (
@@ -132,30 +144,66 @@ export default function SmsLogsPage({ countyScope = null }) {
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Phone</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Event</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Template</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">AT Message ID</th>
-              </tr>
+             <tr>
+               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
+               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Phone</th>
+               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Event</th>
+               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Template</th>
+               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+               <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">AT Message ID</th>
+               <th className="text-center px-4 py-3 font-medium text-muted-foreground w-8"></th>
+             </tr>
             </thead>
             <tbody>
-              {logs.map(log => (
-                <tr key={log.id} className="border-t border-border hover:bg-accent/50">
-                  <td className="px-4 py-3 text-xs">{formatDateTime(log.created_date)}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{log.recipient_phone}</td>
-                  <td className="px-4 py-3 text-xs capitalize">{log.event_type.replace(/_/g, ' ')}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{log.template_key}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-semibold px-2 py-1 rounded border ${STATUS_COLORS[log.status] || 'bg-gray-500/10'}`}>
-                      {log.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-[10px] text-muted-foreground hidden lg:table-cell truncate">{log.at_message_id || '—'}</td>
-                </tr>
-              ))}
+             {logs.map(log => (
+               <React.Fragment key={log.id}>
+                 <tr className="border-t border-border hover:bg-accent/50 cursor-pointer" onClick={() => toggleExpanded(log.id)}>
+                   <td className="px-4 py-3 text-xs">{formatDateTime(log.created_date)}</td>
+                   <td className="px-4 py-3 font-mono text-xs">{log.recipient_phone}</td>
+                   <td className="px-4 py-3 text-xs capitalize">{log.event_type.replace(/_/g, ' ')}</td>
+                   <td className="px-4 py-3 text-xs text-muted-foreground">{log.template_key}</td>
+                   <td className="px-4 py-3">
+                     <span className={`text-xs font-semibold px-2 py-1 rounded border ${STATUS_COLORS[log.status] || 'bg-gray-500/10'}`}>
+                       {log.status}
+                     </span>
+                   </td>
+                   <td className="px-4 py-3 font-mono text-[10px] text-muted-foreground hidden lg:table-cell truncate">{log.at_message_id || '—'}</td>
+                   <td className="px-4 py-3 text-center">
+                     {expandedIds.has(log.id) ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                   </td>
+                 </tr>
+                 {expandedIds.has(log.id) && (
+                   <tr className="border-t border-orange-400/30 bg-muted/50">
+                     <td colSpan="7" className="px-4 py-4">
+                       <div className="space-y-3 border-l-2 border-orange-400 pl-4">
+                         <div>
+                           <p className="text-xs font-medium text-muted-foreground mb-2">Message</p>
+                           <pre className="bg-background rounded p-3 text-xs font-mono whitespace-pre-wrap break-words">{log.message_body}</pre>
+                         </div>
+                         {log.failure_reason && (
+                           <div>
+                             <p className="text-xs font-medium text-destructive mb-1">Failure Reason</p>
+                             <p className="text-xs text-destructive">{log.failure_reason}</p>
+                           </div>
+                         )}
+                         <div className="grid grid-cols-2 gap-3">
+                           <div>
+                             <p className="text-xs font-medium text-muted-foreground mb-1">AT Message ID</p>
+                             <p className="text-xs font-mono text-foreground break-all">{log.at_message_id || '—'}</p>
+                           </div>
+                           {log.metadata_json && (
+                             <div>
+                               <p className="text-xs font-medium text-muted-foreground mb-1">Metadata</p>
+                               <pre className="text-xs font-mono text-muted-foreground bg-background rounded p-2 max-h-20 overflow-y-auto">{JSON.stringify(JSON.parse(log.metadata_json), null, 2)}</pre>
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     </td>
+                   </tr>
+                 )}
+               </React.Fragment>
+             ))}
             </tbody>
           </table>
           {logs.length === 0 && <p className="text-center py-8 text-muted-foreground text-sm">No logs found</p>}

@@ -57,10 +57,6 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (!user.email) {
-      return Response.json({ error: 'No email address on file' }, { status: 400 });
-    }
-
     // Generate OTP
     const otpCode = generateOtp();
     const salt = generateSaltBase64();
@@ -86,36 +82,43 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid phone number format' }, { status: 400 });
     }
 
-    // Get Africa's Talking config (sandbox or production)
-    const isProd = Deno.env.get('AT_ENVIRONMENT') === 'production';
-    const atApiKey = isProd
-      ? (Deno.env.get('AT_API_KEY_PRODUCTION') || Deno.env.get('AT_API_KEY'))
-      : Deno.env.get('AT_API_KEY');
-    const atUsername = isProd
-      ? (Deno.env.get('AT_USERNAME_PRODUCTION') || Deno.env.get('AT_USERNAME'))
-      : Deno.env.get('AT_USERNAME');
-    
-    if (!atApiKey || !atUsername) {
+    // Get Africa's Talking credentials
+    function getAtCredentials() {
+      const isProd = Deno.env.get('AT_ENVIRONMENT') === 'production';
+      const username = isProd
+        ? (Deno.env.get('AT_USERNAME_PRODUCTION') || Deno.env.get('AT_USERNAME'))
+        : Deno.env.get('AT_USERNAME');
+      const apiKey = isProd
+        ? (Deno.env.get('AT_API_KEY_PRODUCTION') || Deno.env.get('AT_API_KEY'))
+        : Deno.env.get('AT_API_KEY');
+      const baseUrl = isProd 
+        ? 'https://api.africastalking.com' 
+        : 'https://api.sandbox.africastalking.com';
+      const senderId = Deno.env.get('AT_SENDER_ID') || null;
+      return { username, apiKey, baseUrl, senderId, isProd };
+    }
+
+    const { username, apiKey, baseUrl, senderId, isProd } = getAtCredentials();
+    if (!apiKey || !username) {
       return Response.json({ error: 'SMS not configured' }, { status: 500 });
     }
 
     const smsMessage = `Your BodaSure code: ${otpCode}. Valid 5 mins. Do not share.`;
 
-    try {
-      const atBaseUrl = isProd 
-        ? 'https://api.africastalking.com' 
-        : 'https://api.sandbox.africastalking.com';
+    console.log(`[sendOtp] env=${isProd ? 'production' : 'sandbox'} username=${username} baseUrl=${baseUrl} senderId=${senderId || 'default'}`);
 
+    try {
       const body = new URLSearchParams();
-      body.append('username', atUsername);
+      body.append('username', username);
       body.append('to', formattedPhone);
       body.append('message', smsMessage);
+      if (senderId) body.append('from', senderId);
 
-      const response = await fetch(`${atBaseUrl}/version1/messaging`, {
+      const response = await fetch(`${baseUrl}/version1/messaging`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
-          'apiKey': atApiKey,
+          'apiKey': apiKey,
         },
         body,
       });

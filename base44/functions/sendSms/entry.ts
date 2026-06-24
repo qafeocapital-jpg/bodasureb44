@@ -6,6 +6,22 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * Phone numbers are sanitized to +254[number] format automatically.
  */
 
+// Shared credential resolver
+function getAtCredentials() {
+  const isProd = Deno.env.get('AT_ENVIRONMENT') === 'production';
+  const username = isProd
+    ? (Deno.env.get('AT_USERNAME_PRODUCTION') || Deno.env.get('AT_USERNAME'))
+    : Deno.env.get('AT_USERNAME');
+  const apiKey = isProd
+    ? (Deno.env.get('AT_API_KEY_PRODUCTION') || Deno.env.get('AT_API_KEY'))
+    : Deno.env.get('AT_API_KEY');
+  const baseUrl = isProd 
+    ? 'https://api.africastalking.com' 
+    : 'https://api.sandbox.africastalking.com';
+  const senderId = Deno.env.get('AT_SENDER_ID') || null;
+  return { username, apiKey, baseUrl, senderId, isProd };
+}
+
 // Phone number sanitization
 function sanitizePhoneNumber(phone) {
   if (!phone || typeof phone !== 'string') return null;
@@ -33,36 +49,32 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid phone number format' }, { status: 400 });
     }
 
-    // Get Africa's Talking config (sandbox or production)
-    const isProd = Deno.env.get('AT_ENVIRONMENT') === 'production';
-    const atUsername = isProd
-      ? (Deno.env.get('AT_USERNAME_PRODUCTION') || Deno.env.get('AT_USERNAME'))
-      : Deno.env.get('AT_USERNAME');
-    const atApiKey = isProd
-      ? (Deno.env.get('AT_API_KEY_PRODUCTION') || Deno.env.get('AT_API_KEY'))
-      : Deno.env.get('AT_API_KEY');
-    
-    if (!atUsername || !atApiKey) {
+    // Get Africa's Talking credentials
+    const { username, apiKey, baseUrl, senderId, isProd } = getAtCredentials();
+    if (!username || !apiKey) {
       return Response.json({ error: 'Africa\'s Talking credentials not configured' }, { status: 500 });
     }
 
-    const atBaseUrl = isProd 
-      ? 'https://api.africastalking.com' 
-      : 'https://api.sandbox.africastalking.com';
+    // Audit logging
+    console.log(`[sendSms] env=${isProd ? 'production' : 'sandbox'} username=${username} baseUrl=${baseUrl} senderId=${senderId || 'default'}`);
+
+    // Build request body
+    const body = new URLSearchParams({
+      username: username,
+      to: formattedPhone,
+      message: message,
+    });
+    if (senderId) body.append('from', senderId);
 
     // Send SMS via Africa's Talking
-    const response = await fetch(`${atBaseUrl}/version1/messaging`, {
+    const response = await fetch(`${baseUrl}/version1/messaging`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
-        'apiKey': atApiKey,
+        'apiKey': apiKey,
       },
-      body: new URLSearchParams({
-        username: atUsername,
-        to: formattedPhone,
-        message: message,
-      }).toString(),
+      body,
     });
 
     const data = await response.json();

@@ -1,12 +1,13 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const getAtCredentials = () => {
-  const env = Deno.env.get('AT_ENVIRONMENT');
-  const isProd = env === 'production';
+  const isProd = Deno.env.get('AT_ENVIRONMENT') === 'production';
   return {
     username: isProd ? Deno.env.get('AT_USERNAME_PRODUCTION') : Deno.env.get('AT_USERNAME'),
     apiKey: isProd ? Deno.env.get('AT_API_KEY_PRODUCTION') : Deno.env.get('AT_API_KEY'),
     baseUrl: isProd ? 'https://api.africastalking.com' : 'https://api.sandbox.africastalking.com',
+    senderId: Deno.env.get('AT_SENDER_ID') || null,
+    isProd,
   };
 };
 
@@ -76,7 +77,8 @@ Deno.serve(async (req) => {
     let failedCount = 0;
     let batchesProcessed = 0;
 
-    const { username, apiKey, baseUrl } = getAtCredentials();
+    const { username, apiKey, baseUrl, senderId, isProd } = getAtCredentials();
+    console.log(`[sendBulkSms] env=${isProd ? 'production' : 'sandbox'} username=${username} baseUrl=${baseUrl} senderId=${senderId || 'default'}`);
 
     // Process in batches of 1000
     for (let i = 0; i < recipientPhones.length; i += 1000) {
@@ -84,31 +86,36 @@ Deno.serve(async (req) => {
       const toPhones = batch.join(',');
 
       try {
+        const body = new URLSearchParams({
+          username: username,
+          to: toPhones,
+          message: campaign.message_body,
+        });
+        if (senderId) body.append('from', senderId);
+
         const atResponse = await fetch(`${baseUrl}/version1/messaging`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
             'apiKey': apiKey,
           },
-          body: new URLSearchParams({
-            username: username,
-            to: toPhones,
-            message: campaign.message_body,
-          }).toString(),
+          body,
         });
 
         const atData = await atResponse.json();
         if (atData.SMSMessageData?.Recipients) {
           for (const recipient of atData.SMSMessageData.Recipients) {
+            const status = recipient.status === 'Success' ? 'sent' : 'failed';
             const log = await base44.asServiceRole.entities.SmsLog.create({
               recipient_phone: recipient.number,
               message_body: campaign.message_body,
               event_type: 'bulk',
               at_message_id: recipient.messageId || '',
-              status: recipient.statusCode === '101' ? 'delivered' : recipient.statusCode === '100' ? 'sent' : 'failed',
+              status: status,
               metadata_json: JSON.stringify({ campaign_id: campaignId }),
             });
-            if (log.status === 'delivered' || log.status === 'sent') {
+            if (status === 'sent') {
               sentCount++;
             } else {
               failedCount++;
