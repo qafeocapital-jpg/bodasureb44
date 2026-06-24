@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { MessageSquare, FileText, Send, History } from 'lucide-react';
+import { MessageSquare, FileText, Send, History, Activity } from 'lucide-react';
 import SmsTemplatesPage from '@/components/admin/comms/SmsTemplatesPage';
 import BulkSmsPage from '@/components/admin/comms/BulkSmsPage';
 import SmsLogsPage from '@/components/admin/comms/SmsLogsPage';
+import CampaignsPage from '@/components/admin/comms/CampaignsPage';
 
 export default function Communications() {
   const { user } = useAuth();
@@ -37,14 +38,24 @@ export default function Communications() {
           <FileText className="w-4 h-4" /> SMS Templates
         </button>
         {isSuperAdmin && (
-          <button
-            onClick={() => setActiveTab('bulk')}
-            className={`flex items-center gap-2 px-4 py-3 font-semibold text-sm border-b-2 -mb-[1px] whitespace-nowrap ${
-              activeTab === 'bulk' ? 'text-primary border-primary' : 'text-muted-foreground border-transparent'
-            }`}
-          >
-            <Send className="w-4 h-4" /> Bulk SMS
-          </button>
+          <>
+            <button
+              onClick={() => setActiveTab('bulk')}
+              className={`flex items-center gap-2 px-4 py-3 font-semibold text-sm border-b-2 -mb-[1px] whitespace-nowrap ${
+                activeTab === 'bulk' ? 'text-primary border-primary' : 'text-muted-foreground border-transparent'
+              }`}
+            >
+              <Send className="w-4 h-4" /> Bulk SMS
+            </button>
+            <button
+              onClick={() => setActiveTab('campaigns')}
+              className={`flex items-center gap-2 px-4 py-3 font-semibold text-sm border-b-2 -mb-[1px] whitespace-nowrap ${
+                activeTab === 'campaigns' ? 'text-primary border-primary' : 'text-muted-foreground border-transparent'
+              }`}
+            >
+              <Activity className="w-4 h-4" /> Campaigns
+            </button>
+          </>
         )}
         <button
           onClick={() => setActiveTab('logs')}
@@ -59,6 +70,7 @@ export default function Communications() {
       {/* Tab Content */}
       {activeTab === 'templates' && <SmsTemplatesPage />}
       {activeTab === 'bulk' && isSuperAdmin && <BulkSmsPage />}
+      {activeTab === 'campaigns' && isSuperAdmin && <CampaignsPage />}
       {activeTab === 'logs' && <SmsLogsPage />}
     </div>
   );

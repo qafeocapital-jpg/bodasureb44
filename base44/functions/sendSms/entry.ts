@@ -22,8 +22,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Africa\'s Talking credentials not configured' }, { status: 500 });
     }
 
+    // Resolve AT base URL from environment
+    const atEnv = Deno.env.get('AT_ENVIRONMENT');
+    const atBaseUrl = atEnv === 'sandbox' ? 'https://api.sandbox.africastalking.com' : 'https://api.africastalking.com';
+
     // Send SMS via Africa's Talking
-    const response = await fetch('https://api.sandbox.africastalking.com/version1/messaging', {
+    const response = await fetch(`${atBaseUrl}/version1/messaging`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

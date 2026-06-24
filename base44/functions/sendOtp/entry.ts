@@ -80,12 +80,16 @@ Deno.serve(async (req) => {
     const smsMessage = `Your BodaSure code: ${otpCode}. Valid 5 mins. Do not share.`;
 
     try {
+      // Resolve AT base URL from environment
+      const atEnv = Deno.env.get('AT_ENVIRONMENT');
+      const atBaseUrl = atEnv === 'sandbox' ? 'https://api.sandbox.africastalking.com' : 'https://api.africastalking.com';
+
       const body = new URLSearchParams();
       body.append('username', atUsername);
       body.append('to', user.phone);
       body.append('message', smsMessage);
 
-      const response = await fetch('https://api.africastalking.com/version1/messaging', {
+      const response = await fetch(`${atBaseUrl}/version1/messaging`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',

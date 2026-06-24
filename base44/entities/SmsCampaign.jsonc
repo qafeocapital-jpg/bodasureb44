@@ -1,0 +1,75 @@
+{
+  "name": "SmsCampaign",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "message_body": {
+      "type": "string"
+    },
+    "audience_type": {
+      "type": "string",
+      "enum": [
+        "all_riders",
+        "by_county",
+        "by_sacco",
+        "by_stage",
+        "by_sub_county",
+        "by_ward",
+        "individual"
+      ]
+    },
+    "audience_filter_id": {
+      "type": "string"
+    },
+    "audience_phone": {
+      "type": "string"
+    },
+    "county_scope_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "processing",
+        "completed",
+        "failed"
+      ],
+      "default": "queued"
+    },
+    "total_recipients": {
+      "type": "integer"
+    },
+    "sent_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "failed_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "batch_count": {
+      "type": "integer"
+    },
+    "batches_processed": {
+      "type": "integer",
+      "default": 0
+    },
+    "created_by_id": {
+      "type": "string"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "name",
+    "message_body",
+    "audience_type",
+    "status",
+    "total_recipients"
+  ]
+}

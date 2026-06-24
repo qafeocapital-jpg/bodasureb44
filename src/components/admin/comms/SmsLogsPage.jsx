@@ -10,7 +10,7 @@ const STATUS_COLORS = {
   failed: 'bg-destructive/10 text-destructive border-destructive/30',
 };
 
-export default function SmsLogsPage() {
+export default function SmsLogsPage({ countyScope = null }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('');

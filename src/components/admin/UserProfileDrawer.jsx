@@ -4,11 +4,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { formatKES, formatDateTime, formatDate } from '@/lib/format';
 import { splitFullName } from '@/lib/nameUtils';
-import { Wallet, FileText, Bike, Users, UserCircle, Inbox, ExternalLink, AlertTriangle, CheckCircle, XCircle, Link2, Loader2, Shield } from 'lucide-react';
+import { Wallet, FileText, Bike, Users, UserCircle, Inbox, ExternalLink, AlertTriangle, CheckCircle, XCircle, Link2, Loader2, Shield, Send } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/AuthContext';
 import SubmissionsTab from '@/components/admin/drawer-tabs/SubmissionsTab';
 import RolesTab from '@/components/admin/drawer-tabs/RolesTab';
+import SendSmsModal from '@/components/admin/comms/SendSmsModal';
 
 const DOC_TYPE_LABELS = {
   id_front: 'ID (Front)',
@@ -50,6 +51,7 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
   const [linking, setLinking] = useState('idle');
   const [linkedAccount, setLinkedAccount] = useState('');
   const [linkError, setLinkError] = useState('');
+  const [sendSmsOpen, setSendSmsOpen] = useState(false);
 
   // Reset when user changes
   useEffect(() => {
@@ -128,11 +130,22 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
   const accountNumber = wallet?.sasapay_account_number || wallet?.account_number || '—';
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col p-0">
         {/* Header */}
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-border">
-          <SheetTitle className="text-lg font-heading font-bold">{user.full_name || 'User'}</SheetTitle>
+          <div className="flex items-center justify-between">
+            <SheetTitle className="text-lg font-heading font-bold">{user.full_name || 'User'}</SheetTitle>
+            {isSuper && user?.phone && (
+              <button
+                onClick={() => setSendSmsOpen(true)}
+                className="flex items-center gap-1 bg-primary text-primary-foreground rounded-lg px-3 py-1.5 text-xs font-semibold hover:opacity-90"
+              >
+                <Send className="w-3 h-3" /> SMS
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>{user.phone || 'No phone'}</span>
             <span className="font-mono">{accountNumber}</span>
@@ -337,5 +350,16 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
         </Tabs>
       </SheetContent>
     </Sheet>
+
+    {user?.phone && (
+      <SendSmsModal
+        open={sendSmsOpen}
+        onOpenChange={setSendSmsOpen}
+        userPhone={user.phone}
+        userName={user.full_name || 'User'}
+        onSuccess={onLinked}
+      />
+    )}
+  </>
   );
 }
