@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, ShieldAlert, Search, Play, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { X, Loader2, ShieldAlert, Search, Play, CheckCircle2, AlertTriangle, XCircle, Webhook, Wrench } from 'lucide-react';
+import WebhookDeliveriesList from '@/components/admin/WebhookDeliveriesList';
 
 const DECISION_CONFIG = {
   accept: { label: 'Accepted', color: 'green', icon: CheckCircle2, bg: 'bg-success/10', text: 'text-success' },
@@ -9,6 +10,7 @@ const DECISION_CONFIG = {
 };
 
 export default function ManualRecoveryModal({ onClose, prefillUserId }) {
+  const [activeTab, setActiveTab] = useState('deliveries');
   const [transactionId, setTransactionId] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -68,7 +70,37 @@ export default function ManualRecoveryModal({ onClose, prefillUserId }) {
           </button>
         </div>
 
+        {/* Tab Toggle */}
+        <div className="flex border-b border-border px-4">
+          <button
+            onClick={() => setActiveTab('deliveries')}
+            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors ${
+              activeTab === 'deliveries'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Webhook className="w-3.5 h-3.5" />
+            Webhook Deliveries
+          </button>
+          <button
+            onClick={() => setActiveTab('replay')}
+            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-semibold border-b-2 transition-colors ${
+              activeTab === 'replay'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Wrench className="w-3.5 h-3.5" />
+            Manual Replay
+          </button>
+        </div>
+
         <div className="p-4 space-y-4">
+          {activeTab === 'deliveries' && <WebhookDeliveriesList />}
+
+          {activeTab === 'replay' && (
+            <>
           {/* Warning Banner */}
           <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 flex items-start gap-2">
             <ShieldAlert className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
@@ -240,9 +272,11 @@ export default function ManualRecoveryModal({ onClose, prefillUserId }) {
                 <span>{new Date(result.processedAt).toLocaleString()}</span>
               </div>
             </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+            )}
+            </>
+            )}
+            </div>
+            </div>
+            </div>
+            );
+            }
