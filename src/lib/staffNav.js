@@ -45,6 +45,12 @@ export const stageNav = [
   { label: 'Compliance', path: '/stage/compliance', icon: BadgeCheck },
 ];
 
+export const commsNav = [
+  { label: 'SMS Templates', path: '/admin/comms/templates', icon: FileText },
+  { label: 'Bulk SMS', path: '/admin/comms/bulk', icon: MessageSquare },
+  { label: 'SMS Logs', path: '/admin/comms/logs', icon: Clock },
+];
+
 export const adminNav = [
   { label: 'Overview', path: '/admin/overview', icon: LayoutDashboard },
   { label: 'Flags', path: '/admin/flags', icon: ShieldAlert },
@@ -69,10 +75,4 @@ export const staffAdminNav = [
   { label: 'Announcements', path: '/admin/announcements', icon: Megaphone },
   { label: 'Reconciliation', path: '/admin/reconciliation', icon: Scale },
   { label: 'Reports', path: '/admin/reports', icon: FileBarChart },
-];
-
-export const commsNav = [
-  { label: 'SMS Templates', path: '/admin/comms/templates', icon: FileText },
-  { label: 'Bulk SMS', path: '/admin/comms/bulk', icon: MessageSquare },
-  { label: 'SMS Logs', path: '/admin/comms/logs', icon: Clock },
 ];
