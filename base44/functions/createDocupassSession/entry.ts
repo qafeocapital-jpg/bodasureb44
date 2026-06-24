@@ -52,6 +52,15 @@ Deno.serve(async (req) => {
 
     console.log('[createDocupassSession] Session created:', data.url);
 
+    // Increment attempt count on user
+    try {
+      await base44.auth.updateMe({
+        docupass_attempt_count: (user.docupass_attempt_count || 0) + 1,
+      });
+    } catch (e) {
+      console.warn('[createDocupassSession] Failed to increment attempt count:', e.message);
+    }
+
     return Response.json({ url: data.url, docupassId: data.id });
   } catch (error) {
     console.error('createDocupassSession error:', error);

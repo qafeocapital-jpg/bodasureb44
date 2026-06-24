@@ -16,6 +16,8 @@ import PhaseVerification from '@/components/rider/onboarding/PhaseVerification';
 import CompletionScreen from '@/components/rider/onboarding/CompletionScreen';
 import { getOrCreateWallet } from '@/lib/payments';
 import KycTierStatus from '@/components/rider/KycTierStatus';
+import DocupassResultScreen from '@/components/rider/onboarding/DocupassResultScreen';
+import ProfileSummaryCard from '@/components/rider/onboarding/ProfileSummaryCard';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -32,10 +34,18 @@ export default function Profile() {
   const [readOnly, setReadOnly] = useState(false);
   const [kycDocs, setKycDocs] = useState([]);
   const [wallet, setWallet] = useState(null);
+  const [showDocupassResult, setShowDocupassResult] = useState(false);
+  const [docupassOutcome, setDocupassOutcome] = useState(null);
+  const [group, setGroup] = useState(null);
+
+  // Reset initialization when user changes
+  useEffect(() => {
+    setHasInitialized(false);
+  }, [user?.id]);
 
   useEffect(() => {
     async function load() {
-      if (!user || hasInitialized) return;
+      if (!user?.id || hasInitialized) return;
       try {
         const [cs, vs, gms, kd, w] = await Promise.all([
           base44.entities.County.filter({}),
@@ -49,18 +59,51 @@ export default function Profile() {
         setGroupMembers(gms);
         setKycDocs(kd);
         setWallet(w);
+
+        // Fetch group if user is a member
+        if (gms.length > 0 && gms[0].group_id) {
+          try {
+            const grp = await base44.entities.Group.get(gms[0].group_id);
+            setGroup(grp);
+          } catch (e) {}
+        }
+
+        // Issue 5a: Legacy doc auto-purge (silent, non-blocking)
+        const legacyDocs = kd.filter(d =>
+          !d.provider_reference &&
+          d.provider_name !== 'idanalyzer_docupass' &&
+          ['id_front', 'id_back', 'selfie'].includes(d.document_type)
+        );
+        if (legacyDocs.length > 0) {
+          Promise.allSettled(legacyDocs.map(d => base44.entities.KycDocument.delete(d.id)))
+            .then(() => {
+              setKycDocs(prev => prev.filter(d => !legacyDocs.find(ld => ld.id === d.id)));
+            })
+            .catch(() => {});
+        }
+
+        // Issue 1: DocuPass result detection
+        const idDocTypes = ['id_front', 'id_back', 'selfie'];
+        const processedIdDocs = kd.filter(d => idDocTypes.includes(d.document_type) && d.provider_reference);
+        const allThreeProcessed = idDocTypes.every(type => processedIdDocs.some(d => d.document_type === type));
+        if (allThreeProcessed && sessionStorage.getItem('docupass_just_started') === 'true') {
+          sessionStorage.removeItem('docupass_just_started');
+          const allApproved = idDocTypes.every(type =>
+            processedIdDocs.find(d => d.document_type === type)?.status === 'approved'
+          );
+          const anyRejected = processedIdDocs.some(d => d.status === 'rejected');
+          if (allApproved) setDocupassOutcome('accepted');
+          else if (anyRejected) setDocupassOutcome('rejected');
+          else setDocupassOutcome('review');
+          setShowDocupassResult(true);
+        }
+
+        // Issue 4: Smart phase routing using independent phase evaluation
         const phase = getOnboardingPhase(user, vs, gms);
         setCompletedPhase(phase);
         const targetPhase = location.state?.targetPhase;
         const viewStep = location.state?.viewStep;
-        
-        // FIX 2: Auto-skip phase 0 only if wallet is active AND all profile fields filled
-        let initialPhase = Math.min(phase, 6);
-        if (phase === 0 && user.full_name && user.phone && user.national_id && user.county_id && w.status === 'active') {
-          initialPhase = 1;
-          setCompletedPhase(1);
-        }
-        
+
         if (targetPhase !== undefined && targetPhase !== null) {
           setCurrentPhase(targetPhase);
           setReadOnly(false);
@@ -68,7 +111,7 @@ export default function Profile() {
           setCurrentPhase(viewStep);
           setReadOnly(true);
         } else {
-          setCurrentPhase(initialPhase);
+          setCurrentPhase(Math.min(phase, 6));
           setReadOnly(false);
         }
       } catch (e) {}
@@ -76,7 +119,7 @@ export default function Profile() {
       setLoading(false);
     }
     load();
-  }, [user, hasInitialized]);
+  }, [user?.id, hasInitialized]);
 
   async function refreshData() {
     if (refreshUser) await refreshUser();
@@ -143,6 +186,38 @@ export default function Profile() {
   };
 
   if (loading || !user) return <PageSkeleton variant="default" />;
+
+  // Issue 1: DocuPass result screen
+  if (showDocupassResult) {
+    return (
+      <DocupassResultScreen
+        outcome={docupassOutcome}
+        user={user}
+        kycDocs={kycDocs}
+        attemptCount={user.docupass_attempt_count || 0}
+        onDismiss={() => { setShowDocupassResult(false); setDocupassOutcome(null); }}
+        onGoToDashboard={() => { setShowDocupassResult(false); setDocupassOutcome(null); navigate('/app'); }}
+        onContactSupport={() => { setShowDocupassResult(false); setDocupassOutcome(null); navigate('/app/support'); }}
+        onRefresh={refreshData}
+      />
+    );
+  }
+
+  // Issue 2: Completed profile summary card
+  if (user.onboarding_complete && user.verification_complete) {
+    const county = counties.find(c => c.id === user.county_id);
+    return (
+      <ProfileSummaryCard
+        user={user}
+        vehicle={vehicles[0]}
+        group={group}
+        county={county}
+        wallet={wallet}
+        onBack={() => navigate('/app')}
+        onContactSupport={() => navigate('/app/support')}
+      />
+    );
+  }
 
   return (
     <div className="p-5 animate-fade-in">

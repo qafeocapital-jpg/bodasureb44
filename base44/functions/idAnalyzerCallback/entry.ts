@@ -150,20 +150,35 @@ Deno.serve(async (req) => {
     }
   }));
 
-  // --- Hydrate user identity data (on accept) ---
-  if (decision === 'accept') {
-    try {
-      const user = await base44.asServiceRole.entities.User.get(userId);
-      const userUpdate = {};
+  // --- Hydrate user identity data (store decision + face confidence always; extracted fields on accept) ---
+  try {
+    const user = await base44.asServiceRole.entities.User.get(userId);
+    const userUpdate = { docupass_decision: decision };
+
+    // Extract face confidence from various possible payload paths
+    let faceConfidence = null;
+    const faceField = data.face;
+    if (faceField) {
+      if (typeof faceField === 'number') faceConfidence = faceField;
+      else if (Array.isArray(faceField) && faceField[0]) {
+        faceConfidence = typeof faceField[0] === 'object' ? (faceField[0].confidence ?? faceField[0].value) : faceField[0];
+      } else if (typeof faceField === 'object') {
+        faceConfidence = faceField.confidence ?? faceField.value;
+      }
+    }
+    if (faceConfidence != null) {
+      if (faceConfidence > 1) faceConfidence = faceConfidence / 100;
+      userUpdate.id_face_confidence = faceConfidence;
+    }
+
+    if (decision === 'accept') {
       if (fullName) userUpdate.id_extracted_name = fullName;
       if (dob) userUpdate.id_extracted_dob = dob;
       if (documentNumber && !user?.national_id) userUpdate.national_id = documentNumber;
-      if (Object.keys(userUpdate).length > 0) {
-        await base44.asServiceRole.entities.User.update(userId, userUpdate);
-      }
-    } catch (e) {
-      console.warn('[idAnalyzerCallback] Failed to hydrate user:', e.message);
     }
+    await base44.asServiceRole.entities.User.update(userId, userUpdate);
+  } catch (e) {
+    console.warn('[idAnalyzerCallback] Failed to hydrate user:', e.message);
   }
 
   // --- 7a. AuditLog: DocuPass completion ---

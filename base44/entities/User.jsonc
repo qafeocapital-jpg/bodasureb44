@@ -200,6 +200,21 @@
     "kyc_just_approved": {
       "type": "boolean",
       "default": false
+    },
+    "docupass_attempt_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "docupass_decision": {
+      "type": "string",
+      "enum": [
+        "accept",
+        "review",
+        "reject"
+      ]
+    },
+    "id_face_confidence": {
+      "type": "number"
     }
   }
 }

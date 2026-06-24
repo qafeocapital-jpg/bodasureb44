@@ -14,14 +14,19 @@ export const ONBOARDING_PHASES = [
  * @returns 0–5 (first incomplete phase) or 6 (all complete)
  */
 export function getOnboardingPhase(user, vehicles, groupMembers) {
+  // Phase 0: Personal — complete if all core fields set
   if (!user?.full_name || !user?.phone || !user?.national_id || !user?.county_id) return 0;
-  if (!vehicles || vehicles.length === 0) return 1;
+  // Phase 1: Bike — complete if a vehicle with plate_number exists
+  if (!vehicles || vehicles.length === 0 || !vehicles[0]?.plate_number) return 1;
   const sorted = [...vehicles].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
   const latestBike = sorted[0];
-  if (!latestBike?.sub_county_id || !latestBike?.ward_id || !latestBike?.stage_id) return 2;
-  if (!user?.stage_id) return 3;
+  // Phase 2: Map — complete if vehicle has stage_id or sub_county_id
+  if (!latestBike?.stage_id && !latestBike?.sub_county_id) return 2;
+  // Phase 3: Stage — complete if vehicle has stage_id
+  if (!latestBike?.stage_id) return 3;
+  // Phase 4: SACCO — complete if user has group memberships
   if (!groupMembers || groupMembers.length === 0) return 4;
-  if (!user?.onboarding_complete) return 4; // still completing SACCO step
-  if (!user?.verification_complete) return 5; // Phase 6 verification
+  // Phase 5: Verification — shown if not yet verified
+  if (!user?.verification_complete) return 5;
   return 6; // all complete
 }

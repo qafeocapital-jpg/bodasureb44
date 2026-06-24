@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { CreditCard, FileText, User, ChevronLeft, Check, AlertTriangle, Loader2, ShieldCheck, Clock } from 'lucide-react';
+import { CreditCard, FileText, User, ChevronLeft, Check, AlertTriangle, Loader2, ShieldCheck, Clock, LifeBuoy } from 'lucide-react';
 import DocupassOverlay from './DocupassOverlay';
 
 const STEPS = [
@@ -10,6 +11,7 @@ const STEPS = [
 ];
 
 export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [docupassUrl, setDocupassUrl] = useState(null);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -24,6 +26,8 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
 
   const allApproved = idFrontDoc?.status === 'approved' && idBackDoc?.status === 'approved' && selfieDoc?.status === 'approved';
   const anyRejected = [idFrontDoc, idBackDoc, selfieDoc].some(d => d?.status === 'rejected');
+  const attemptCount = user?.docupass_attempt_count || 0;
+  const isLocked = attemptCount >= 3 && anyRejected;
 
   // Detect return from DocuPass (mobile new tab)
   useEffect(() => {
@@ -92,6 +96,7 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
         redirectUrl: typeof window !== 'undefined' ? window.location.href : undefined,
       });
       if (res.data?.url) {
+        sessionStorage.setItem('docupass_just_started', 'true');
         setDocupassUrl(res.data.url);
         const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
         if (isMobile) {
@@ -218,7 +223,7 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
       )}
 
       {/* CTA */}
-      {!polling && (
+      {!polling && !isLocked && (
         <button
           onClick={handleStart}
           disabled={loading}
@@ -230,6 +235,17 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
               ? <><ShieldCheck className="w-4 h-4" /> Try Again</>
               : <><ShieldCheck className="w-4 h-4" /> Start Secure Verification</>}
         </button>
+      )}
+      {isLocked && (
+        <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4 text-center space-y-3">
+          <p className="text-xs text-destructive font-medium">Maximum verification attempts reached</p>
+          <button
+            onClick={() => navigate('/app/support')}
+            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm"
+          >
+            <LifeBuoy className="w-4 h-4" /> Contact Support
+          </button>
+        </div>
       )}
 
       <p className="text-center text-[10px] text-muted-foreground">

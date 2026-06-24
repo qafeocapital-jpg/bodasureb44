@@ -10,18 +10,22 @@ export const VERIFICATION_TASKS = [
  * @returns Array of { id, status } where status is: not_started | in_progress | submitted | verified
  */
 export function getTaskStatuses(kycDocs = [], user, vehicle) {
-  // Task 1: Identity Verification (ID front + ID back + Selfie — batched)
-  const idFront = kycDocs.find(d => d.document_type === 'id_front' && d.file_url);
-  const idBack = kycDocs.find(d => d.document_type === 'id_back' && d.file_url);
-  const selfie = kycDocs.find(d => d.document_type === 'selfie' && d.file_url);
-  const idFrontApproved = kycDocs.some(d => d.document_type === 'id_front' && d.status === 'approved');
-  const idBackApproved = kycDocs.some(d => d.document_type === 'id_back' && d.status === 'approved');
-  const selfieApproved = kycDocs.some(d => d.document_type === 'selfie' && d.status === 'approved');
-  const allThreeApproved = idFrontApproved && idBackApproved && selfieApproved;
-  const uploadedCount = [idFront, idBack, selfie].filter(Boolean).length;
+  // Task 1: Identity Verification (IDAnalyzer DocuPass only)
+  // Only consider docs with provider_reference (IDAnalyzer-processed)
+  const idFrontProcessed = kycDocs.find(d => d.document_type === 'id_front' && d.provider_reference);
+  const idBackProcessed = kycDocs.find(d => d.document_type === 'id_back' && d.provider_reference);
+  const selfieProcessed = kycDocs.find(d => d.document_type === 'selfie' && d.provider_reference);
+  const processedCount = [idFrontProcessed, idBackProcessed, selfieProcessed].filter(Boolean).length;
+  const allThreeProcessed = processedCount === 3;
+  const allThreeApproved = allThreeProcessed &&
+    idFrontProcessed.status === 'approved' &&
+    idBackProcessed.status === 'approved' &&
+    selfieProcessed.status === 'approved';
+  const anyIdRejected = [idFrontProcessed, idBackProcessed, selfieProcessed].some(d => d?.status === 'rejected');
   const identityStatus = allThreeApproved ? 'verified'
-    : uploadedCount === 3 ? 'submitted'
-    : uploadedCount > 0 ? 'in_progress'
+    : anyIdRejected ? 'rejected'
+    : allThreeProcessed ? 'submitted'
+    : (user?.docupass_attempt_count > 0) ? 'processing'
     : 'not_started';
 
   // Task 2: Bike Photos
@@ -81,6 +85,8 @@ export const VERIFICATION_LEVEL_CONFIG = {
 export const TASK_STATUS_CONFIG = {
   not_started: { label: 'Not Started', icon: 'circle', className: 'text-muted-foreground', bg: 'bg-muted' },
   in_progress: { label: 'In Progress', icon: 'clock', className: 'text-amber-600', bg: 'bg-amber-50' },
+  processing: { label: 'Processing', icon: 'clock', className: 'text-amber-600 animate-pulse', bg: 'bg-amber-50' },
   submitted: { label: 'Submitted', icon: 'check', className: 'text-blue-600', bg: 'bg-blue-50' },
   verified: { label: 'Verified', icon: 'check-circle', className: 'text-success', bg: 'bg-success/10' },
+  rejected: { label: 'Rejected', icon: 'x-circle', className: 'text-destructive', bg: 'bg-destructive/10' },
 };
