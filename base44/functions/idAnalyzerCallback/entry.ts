@@ -134,12 +134,10 @@ Deno.serve(async (req) => {
   ];
 
   const fields = {};
-  const values = {};
   for (const key of fieldDefs) {
     const extracted = extractField(data[key]);
     if (extracted) {
       fields[key] = extracted;
-      if (extracted.value != null) values[key] = extracted.value;
     }
   }
 
@@ -154,6 +152,12 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Helper: get just the value from a field (avoids storing redundant `values` object)
+  function fieldValue(key) {
+    const f = fields[key];
+    return f?.value ?? null;
+  }
+
   // --- 4. Face match confidence from scores.faceCompare (NOT data.face) ---
   const scores = payload.scores || {};
   const faceConfidence = scores.faceCompare != null ? scores.faceCompare : null;
@@ -161,9 +165,19 @@ Deno.serve(async (req) => {
   // Face identical: derive from threshold (>= 0.7 = identical match)
   const faceIsIdentical = faceConfidence != null ? faceConfidence >= 0.7 : null;
 
-  // --- Document authentication score (derived from warnings) ---
-  const highSeverityWarnings = warnings.filter(w => w.severity === 'high');
-  const authScore = highSeverityWarnings.length === 0 ? 1.0 : 0.0;
+  // --- Document authentication score (only anti-forgery warnings, not all high-severity) ---
+  const ANTI_FORGERY_CODES = new Set([
+    'IMAGE_FORGERY', 'FAKE_ID', 'FEATURE_VERIFICATION_FAILED',
+    'ARTIFICIAL_IMAGE', 'RECAPTURED_DOCUMENT', 'SCREEN_DETECTED',
+    'CHECK_DIGIT_FAILED', 'MRZ_VISUAL_VALID', 'PHYSICAL_DOCUMENT_MISSING',
+  ]);
+  const antiForgeryWarnings = warnings.filter(w => ANTI_FORGERY_CODES.has(w.code));
+  const authScore = antiForgeryWarnings.length === 0 ? 1.0 : 0.0;
+
+  // --- OCR quality: ratio of expected fields successfully extracted ---
+  const totalFieldDefs = fieldDefs.length;
+  const extractedCount = Object.keys(fields).length;
+  const matchRate = totalFieldDefs > 0 ? Math.round((extractedCount / totalFieldDefs) * 100) / 100 : null;
 
   // --- PDF audit report URL from outputFile (no download needed) ---
   const outputFile = payload.outputFile || [];
@@ -174,13 +188,12 @@ Deno.serve(async (req) => {
   );
   const auditReportUrl = auditReport?.fileUrl || null;
 
-  // Build extracted data JSON (strip bounding boxes to reduce storage)
+  // Build extracted data JSON (strip bounding boxes + redundant values to reduce storage)
   const extractedData = {
     fields,
     extraFields,
-    values,
     face: { confidence: faceConfidence, isIdentical: faceIsIdentical },
-    authentication: { score: authScore, derivedFromWarnings: true },
+    authentication: { score: authScore, antiForgeryOnly: true },
     warnings: warnings.map(w => ({
       code: w.code,
       description: w.description,
@@ -226,29 +239,37 @@ Deno.serve(async (req) => {
     }
   }));
 
-  // --- 6. Hydrate User with ALL extracted data + auto-set verification status ---
+  // --- 6. Hydrate User with essential fields + auto-set verification status ---
+  // This is SYNCHRONOUS (before returning 200) because the frontend polls for these fields.
+  // Wallet upgrade, AuditLog, SasaPay, SMS are moved to fire-and-forget after returning 200.
+  let existingNationalId = null;
   try {
     const user = await base44.asServiceRole.entities.User.get(userId);
+    existingNationalId = user?.national_id || null;
     const userUpdate = {
       docupass_decision: decision,
       id_extracted_data: JSON.stringify(extractedData),
+      // Always mark report as fetched (we looked — URL either exists or doesn't)
+      docupass_report_fetched: true,
     };
 
-    // Store key fields individually for querying/display (using correct v2 field names)
+    // Store key fields individually for querying/display
     if (faceConfidence != null) userUpdate.id_face_confidence = faceConfidence;
     if (faceIsIdentical != null) userUpdate.id_face_identical = faceIsIdentical;
     if (authScore != null) userUpdate.id_authentication_score = authScore;
-    if (values.sex) userUpdate.id_sex = values.sex;
-    if (values.address1) userUpdate.id_address = [values.address1, values.address2, values.postcode].filter(Boolean).join(', ');
-    if (values.countryFull) userUpdate.id_country = values.countryFull;
-    if (values.nationalityFull) userUpdate.id_nationality = values.nationalityFull;
-    if (values.expiry) userUpdate.id_expiry_date = normalizeDate(values.expiry);
-    if (values.issued) userUpdate.id_issued_date = normalizeDate(values.issued);
+    if (matchRate != null) userUpdate.id_match_rate = matchRate;
+    if (fieldValue('sex')) userUpdate.id_sex = fieldValue('sex');
+    if (fieldValue('address1')) {
+      userUpdate.id_address = [fieldValue('address1'), fieldValue('address2'), fieldValue('postcode')].filter(Boolean).join(', ');
+    }
+    if (fieldValue('countryFull')) userUpdate.id_country = fieldValue('countryFull');
+    if (fieldValue('nationalityFull')) userUpdate.id_nationality = fieldValue('nationalityFull');
+    if (fieldValue('expiry')) userUpdate.id_expiry_date = normalizeDate(fieldValue('expiry'));
+    if (fieldValue('issued')) userUpdate.id_issued_date = normalizeDate(fieldValue('issued'));
 
     // Store audit report URL directly (no PDF download — optimizes DB for millions of users)
     if (auditReportUrl) {
       userUpdate.docupass_report_url = auditReportUrl;
-      userUpdate.docupass_report_fetched = true;
     }
 
     // Auto-set verification status based on decision
@@ -260,23 +281,13 @@ Deno.serve(async (req) => {
       userUpdate.wallet_tier = 2;
       userUpdate.kyc_just_approved = true;
 
-      if (values.fullName) userUpdate.id_extracted_name = values.fullName;
-      if (values.dob) userUpdate.id_extracted_dob = normalizeDate(values.dob);
-      if (values.documentNumber && !user?.national_id) userUpdate.national_id = values.documentNumber;
-      if (values.dob) userUpdate.date_of_birth = normalizeDate(values.dob);
-
-      // Upgrade wallet to Tier 2
-      try {
-        const wallets = await base44.asServiceRole.entities.Wallet.filter({
-          user_id: userId, entity_type: 'personal',
-        });
-        if (wallets.length > 0) {
-          await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
-            tier: 2, status: 'active',
-          });
-        }
-      } catch (e) {
-        console.warn('[idAnalyzerCallback] Wallet upgrade failed:', e.message);
+      if (fieldValue('fullName')) userUpdate.id_extracted_name = fieldValue('fullName');
+      if (fieldValue('dob')) {
+        userUpdate.id_extracted_dob = normalizeDate(fieldValue('dob'));
+        userUpdate.date_of_birth = normalizeDate(fieldValue('dob'));
+      }
+      if (fieldValue('documentNumber') && !existingNationalId) {
+        userUpdate.national_id = fieldValue('documentNumber');
       }
     } else if (decision === 'reject') {
       userUpdate.kyc_status = 'rejected';
@@ -291,31 +302,52 @@ Deno.serve(async (req) => {
     console.warn('[idAnalyzerCallback] Failed to hydrate user:', e.message);
   }
 
-  // --- AuditLog ---
-  try {
-    await base44.asServiceRole.entities.AuditLog.create({
-      user_id: userId,
-      action: 'idanalyzer_docupass_completed',
-      entity_type: 'KycDocument',
-      description: `DocuPass ${decision}. Tx: ${transactionId}. Face: ${faceConfidence}, Auth: ${authScore}. Report URL: ${auditReportUrl ? 'stored' : 'none'}`,
-      new_values: { decision, transactionId, faceConfidence, auditReportUrl },
-    });
-  } catch (e) {
-    console.warn('[idAnalyzerCallback] AuditLog failed:', e.message);
-  }
-
-  // --- Return 200 immediately; SasaPay + SMS are fire-and-forget ---
+  // --- Return 200 immediately; wallet upgrade, audit log, SasaPay, SMS are fire-and-forget ---
+  // Per IDAnalyzer docs: "Your endpoint must return HTTP 200 within 10 seconds."
   const responsePayload = Response.json({ success: true, status: docStatus, decision });
 
   const tasks = [];
+  // Wallet tier upgrade (fire-and-forget)
+  if (decision === 'accept') {
+    tasks.push(upgradeWalletTier(base44, userId));
+  }
+  // AuditLog (fire-and-forget)
+  tasks.push(base44.asServiceRole.entities.AuditLog.create({
+    user_id: userId,
+    action: 'idanalyzer_docupass_completed',
+    entity_type: 'KycDocument',
+    description: `DocuPass ${decision}. Tx: ${transactionId}. Face: ${faceConfidence}, Auth: ${authScore}. Report: ${auditReportUrl ? 'stored' : 'none'}`,
+    new_values: { decision, transactionId, faceConfidence, auditReportUrl },
+  }).catch(() => {}));
+  // SasaPay KYC push (fire-and-forget)
   if (decision === 'accept' && frontUrl && backUrl && faceUrl) {
     tasks.push(pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }));
   }
+  // SMS notification (fire-and-forget)
   tasks.push(sendKycSms(base44, userId, decision));
   Promise.allSettled(tasks).catch(() => {});
 
   return responsePayload;
 });
+
+// ---------------------------------------------------------------------------
+// Wallet tier upgrade (fire-and-forget, called after returning 200)
+// ---------------------------------------------------------------------------
+
+async function upgradeWalletTier(base44, userId) {
+  try {
+    const wallets = await base44.asServiceRole.entities.Wallet.filter({
+      user_id: userId, entity_type: 'personal',
+    });
+    if (wallets.length > 0) {
+      await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
+        tier: 2, status: 'active',
+      });
+    }
+  } catch (e) {
+    console.warn('[idAnalyzerCallback] Wallet upgrade failed:', e.message);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers

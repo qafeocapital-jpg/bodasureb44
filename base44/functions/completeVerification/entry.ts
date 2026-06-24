@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
 
     // Set verification_complete + kyc_status
     const updateData = { verification_complete: true };
-    if (identityApproved && !fullUser.kyc_status || fullUser.kyc_status === 'unverified') {
+    if (identityApproved && (!fullUser.kyc_status || fullUser.kyc_status === 'unverified')) {
       updateData.kyc_status = 'verified';
     }
     await sr.entities.User.update(user.id, updateData);

@@ -23,7 +23,7 @@ export default function DocupassResultScreen({
     if (outcome !== 'review') return;
     setPolling(true);
     let attempts = 0;
-    const maxAttempts = 6;
+    const maxAttempts = 12; // 12 x 5s = 60s — webhook can take 30-60s to fire
     const timer = setInterval(async () => {
       attempts++;
       if (onRefresh) await onRefresh();
