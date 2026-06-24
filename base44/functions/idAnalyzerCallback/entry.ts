@@ -6,12 +6,13 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * Atomic flow on every docupass_conclusive event:
  *   1. Validate HMAC signature (or query-string secret fallback)
  *   2. Filter events — only process docupass_conclusive
- *   3. Extract ALL ID fields (52+) + face + authentication + AML
+ *   3. Extract ALL ID fields (52+) with confidence scores + face + auth + AML
  *   4. Upsert KycDocuments + hydrate User with full extracted identity
  *   5. Auto-set kyc_status, verification_complete, wallet tier on accept
  *   6. Push docs to SasaPay KYC (on accept, if wallet onboarded)
  *   7. SMS notification to rider
- *   8. AuditLog entries
+ *   8. Fetch + store PDF audit report from IDAnalyzer
+ *   9. AuditLog entries
  */
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -95,8 +96,7 @@ Deno.serve(async (req) => {
     console.warn('[idAnalyzerCallback] Idempotency check failed:', e.message);
   }
 
-  // --- 3. Extract ALL data fields ---
-  // DocuPass v2 callback wraps data in "data", Core API uses "result"
+  // --- 3. Extract ALL data fields with confidence ---
   const data = payload.data || payload.result || {};
   const outputImage = payload.outputImage || payload.output_image || {};
   const faceData = payload.face || data.face || {};
@@ -107,27 +107,45 @@ Deno.serve(async (req) => {
   const backUrl = outputImage.back || outputImage.backUrl || '';
   const faceUrl = outputImage.face || outputImage.faceUrl || '';
 
-  // Extract all standard ID fields
-  const fullName = extractValue(data.fullName);
-  const firstName = extractValue(data.firstName);
-  const lastName = extractValue(data.lastName);
-  const middleName = extractValue(data.middleName);
-  const dob = extractValue(data.dob);
-  const age = extractValue(data.age);
-  const sex = extractValue(data.sex);
-  const documentNumber = extractValue(data.documentNumber);
-  const internalId = extractValue(data.internalId);
-  const expiry = extractValue(data.expiry);
-  const issued = extractValue(data.issued);
-  const address1 = extractValue(data.address1);
-  const address2 = extractValue(data.address2);
-  const postcode = extractValue(data.postcode);
-  const country = extractValue(data.country);
-  const nationality = extractValue(data.nationality);
-  const documentType = extractValue(data.documentType) || extractValue(data.type);
-  const issuingAuthority = extractValue(data.issuingAuthority);
-  const placeOfBirth = extractValue(data.placeOfBirth);
-  const mrz = extractValue(data.mrz);
+  // Extract ALL standard ID fields with confidence scores
+  const fieldDefs = [
+    // Identity
+    'fullName', 'firstName', 'lastName', 'middleName',
+    'dob', 'age', 'dayOfBirth', 'monthOfBirth', 'yearOfBirth',
+    'sex', 'placeOfBirth', 'personalNumber',
+    // Document
+    'documentNumber', 'internalId', 'documentType', 'documentName', 'documentSide',
+    'issuingAuthority', 'issued', 'daysFromIssue', 'expiry',
+    'mrz',
+    // Address / Location
+    'address1', 'address2', 'postcode',
+    'district', 'division', 'location', 'subLocation',
+    // Nationality & Country
+    'country', 'issuedCountryIso2', 'issuedCountryIso3',
+    'nationality', 'nationalityIso2', 'nationalityIso3',
+    'optionalData1', 'optionalData2',
+  ];
+
+  const fields = {};
+  const values = {};
+  for (const key of fieldDefs) {
+    const extracted = extractField(data[key]);
+    if (extracted) {
+      fields[key] = extracted;
+      if (extracted.value != null) values[key] = extracted.value;
+    }
+  }
+
+  // Also capture any extra fields in the payload we didn't explicitly list
+  const extraFields = {};
+  for (const key of Object.keys(data)) {
+    if (!fieldDefs.includes(key) && key !== 'face' && key !== 'authentication' && key !== 'aml') {
+      const extracted = extractField(data[key]);
+      if (extracted && extracted.value != null) {
+        extraFields[key] = extracted;
+      }
+    }
+  }
 
   // Face verification data
   let faceConfidence = null;
@@ -152,22 +170,20 @@ Deno.serve(async (req) => {
   }
 
   // OCR match rate
-  const matchRate = extractValue(data.matchRate) || payload.matchRate || payload.matchrate || null;
+  const matchRateField = extractField(data.matchRate) || extractField(data.matchrate);
+  const matchRate = matchRateField?.value || payload.matchRate || payload.matchrate || null;
 
   // AML matches
   const amlMatches = payload.aml || data.aml || [];
 
-  // Build comprehensive extracted data JSON
+  // Build comprehensive extracted data JSON with confidence scores
   const extractedData = {
-    fullName, firstName, lastName, middleName,
-    dob, age, sex,
-    documentNumber, internalId, documentType, issuingAuthority,
-    expiry, issued,
-    address1, address2, postcode, country, nationality, placeOfBirth,
+    fields,
+    extraFields,
+    values,
     face: { confidence: faceConfidence, isIdentical: faceIsIdentical },
     authentication: { score: authScore },
     matchRate,
-    mrz,
     aml: amlMatches,
     warnings: warnings.map(w => ({
       code: w.code || w.name,
@@ -219,6 +235,7 @@ Deno.serve(async (req) => {
     const userUpdate = {
       docupass_decision: decision,
       id_extracted_data: JSON.stringify(extractedData),
+      docupass_report_fetched: false,
     };
 
     // Store key fields individually for querying/display
@@ -226,12 +243,12 @@ Deno.serve(async (req) => {
     if (faceIsIdentical != null) userUpdate.id_face_identical = faceIsIdentical;
     if (authScore != null) userUpdate.id_authentication_score = authScore;
     if (matchRate != null) userUpdate.id_match_rate = matchRate;
-    if (sex) userUpdate.id_sex = sex;
-    if (address1) userUpdate.id_address = [address1, address2, postcode].filter(Boolean).join(', ');
-    if (country) userUpdate.id_country = country;
-    if (nationality) userUpdate.id_nationality = nationality;
-    if (expiry) userUpdate.id_expiry_date = normalizeDate(expiry);
-    if (issued) userUpdate.id_issued_date = normalizeDate(issued);
+    if (values.sex) userUpdate.id_sex = values.sex;
+    if (values.address1) userUpdate.id_address = [values.address1, values.address2, values.postcode].filter(Boolean).join(', ');
+    if (values.country) userUpdate.id_country = values.country;
+    if (values.nationality) userUpdate.id_nationality = values.nationality;
+    if (values.expiry) userUpdate.id_expiry_date = normalizeDate(values.expiry);
+    if (values.issued) userUpdate.id_issued_date = normalizeDate(values.issued);
 
     // Auto-set verification status based on decision
     if (decision === 'accept') {
@@ -242,10 +259,10 @@ Deno.serve(async (req) => {
       userUpdate.wallet_tier = 2;
       userUpdate.kyc_just_approved = true;
 
-      if (fullName) userUpdate.id_extracted_name = fullName;
-      if (dob) userUpdate.id_extracted_dob = normalizeDate(dob);
-      if (documentNumber && !user?.national_id) userUpdate.national_id = documentNumber;
-      if (dob) userUpdate.date_of_birth = normalizeDate(dob);
+      if (values.fullName) userUpdate.id_extracted_name = values.fullName;
+      if (values.dob) userUpdate.id_extracted_dob = normalizeDate(values.dob);
+      if (values.documentNumber && !user?.national_id) userUpdate.national_id = values.documentNumber;
+      if (values.dob) userUpdate.date_of_birth = normalizeDate(values.dob);
 
       // Upgrade wallet to Tier 2
       try {
@@ -288,7 +305,7 @@ Deno.serve(async (req) => {
     console.warn('[idAnalyzerCallback] AuditLog failed:', e.message);
   }
 
-  // --- Return 200 immediately; SasaPay + SMS are fire-and-forget ---
+  // --- Return 200 immediately; SasaPay + SMS + PDF are fire-and-forget ---
   const responsePayload = Response.json({ success: true, status: docStatus, decision });
 
   const tasks = [];
@@ -296,6 +313,7 @@ Deno.serve(async (req) => {
     tasks.push(pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }));
   }
   tasks.push(sendKycSms(base44, userId, decision));
+  tasks.push(fetchDocupassReport(base44, userId, transactionId));
   Promise.allSettled(tasks).catch(() => {});
 
   return responsePayload;
@@ -305,21 +323,33 @@ Deno.serve(async (req) => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function extractValue(field) {
+/**
+ * Extract a field value and its confidence score from IDAnalyzer payload.
+ * Fields can be: string, number, array of {value, confidence}, or {value, confidence}.
+ */
+function extractField(field) {
   if (field == null) return null;
-  if (Array.isArray(field)) return field[0]?.value || field[0] || null;
-  if (typeof field === 'string') return field;
-  if (typeof field === 'number') return field;
-  return field.value || null;
+  if (typeof field === 'string') return { value: field, confidence: null };
+  if (typeof field === 'number') return { value: field, confidence: null };
+  if (typeof field === 'boolean') return { value: field, confidence: null };
+  if (Array.isArray(field)) {
+    if (field.length === 0) return null;
+    const first = field[0];
+    if (typeof first === 'object') {
+      return { value: first.value ?? first, confidence: first.confidence ?? null };
+    }
+    return { value: first, confidence: null };
+  }
+  if (typeof field === 'object') {
+    return { value: field.value ?? null, confidence: field.confidence ?? null };
+  }
+  return null;
 }
 
 function normalizeDate(dateStr) {
   if (!dateStr) return null;
-  // IDAnalyzer returns dates in various formats: YYYY/MM/DD, YYYY-MM-DD, DD/MM/YYYY
   const cleaned = String(dateStr).replace(/\//g, '-');
-  // Try YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) return cleaned.substring(0, 10);
-  // Try DD-MM-YYYY → YYYY-MM-DD
   const parts = cleaned.split('-');
   if (parts.length === 3 && parts[2].length === 4) {
     return `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -350,6 +380,101 @@ async function constantTimeEqual(a, b) {
   let diff = 0;
   for (let i = 0; i < aArr.length; i++) diff |= aArr[i] ^ bArr[i];
   return diff === 0;
+}
+
+// ---------------------------------------------------------------------------
+// PDF Audit Report fetch (fire-and-forget)
+// ---------------------------------------------------------------------------
+
+async function fetchDocupassReport(base44, userId, transactionId) {
+  const apiKey = Deno.env.get('IDANALYZER_API_KEY');
+  if (!apiKey) {
+    console.warn('[idAnalyzerCallback] IDANALYZER_API_KEY not set, skipping PDF fetch');
+    return;
+  }
+
+  try {
+    // Step 1: Get the transaction record to find the audit report file name
+    const txResponse = await fetch(`https://api2.idanalyzer.com/transaction/${transactionId}`, {
+      method: 'GET',
+      headers: { 'X-API-KEY': apiKey },
+    });
+
+    if (!txResponse.ok) {
+      throw new Error(`Transaction API returned HTTP ${txResponse.status}`);
+    }
+
+    const txData = await txResponse.json();
+
+    // Find the audit report file name in the transaction data
+    // IDAnalyzer stores output files in the transaction record
+    let reportFileName = null;
+    if (txData.data) {
+      // Look for audit report file in various possible locations
+      reportFileName = txData.data.auditReport || txData.data.audit_report ||
+        txData.data.fileName || txData.data.file_name || null;
+      // Some transactions store files in an array
+      if (!reportFileName && Array.isArray(txData.data.files)) {
+        const auditFile = txData.data.files.find(f =>
+          f.fileName?.includes('audit') || f.fileName?.includes('report') || f.fileName?.endsWith('.pdf')
+        );
+        reportFileName = auditFile?.fileName || auditFile?.name || null;
+      }
+    }
+    if (!reportFileName && txData.fileName) reportFileName = txData.fileName;
+
+    if (!reportFileName) {
+      console.warn('[idAnalyzerCallback] No audit report file name found in transaction data');
+      await base44.asServiceRole.entities.User.update(userId, { docupass_report_fetched: true });
+      return;
+    }
+
+    // Step 2: Download the PDF from the file vault
+    const fileResponse = await fetch(`https://api2.idanalyzer.com/filevault/${reportFileName}`, {
+      method: 'GET',
+      headers: { 'X-API-KEY': apiKey },
+    });
+
+    if (!fileResponse.ok) {
+      throw new Error(`File vault API returned HTTP ${fileResponse.status}`);
+    }
+
+    const pdfBlob = await fileResponse.blob();
+    const pdfFile = new File([pdfBlob], `docupass_report_${transactionId}.pdf`, {
+      type: 'application/pdf',
+    });
+
+    // Step 3: Upload to BodaSure file storage
+    const uploadResult = await base44.asServiceRole.integrations.Core.UploadFile({ file: pdfFile });
+
+    // Step 4: Store the URL on the User entity
+    await base44.asServiceRole.entities.User.update(userId, {
+      docupass_report_url: uploadResult.file_url,
+      docupass_report_fetched: true,
+    });
+
+    await base44.asServiceRole.entities.AuditLog.create({
+      user_id: userId,
+      action: 'idanalyzer_audit_report_stored',
+      entity_type: 'User',
+      entity_id: userId,
+      description: `DocuPass audit report PDF stored. File: ${reportFileName}`,
+      new_values: { docupass_report_url: uploadResult.file_url },
+    });
+  } catch (error) {
+    console.error(`[idAnalyzerCallback] PDF audit report fetch failed: ${error.message}`);
+    try {
+      await base44.asServiceRole.entities.User.update(userId, { docupass_report_fetched: true });
+    } catch {}
+    try {
+      await base44.asServiceRole.entities.AuditLog.create({
+        user_id: userId,
+        action: 'idanalyzer_audit_report_failed',
+        entity_type: 'User',
+        description: `Failed to fetch/store DocuPass audit report: ${error.message}`,
+      });
+    } catch {}
+  }
 }
 
 // ---------------------------------------------------------------------------

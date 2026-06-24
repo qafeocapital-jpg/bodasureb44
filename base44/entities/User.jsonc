@@ -251,6 +251,13 @@
     },
     "id_face_confidence": {
       "type": "number"
+    },
+    "docupass_report_url": {
+      "type": "string"
+    },
+    "docupass_report_fetched": {
+      "type": "boolean",
+      "default": false
     }
   }
 }

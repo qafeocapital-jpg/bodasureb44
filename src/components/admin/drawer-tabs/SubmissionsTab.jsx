@@ -5,6 +5,8 @@ import { Loader2, ImageIcon, ShieldCheck, AlertTriangle, Car, ChevronDown, Chevr
 import SignalBadge from '@/components/admin/flags/SignalBadge';
 import ConfidenceBar from '@/components/admin/flags/ConfidenceBar';
 import ImageLightbox from '@/components/admin/flags/ImageLightbox';
+import ExtractedDataGrid from '@/components/admin/flags/ExtractedDataGrid';
+import PdfReportCard from '@/components/admin/flags/PdfReportCard';
 
 const DOC_TYPE_LABELS = {
   id_front: 'ID (Front)',
@@ -181,25 +183,8 @@ export default function SubmissionsTab({ user }) {
               })}
             </div>
 
-            {/* Extracted Identity Data */}
-            <div className="space-y-2 pt-2 border-t border-border">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                <FileText className="w-3 h-3" /> Extracted Identity Data
-              </p>
-              <DataRow icon={User} label="Full Name" value={user?.id_extracted_name || extractedData?.fullName} mono />
-              <DataRow icon={Calendar} label="Date of Birth" value={user?.id_extracted_dob || extractedData?.dob} />
-              <DataRow icon={User} label="Gender" value={user?.id_sex || extractedData?.sex} />
-              <DataRow icon={Calendar} label="Age" value={extractedData?.age} />
-              <DataRow icon={FileText} label="National ID" value={user?.national_id || extractedData?.documentNumber} mono />
-              <DataRow icon={FileText} label="Document Type" value={extractedData?.documentType} />
-              <DataRow icon={Calendar} label="ID Issue Date" value={user?.id_issued_date} />
-              <DataRow icon={Calendar} label="ID Expiry Date" value={user?.id_expiry_date} />
-              <DataRow icon={MapPin} label="Address" value={user?.id_address || [extractedData?.address1, extractedData?.address2, extractedData?.postcode].filter(Boolean).join(', ')} />
-              <DataRow icon={Globe} label="Country" value={user?.id_country || extractedData?.country} />
-              <DataRow icon={Globe} label="Nationality" value={user?.id_nationality || extractedData?.nationality} />
-              <DataRow icon={FileText} label="Issuing Authority" value={extractedData?.issuingAuthority} />
-              <DataRow icon={FileText} label="Internal ID" value={extractedData?.internalId} mono />
-            </div>
+            {/* Comprehensive Extracted Data with Confidence Badges */}
+            <ExtractedDataGrid extractedData={extractedData} />
 
             {/* Biometric Verification */}
             <div className="space-y-2 pt-2 border-t border-border">
