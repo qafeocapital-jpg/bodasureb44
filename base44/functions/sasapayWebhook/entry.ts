@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * SasaPay C2B Webhook Handler.
+ * SasaPay C2B Webhook Handler with HMAC-SHA512 Signature Verification.
  *
  * Handles two types of callbacks from SasaPay:
  * 1. C2B Payment Result Callback — posted to the CallBackURL provided in
@@ -10,7 +10,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * 2. Status Query Callback — posted in response to a status query. Contains
  *    CheckoutId, Paid, PaidAmount, ResultCode, etc.
  *
- * URL: https://your-app.base44.app/functions/invoke/sasapayWebhook?secret=XXX
+ * Signature Verification: X-SasaPay-Signature header contains HMAC-SHA512 of:
+ * {TransactionCode}-{MerchantCode}-{AccountNumber}-{PaymentReference}-{Amount}
+ * Secret key: SASAPAY_CLIENT_ID (per SasaPay docs)
+ *
+ * URL: https://your-app.base44.app/functions/sasapayWebhook
  */
 Deno.serve(async (req) => {
   try {
@@ -35,19 +39,62 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Enforce mandatory webhook secret (C3 fix: constant-time comparison)
-    const webhookSecret = Deno.env.get('SASAPAY_WEBHOOK_SECRET');
-    if (!webhookSecret) {
-      return Response.json({ error: 'Webhook secret not configured' }, { status: 500 });
+    // HMAC-SHA512 Signature Verification
+    const signature = req.headers.get('x-sasapay-signature') || '';
+    const clientId = Deno.env.get('SASAPAY_CLIENT_ID');
+    const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
+    const environment = Deno.env.get('SASAPAY_ENVIRONMENT');
+
+    if (!clientId) {
+      return Response.json({ error: 'SASAPAY_CLIENT_ID not configured' }, { status: 500 });
     }
-    const providedSecret = new URL(req.url).searchParams.get('secret') || '';
-    
-    // Constant-time comparison to prevent timing attacks
-    const secretMatch = providedSecret.length === webhookSecret.length && 
-      providedSecret.split('').every((c, i) => c === webhookSecret[i]);
-    
-    if (!secretMatch) {
-      return Response.json({ error: 'Invalid webhook secret' }, { status: 401 });
+
+    if (!merchantCode) {
+      return Response.json({ error: 'SASAPAY_MERCHANT_CODE not configured' }, { status: 500 });
+    }
+
+    // If signature header is absent in sandbox, log warning but allow; if present, always verify
+    const isSandbox = environment === 'sandbox';
+    if (signature) {
+      // Construct message: {TransactionCode}-{MerchantCode}-{AccountNumber}-{PaymentReference}-{Amount}
+      const transactionCode = body.TransactionCode || '';
+      const accountNumber = body.AccountNumber || body.account_number || '';
+      const paymentReference = body.PaymentReference || body.MerchantReference || '';
+      const amount = body.TransAmount || body.Amount;
+
+      if (!transactionCode || !accountNumber || !paymentReference || amount === undefined) {
+        console.warn('[sasapayWebhook] Missing required fields for signature verification', {
+          transactionCode: !!transactionCode,
+          accountNumber: !!accountNumber,
+          paymentReference: !!paymentReference,
+          amount: amount !== undefined,
+        });
+        return Response.json({ error: 'Missing required fields for verification' }, { status: 400 });
+      }
+
+      // Format amount to 2 decimal places
+      const formattedAmount = (parseFloat(amount) || 0).toFixed(2);
+      const message = `${transactionCode}-${merchantCode}-${accountNumber}-${paymentReference}-${formattedAmount}`;
+
+      // Compute HMAC-SHA512
+      const encoder = new TextEncoder();
+      const msgBytes = encoder.encode(message);
+      const keyBytes = encoder.encode(clientId);
+      const hmacKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']);
+      const signatureBytes = await crypto.subtle.sign('HMAC', hmacKey, msgBytes);
+      const computedSignature = Array.from(new Uint8Array(signatureBytes)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      // Constant-time comparison
+      if (!constantTimeCompare(signature, computedSignature)) {
+        console.error('[sasapayWebhook] Signature verification failed', { signature, computedSignature: computedSignature.substring(0, 16) + '...' });
+        return Response.json({ error: 'Invalid signature' }, { status: 401 });
+      }
+    } else if (!isSandbox) {
+      // Production requires signature header
+      return Response.json({ error: 'Missing X-SasaPay-Signature header' }, { status: 401 });
+    } else {
+      // Sandbox without signature — log warning but allow
+      console.warn('[sasapayWebhook] Sandbox: X-SasaPay-Signature header absent, allowing through');
     }
 
     // Determine callback type: C2B result or status query
@@ -179,3 +226,14 @@ Deno.serve(async (req) => {
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
+
+// Constant-time string comparison to prevent timing attacks
+function constantTimeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
