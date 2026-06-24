@@ -1,85 +1,164 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { CreditCard, ChevronLeft, Check, AlertTriangle, Loader2, ShieldCheck } from 'lucide-react';
-import CameraCapture from '@/components/rider/onboarding/CameraCapture';
+import { CreditCard, FileText, User, ChevronLeft, Check, AlertTriangle, Loader2, ShieldCheck, Clock } from 'lucide-react';
+import DocupassOverlay from './DocupassOverlay';
 
-const CAPTURES = [
-  { type: 'id_front', label: 'ID Front', sublabel: 'Front of your National ID', overlayType: 'rect' },
-  { type: 'id_back', label: 'ID Back', sublabel: 'Back of your National ID', overlayType: 'rect' },
-  { type: 'selfie', label: 'Selfie', sublabel: 'Your face — no helmet or sunglasses', overlayType: 'circle' },
+const STEPS = [
+  { icon: CreditCard, title: 'ID Front', desc: 'Photograph the front of your National ID' },
+  { icon: FileText, title: 'ID Back', desc: 'Photograph the back of your National ID' },
+  { icon: User, title: 'Face Liveness', desc: 'Complete a quick face movement check' },
 ];
 
 export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack }) {
-  const [nationalId, setNationalId] = useState(user?.national_id || '');
-  const [savingId, setSavingId] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [docupassUrl, setDocupassUrl] = useState(null);
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [polling, setPolling] = useState(false);
   const [error, setError] = useState('');
-  const [submitResult, setSubmitResult] = useState(null);
+  const pollTimerRef = useRef(null);
 
   const idFrontDoc = kycDocs.find(d => d.document_type === 'id_front');
   const idBackDoc = kycDocs.find(d => d.document_type === 'id_back');
   const selfieDoc = kycDocs.find(d => d.document_type === 'selfie');
 
-  const docs = { id_front: idFrontDoc, id_back: idBackDoc, selfie: selfieDoc };
-  const allThreeUploaded = idFrontDoc?.file_url && idBackDoc?.file_url && selfieDoc?.file_url;
   const allApproved = idFrontDoc?.status === 'approved' && idBackDoc?.status === 'approved' && selfieDoc?.status === 'approved';
-  const uploadedCount = CAPTURES.filter(c => docs[c.type]?.file_url).length;
+  const anyRejected = [idFrontDoc, idBackDoc, selfieDoc].some(d => d?.status === 'rejected');
 
-  async function handleUpload(docType, fileUrl) {
-    setError('');
-    setSubmitResult(null);
-    try {
-      const existing = kycDocs.find(d => d.document_type === docType);
-      const updateData = { file_url: fileUrl, status: 'pending', rejection_reason: null, provider_name: null, provider_reference: null };
-      if (existing) {
-        await base44.entities.KycDocument.update(existing.id, updateData);
-      } else {
-        await base44.entities.KycDocument.create({ user_id: user.id, document_type: docType, ...updateData });
+  // Detect return from DocuPass (mobile new tab)
+  useEffect(() => {
+    if (!sessionActive) return;
+
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') {
+        setSessionActive(false);
+        handleReturn();
       }
-      await onDataChange();
-    } catch (e) {
-      setError(e.message || 'Failed to save document');
     }
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pageshow', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pageshow', handleVisibility);
+    };
+  }, [sessionActive]);
+
+  // Polling effect
+  useEffect(() => {
+    if (!polling) return;
+
+    let attempts = 0;
+    const maxAttempts = 6; // 6 x 5s = 30s
+
+    const doPoll = async () => {
+      attempts++;
+      await onDataChange();
+      if (attempts >= maxAttempts) {
+        setPolling(false);
+      }
+    };
+
+    pollTimerRef.current = setInterval(doPoll, 5000);
+
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, [polling]);
+
+  // Stop polling when approved
+  useEffect(() => {
+    if (allApproved && polling) {
+      setPolling(false);
+    }
+  }, [allApproved, polling]);
+
+  async function handleReturn() {
+    await onDataChange();
+    setPolling(true);
   }
 
-  async function handleSaveNationalId() {
-    if (!nationalId.trim()) return;
-    setSavingId(true);
-    setError('');
-    try {
-      await base44.auth.updateMe({ national_id: nationalId.trim() });
-      await onDataChange();
-    } catch (e) {
-      setError(e.message);
-    }
-    setSavingId(false);
+  function handleCloseOverlay() {
+    setShowOverlay(false);
+    handleReturn();
   }
 
-  async function handleSubmitIdentity() {
-    if (!allThreeUploaded) return;
-    setSubmitting(true);
+  async function handleStart() {
+    setLoading(true);
     setError('');
-    setSubmitResult(null);
     try {
-      const res = await base44.functions.invoke('idAnalyzerSubmit', {
-        idFrontUrl: idFrontDoc.file_url,
-        idBackUrl: idBackDoc.file_url,
-        selfieUrl: selfieDoc.file_url,
+      const res = await base44.functions.invoke('createDocupassSession', {
+        redirectUrl: typeof window !== 'undefined' ? window.location.href : undefined,
       });
-      if (res.data?.success) {
-        setSubmitResult({ decision: res.data.decision, extractedData: res.data.extractedData });
-        await onDataChange();
+      if (res.data?.url) {
+        setDocupassUrl(res.data.url);
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+        if (isMobile) {
+          setSessionActive(true);
+          window.open(res.data.url, '_blank', 'noopener');
+        } else {
+          setShowOverlay(true);
+        }
       } else {
-        setError(res.data?.error || 'Verification failed. Try again.');
+        setError(res.data?.error || 'Failed to start verification. Try again.');
       }
     } catch (e) {
-      setError(e.response?.data?.error || e.message || 'Verification failed. Try again.');
+      setError(e.response?.data?.error || e.message || 'Failed to start verification. Try again.');
     }
-    setSubmitting(false);
+    setLoading(false);
   }
 
+  // === SUCCESS STATE ===
+  if (allApproved) {
+    return (
+      <div className="space-y-4">
+        <button onClick={onBack} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
+          <ChevronLeft className="w-4 h-4" /> Back to tasks
+        </button>
+
+        <div className="bg-success/5 border border-success/20 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
+              <Check className="w-5 h-5 text-success" />
+            </div>
+            <p className="text-sm font-bold text-success">Identity Verified</p>
+          </div>
+
+          {(user?.id_extracted_name || user?.id_extracted_dob || user?.national_id) && (
+            <div className="space-y-2 mt-3 pt-3 border-t border-success/10">
+              {user?.id_extracted_name && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Full Name</span>
+                  <span className="font-medium">{user.id_extracted_name}</span>
+                </div>
+              )}
+              {user?.id_extracted_dob && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Date of Birth</span>
+                  <span className="font-medium">{user.id_extracted_dob}</span>
+                </div>
+              )}
+              {user?.national_id && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">National ID</span>
+                  <span className="font-medium font-mono">{user.national_id}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // === MAIN STATE ===
   return (
     <div className="space-y-4">
+      {showOverlay && docupassUrl && (
+        <DocupassOverlay url={docupassUrl} onClose={handleCloseOverlay} />
+      )}
+
       <button onClick={onBack} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
         <ChevronLeft className="w-4 h-4" /> Back to tasks
       </button>
@@ -90,106 +169,72 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
         </div>
         <div>
           <h3 className="font-heading font-bold text-sm">Identity Verification</h3>
-          <p className="text-[10px] text-muted-foreground">Upload your ID and selfie — verified instantly ({uploadedCount}/3)</p>
+          <p className="text-[10px] text-muted-foreground">Secure KYC powered by IDAnalyzer</p>
         </div>
       </div>
 
-      {/* National ID number */}
-      <div>
-        <label className="text-xs font-medium text-muted-foreground">National ID Number</label>
-        <div className="flex gap-2 mt-1">
-          <input
-            value={nationalId}
-            onChange={e => setNationalId(e.target.value)}
-            placeholder="Enter your National ID"
-            className="flex-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <button
-            onClick={handleSaveNationalId}
-            disabled={!nationalId.trim() || savingId}
-            className="px-4 bg-primary text-primary-foreground rounded-xl text-sm font-semibold disabled:opacity-50"
-          >
-            {savingId ? '...' : 'Save'}
-          </button>
-        </div>
-      </div>
-
-      {/* Mini progress bar */}
-      <div className="flex gap-1.5">
-        {CAPTURES.map(c => (
-          <div key={c.type} className={`flex-1 h-1.5 rounded-full transition-colors ${docs[c.type]?.file_url ? 'bg-success' : 'bg-muted'}`} />
+      {/* 3-step explainer */}
+      <div className="space-y-2">
+        {STEPS.map((step, i) => (
+          <div key={i} className="flex items-center gap-3 bg-card border border-border rounded-xl p-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <step.icon className="w-4 h-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold">{i + 1}. {step.title}</p>
+              <p className="text-[10px] text-muted-foreground">{step.desc}</p>
+            </div>
+          </div>
         ))}
       </div>
 
-      {/* 3 captures */}
-      {CAPTURES.map(c => {
-        const doc = docs[c.type];
-        return (
-          <div key={c.type} className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold">{c.label}</p>
-              {doc?.file_url && (
-                <span className="flex items-center gap-1 text-[10px] font-medium" style={{ color: doc.status === 'approved' ? 'hsl(var(--success))' : doc.status === 'rejected' ? 'hsl(var(--destructive))' : 'hsl(var(--warning))' }}>
-                  <Check className="w-3 h-3" />
-                  {doc.status === 'approved' ? 'Verified' : doc.status === 'rejected' ? 'Rejected' : 'Uploaded'}
-                </span>
-              )}
-            </div>
-            <CameraCapture
-              overlayType={c.overlayType}
-              label={`Position: ${c.label}`}
-              sublabel={c.sublabel}
-              existingUrl={doc?.file_url}
-              onUploaded={url => handleUpload(c.type, url)}
-            />
-          </div>
-        );
-      })}
-
-      {/* Submit for verification */}
-      {allThreeUploaded && !allApproved && (
-        <button
-          onClick={handleSubmitIdentity}
-          disabled={submitting}
-          className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
-        >
-          {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying with BodaSure AI...</> : <><ShieldCheck className="w-4 h-4" /> Submit for Verification</>}
-        </button>
-      )}
-
-      {/* Results */}
-      {submitResult?.decision === 'accept' && (
-        <div className="bg-success/5 border border-success/20 rounded-xl p-3 flex items-center gap-2">
-          <Check className="w-4 h-4 text-success" />
-          <p className="text-xs text-success font-medium">Identity verified! Your KYC is being processed.</p>
+      {/* Polling state */}
+      {polling && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-blue-600 animate-pulse flex-shrink-0" />
+          <p className="text-xs text-blue-700 font-medium">Processing your verification…</p>
         </div>
       )}
-      {submitResult?.decision === 'review' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-          <p className="text-xs text-amber-700 font-medium">Documents submitted for review. Our team will verify shortly.</p>
-        </div>
-      )}
-      {submitResult?.decision === 'reject' && (
+
+      {/* Rejected state */}
+      {anyRejected && !polling && (
         <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-destructive">Verification failed. Please retake your photos with better lighting and clarity.</p>
+          <div>
+            <p className="text-xs text-destructive font-medium">Verification failed. Please try again.</p>
+            {idFrontDoc?.rejection_reason && (
+              <p className="text-[10px] text-destructive/70 mt-0.5">{idFrontDoc.rejection_reason}</p>
+            )}
+          </div>
         </div>
       )}
 
-      {allApproved && (
-        <div className="bg-success/5 border border-success/20 rounded-xl p-3 flex items-center gap-2">
-          <Check className="w-4 h-4 text-success" />
-          <p className="text-xs text-success font-medium">Identity verified and approved!</p>
-        </div>
-      )}
-
+      {/* Error */}
       {error && (
         <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
           <p className="text-xs text-destructive">{error}</p>
         </div>
       )}
+
+      {/* CTA */}
+      {!polling && (
+        <button
+          onClick={handleStart}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold text-sm disabled:opacity-50 animate-pulse-glow"
+        >
+          {loading
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Connecting to secure verification…</>
+            : anyRejected
+              ? <><ShieldCheck className="w-4 h-4" /> Try Again</>
+              : <><ShieldCheck className="w-4 h-4" /> Start Secure Verification</>}
+        </button>
+      )}
+
+      <p className="text-center text-[10px] text-muted-foreground">
+        Powered by IDAnalyzer · Bank-grade security
+      </p>
     </div>
   );
 }

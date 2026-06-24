@@ -2,7 +2,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
  * Webhook callback handler for ID Analyzer v2 results.
- * Called by ID Analyzer after async document processing completes.
+ * Handles BOTH:
+ *  - Legacy async scan results (idAnalyzerSubmit) — KycDocuments exist with provider_reference = id
+ *  - DocuPass hosted flow results — KycDocuments may not exist yet; creates them using reference (user_id)
+ *
  * Validates a shared-secret query parameter.
  */
 Deno.serve(async (req) => {
@@ -19,37 +22,67 @@ Deno.serve(async (req) => {
     }
 
     const payload = await req.json();
-    // v2 uses 'result' (singular); v1 used 'results' (plural)
-    const { id, status, result, results, user_reference } = payload;
+    const { id, status, result, results, user_reference, reference, customData } = payload;
     const data = result || results;
+    const userRef = customData || reference || user_reference;
 
-    if (!id || !status || !user_reference) {
-      return Response.json({ error: 'Missing required fields: id, status, user_reference' }, { status: 400 });
+    if (!id || !status) {
+      return Response.json({ error: 'Missing required fields: id, status' }, { status: 400 });
     }
 
-    const kycDocuments = await base44.asServiceRole.entities.KycDocument.filter({
+    // Try to find existing KycDocuments by provider_reference (legacy scan flow)
+    let kycDocuments = await base44.asServiceRole.entities.KycDocument.filter({
       provider_reference: id,
     });
 
-    if (kycDocuments.length === 0) {
-      console.warn(`No KycDocument found for provider_reference: ${id}`);
-      return Response.json({ success: true, message: 'Document not found, silently accepted' });
+    let userId;
+    if (kycDocuments.length > 0) {
+      // Legacy flow: documents already exist
+      userId = kycDocuments[0].user_id;
+    } else if (userRef) {
+      // DocuPass flow: use reference (user_id) to identify the user
+      userId = userRef;
+    }
+
+    if (!userId) {
+      console.warn(`No user found for id: ${id}, reference: ${userRef}`);
+      return Response.json({ success: true, message: 'No user reference found, silently accepted' });
     }
 
     const docStatus = status === 'success' ? 'approved' : status === 'failure' ? 'rejected' : 'pending';
-    const updateData = { status: docStatus };
-    if (status === 'failure' && payload.error) {
-      updateData.rejection_reason = payload.error;
+    const updateData = {
+      status: docStatus,
+      provider_name: 'idanalyzer_docupass',
+      provider_reference: id,
+    };
+    if (status === 'success') {
+      updateData.reviewed_at = new Date().toISOString();
+    }
+    if (status === 'failure' && (payload.error || data?.error)) {
+      updateData.rejection_reason = payload.error?.message || payload.error || data?.error?.message || 'Verification failed';
     }
 
-    // Update all matching documents
-    await Promise.all(kycDocuments.map(doc =>
-      base44.asServiceRole.entities.KycDocument.update(doc.id, updateData)
-    ));
+    // Fetch existing docs for this user (to upsert)
+    const existingDocs = await base44.asServiceRole.entities.KycDocument.filter({ user_id: userId });
+    const docTypes = ['id_front', 'id_back', 'selfie'];
+
+    // Upsert all 3 document types
+    await Promise.all(docTypes.map(async (docType) => {
+      const existing = existingDocs.find(d => d.document_type === docType);
+      if (existing) {
+        await base44.asServiceRole.entities.KycDocument.update(existing.id, updateData);
+      } else {
+        await base44.asServiceRole.entities.KycDocument.create({
+          user_id: userId,
+          document_type: docType,
+          file_url: '',
+          ...updateData,
+        });
+      }
+    }));
 
     // Hydrate user data if approved
     if (status === 'success' && data) {
-      const userId = kycDocuments[0].user_id;
       const user = await base44.asServiceRole.entities.User.get(userId);
       if (user) {
         const extractedData = extractDataFromV2(data);
@@ -75,20 +108,20 @@ Deno.serve(async (req) => {
 function extractDataFromV2(data) {
   const extracted = {};
   const doc = data?.document || {};
-  const name = data?.name || {};
+  const name = data?.name || doc?.name || {};
 
-  const firstName = name.first_name || doc.first_name || '';
-  const lastName = name.last_name || doc.last_name || '';
+  const firstName = name.first_name || doc.first_name || data?.first_name || '';
+  const lastName = name.last_name || doc.last_name || data?.last_name || '';
   if (firstName || lastName) {
     extracted.fullName = `${firstName} ${lastName}`.trim();
   }
 
-  if (doc.number || data?.document_number) {
-    extracted.documentNumber = doc.number || data.document_number;
+  if (doc.number || data?.document_number || data?.id_number) {
+    extracted.documentNumber = doc.number || data.document_number || data.id_number;
   }
 
-  if (data?.date_of_birth?.raw || doc.date_of_birth) {
-    extracted.dob = data?.date_of_birth?.raw || doc.date_of_birth;
+  if (data?.date_of_birth?.raw || doc.date_of_birth || data?.dob) {
+    extracted.dob = data?.date_of_birth?.raw || doc.date_of_birth || data?.dob;
   }
 
   return extracted;

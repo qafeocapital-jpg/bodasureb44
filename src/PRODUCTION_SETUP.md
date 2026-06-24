@@ -138,6 +138,51 @@ Africa's Talking sends delivery confirmations to:
 
 ---
 
+## IDAnalyzer DocuPass KYC Configuration
+
+The identity verification flow uses IDAnalyzer's **DocuPass** hosted verification — a guided flow that handles ID capture (front + back) and active liveness face check entirely within IDAnalyzer's UI.
+
+### Prerequisites
+
+The following secrets must be set (already configured ✅):
+- `IDANALYZER_API_KEY` — IDAnalyzer v2 API key
+- `IDANALYZER_PROFILE_ID` — KYC Profile ID from the IDAnalyzer portal (**must be a valid 32-char profile ID**)
+- `IDANALYZER_WEBHOOK_SECRET` — Shared secret for webhook validation
+- `BASE44_APP_URL` — App URL for constructing webhook callback URLs
+
+### KYC Profile Setup (IDAnalyzer Portal)
+
+In the [IDAnalyzer Portal](https://portal2.idanalyzer.com/), create or edit a KYC Profile with these settings:
+
+**General Tab:**
+- Webhook URL: `{BASE44_APP_URL}/api/fn/idAnalyzerCallback?secret={IDANALYZER_WEBHOOK_SECRET}`
+
+**DocuPass Tab:**
+- Mode: ID verification + Face verification (mode 0)
+- Enable DocuPass audit report (optional)
+- Redirect URLs: `{BASE44_APP_URL}/app/account` (users return here after completing verification)
+- Company Name: BodaSure (shown in footer)
+
+**Verification Settings:**
+- Document Type: National ID
+- Country: Kenya (KE)
+- Face Match: Enabled
+- Liveness: Active (head movement challenge)
+
+After saving, copy the **Profile ID** (32-character hex string) and set it as the `IDANALYZER_PROFILE_ID` secret in the Base44 dashboard.
+
+### How It Works
+
+1. Rider clicks "Start Secure Verification" in the identity sub-task
+2. `createDocupassSession` backend function creates a DocuPass session with `customData = user.id`
+3. DocuPass URL opens in a new tab (mobile) or iframe overlay (desktop)
+4. IDAnalyzer guides the user through ID capture + active liveness check
+5. On completion, IDAnalyzer sends a webhook to `idAnalyzerCallback`
+6. The callback upserts KycDocument records (id_front, id_back, selfie) and auto-fills the user's profile (name, DOB, national ID)
+7. The frontend polls for status updates and shows success/rejection
+
+---
+
 ## Testing Checklist
 
 - [ ] Production AT credentials entered in Base44
