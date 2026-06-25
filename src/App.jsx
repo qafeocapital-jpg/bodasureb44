@@ -20,7 +20,6 @@ import Profile from './pages/rider/Profile';
 import WalletActivate from './pages/rider/WalletActivate';
 import BikeRegister from './pages/rider/BikeRegister';
 import SaccoRegister from './pages/rider/SaccoRegister';
-import StageApply from './pages/rider/StageApply';
 import MyFleet from './pages/rider/MyFleet';
 
 import Lipisha from './pages/rider/Lipisha';
@@ -129,7 +128,6 @@ const AuthenticatedApp = () => {
         <Route path="/app/bikes/register" element={<BikeRegister />} />
         <Route path="/app/fleet" element={<MyFleet />} />
         <Route path="/app/groups/register-sacco" element={<SaccoRegister />} />
-        <Route path="/app/account/stage-apply" element={<StageApply />} />
         <Route path="/app/lipisha" element={<Lipisha />} />
         <Route path="/app/lipa-county" element={<LipaCounty />} />
         <Route path="/app/lipa-owner" element={<LipaOwner />} />

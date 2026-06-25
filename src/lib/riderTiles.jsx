@@ -1,6 +1,6 @@
 import {
   Wallet, Receipt, HandCoins, Send, FileText,
-  Bike, BadgeCheck, QrCode, UserCheck, MapPin, ShieldCheck,
+  Bike, BadgeCheck, QrCode, UserCheck, ShieldCheck,
   Landmark, History, AlertCircle, CalendarClock, Globe, Bell, Gavel,
   Users, UserPlus, PiggyBank,
   Phone, Wifi, Zap, Droplet, Tv, CreditCard, Gift, Coins,
@@ -66,7 +66,6 @@ export const riderTileSections = [
       { label: 'Join Group', icon: UserPlus, color: 'orange', path: '/app/groups', status: 'live' },
       { label: 'Contributions', icon: PiggyBank, color: 'violet', path: '/app/chama', status: 'live', requiresWallet: true, requiresTier2: true },
       { label: 'Register SACCO', icon: Landmark, color: 'blue', path: '/app/groups/register-sacco', status: 'live' },
-      { label: 'Stage Leader', icon: MapPin, color: 'green', path: '/app/account/stage-apply', status: 'live' },
     ]
   },
   {

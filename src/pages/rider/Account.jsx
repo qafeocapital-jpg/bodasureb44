@@ -99,7 +99,7 @@ export default function Account() {
       {/* Apply for roles */}
       <div className="mt-6">
         <h2 className="text-sm font-heading font-bold text-foreground mb-1">Opportunities</h2>
-        <p className="text-xs text-muted-foreground mb-3">Register your SACCO or apply for leadership</p>
+        <p className="text-xs text-muted-foreground mb-3">Register your SACCO or group for admin review</p>
         <div className="space-y-2">
           <Link to="/app/groups/register-sacco" className="w-full flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 hover:bg-blue-100/50 transition-colors">
             <Layers className="w-5 h-5 text-blue-600" />
