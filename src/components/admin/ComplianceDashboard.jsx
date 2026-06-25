@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
-import { formatDateTime } from '@/lib/format';
-import { Search, Filter, CheckCircle2, Clock, AlertCircle, ChevronRight, ShieldCheck, Fingerprint } from 'lucide-react';
+import { Search, CheckCircle2 } from 'lucide-react';
+import ComplianceStatusCards from '@/components/admin/compliance/ComplianceStatusCards';
+import ComplianceRiderCard from '@/components/admin/compliance/ComplianceRiderCard';
 
 export default function ComplianceDashboard({ onSelectRider }) {
   const { toast } = useToast();
@@ -16,63 +17,63 @@ export default function ComplianceDashboard({ onSelectRider }) {
     load();
   }, []);
 
+  // FIX: N+1 query — collect unique user_ids first, then fetch all rider data in parallel
   async function load() {
     setLoading(true);
     try {
-      // Fetch ALL KYC documents (not just pending) to show full compliance picture
       const docs = await base44.entities.KycDocument.filter({}, '-created_date', 200);
-      
-      // Group by user and get user/vehicle details
-      const riderMap = new Map();
+
+      // Group docs by user_id
+      const docsByUser = new Map();
       for (const doc of docs) {
-        if (!riderMap.has(doc.user_id)) {
+        if (!docsByUser.has(doc.user_id)) {
+          docsByUser.set(doc.user_id, []);
+        }
+        docsByUser.get(doc.user_id).push(doc);
+      }
+
+      // Fetch all rider data in parallel (was: sequential N+1 loop)
+      const userIds = [...docsByUser.keys()];
+      const riderEntries = await Promise.all(
+        userIds.map(async (userId) => {
           try {
             const [user, vehicles, wallet] = await Promise.all([
-              base44.entities.User.get(doc.user_id),
-              base44.entities.Vehicle.filter({ rider_id: doc.user_id }, '-created_date', 1),
-              base44.entities.Wallet.filter({ user_id: doc.user_id, entity_type: 'personal' }),
+              base44.entities.User.get(userId),
+              base44.entities.Vehicle.filter({ rider_id: userId }, '-created_date', 1),
+              base44.entities.Wallet.filter({ user_id: userId, entity_type: 'personal' }),
             ]);
-            
-            riderMap.set(doc.user_id, {
-              user_id: doc.user_id,
+
+            const userDocs = docsByUser.get(userId);
+            const docCount = userDocs.length;
+            const docTypes = [...new Set(userDocs.map(d => d.document_type))];
+            const idAnalyzerDocs = userDocs.filter(d => d.provider_name === 'idanalyzer_docupass').length;
+            const legacyDocs = docCount - idAnalyzerDocs;
+            const docDates = userDocs.map(d => new Date(d.created_date));
+            const oldestDocDate = docDates.length > 0 ? new Date(Math.min(...docDates)).toISOString() : null;
+            const newestDocDate = docDates.length > 0 ? new Date(Math.max(...docDates)).toISOString() : null;
+
+            return {
+              user_id: userId,
               user,
               vehicle: vehicles[0],
               wallet: wallet[0],
-              docCount: 0,
-              docTypes: [],
-              idAnalyzerDocs: 0,
-              legacyDocs: 0,
-              oldestDocDate: null,
-              newestDocDate: null,
+              docCount,
+              docTypes,
+              idAnalyzerDocs,
+              legacyDocs,
+              oldestDocDate,
+              newestDocDate,
               kycStatus: user?.kyc_status || 'unverified',
               docupassDecision: user?.docupass_decision || null,
-            });
+            };
           } catch (e) {
-            console.error('Failed to load rider data:', e);
+            console.error('Failed to load rider data for', userId, e);
+            return null;
           }
-        }
+        })
+      );
 
-        const rider = riderMap.get(doc.user_id);
-        if (rider) {
-          rider.docCount++;
-          if (!rider.docTypes.includes(doc.document_type)) {
-            rider.docTypes.push(doc.document_type);
-          }
-          if (doc.provider_name === 'idanalyzer_docupass') {
-            rider.idAnalyzerDocs++;
-          } else {
-            rider.legacyDocs++;
-          }
-          if (!rider.oldestDocDate || new Date(doc.created_date) < new Date(rider.oldestDocDate)) {
-            rider.oldestDocDate = doc.created_date;
-          }
-          if (!rider.newestDocDate || new Date(doc.created_date) > new Date(rider.newestDocDate)) {
-            rider.newestDocDate = doc.created_date;
-          }
-        }
-      }
-
-      setRiders(Array.from(riderMap.values()));
+      setRiders(riderEntries.filter(Boolean));
     } catch (e) {
       console.error('Load error:', e);
       toast({ title: 'Error', description: 'Failed to load applications', variant: 'destructive' });
@@ -80,7 +81,6 @@ export default function ComplianceDashboard({ onSelectRider }) {
     setLoading(false);
   }
 
-  // Filter and sort riders
   const filteredRiders = useMemo(() => {
     let filtered = riders;
 
@@ -119,29 +119,6 @@ export default function ComplianceDashboard({ onSelectRider }) {
     rejected: riders.filter(r => r.kycStatus === 'rejected').length,
   }), [riders]);
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'verified':
-        return <CheckCircle2 className="w-4 h-4 text-success" />;
-      case 'pending':
-        return <Clock className="w-4 h-4 text-warning" />;
-      case 'rejected':
-        return <AlertCircle className="w-4 h-4 text-destructive" />;
-      default:
-        return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
-    }
-  };
-
-  const getStatusLabel = (status) => {
-    const labels = {
-      unverified: 'Unverified',
-      pending: 'Pending Review',
-      verified: 'Verified',
-      rejected: 'Rejected',
-    };
-    return labels[status] || 'Unknown';
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -152,35 +129,11 @@ export default function ComplianceDashboard({ onSelectRider }) {
         </p>
       </div>
 
-      {/* Status Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {[
-          { key: 'all', label: 'All', icon: null },
-          { key: 'unverified', label: 'Unverified', icon: AlertCircle },
-          { key: 'pending', label: 'Under Review', icon: Clock },
-          { key: 'verified', label: 'Verified', icon: CheckCircle2 },
-          { key: 'rejected', label: 'Rejected', icon: AlertCircle },
-        ].map(s => {
-          const Icon = s.icon;
-          return (
-            <button
-              key={s.key}
-              onClick={() => setStatusFilter(s.key)}
-              className={`p-3 rounded-xl border transition-all ${
-                statusFilter === s.key
-                  ? 'bg-orange-600 text-white border-orange-600'
-                  : 'bg-card border-border hover:border-primary'
-              }`}
-            >
-              {Icon && <Icon className="w-4 h-4 mb-1" />}
-              <p className="text-xs font-semibold">{s.label}</p>
-              <p className={`text-lg font-bold ${statusFilter === s.key ? 'text-white' : 'text-foreground'}`}>
-                {statusCounts[s.key]}
-              </p>
-            </button>
-          );
-        })}
-      </div>
+      <ComplianceStatusCards
+        statusCounts={statusCounts}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
+      />
 
       {/* Search and Sort */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -223,107 +176,7 @@ export default function ComplianceDashboard({ onSelectRider }) {
       ) : (
         <div className="space-y-2">
           {filteredRiders.map(rider => (
-            <div
-              key={rider.user_id}
-              onClick={() => onSelectRider(rider.user_id)}
-              className="bg-card border border-border rounded-xl p-4 hover:border-primary hover:bg-accent/50 transition-all cursor-pointer"
-            >
-              <div className="flex items-start justify-between gap-4">
-                {/* Left: User Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-semibold text-sm truncate">
-                      {rider.user?.id_extracted_name || rider.user?.full_name || 'Unknown Rider'}
-                    </h3>
-                    <span className="flex items-center gap-1 px-2 py-0.5 bg-muted rounded-full text-xs font-semibold text-muted-foreground">
-                      {getStatusIcon(rider.kycStatus)}
-                      {getStatusLabel(rider.kycStatus)}
-                    </span>
-                    {rider.docupassDecision && (
-                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        rider.docupassDecision === 'accept' ? 'bg-success/10 text-success'
-                        : rider.docupassDecision === 'reject' ? 'bg-destructive/10 text-destructive'
-                        : 'bg-warning/10 text-warning'
-                      }`}>
-                        <ShieldCheck className="w-3 h-3" />
-                        IDAnalyzer: {rider.docupassDecision}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-muted-foreground mb-2">
-                    <span>{rider.user?.phone || rider.user?.email || '—'}</span>
-                    {rider.user?.national_id && (
-                      <>
-                        <span className="hidden sm:inline">•</span>
-                        <span className="font-mono font-semibold text-foreground">ID: {rider.user.national_id}</span>
-                      </>
-                    )}
-                    {rider.vehicle?.plate_number && (
-                      <>
-                        <span className="hidden sm:inline">•</span>
-                        <span className="font-mono font-semibold text-foreground">{rider.vehicle.plate_number}</span>
-                      </>
-                    )}
-                  </div>
-                  {/* Extracted data summary for verified users */}
-                  {rider.user?.id_extracted_name && (
-                    <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground mb-1">
-                      {rider.user?.id_sex && <span>Gender: {rider.user.id_sex}</span>}
-                      {rider.user?.id_extracted_dob && <span>DOB: {rider.user.id_extracted_dob}</span>}
-                      {rider.user?.id_address && <span className="truncate max-w-[200px]">Address: {rider.user.id_address}</span>}
-                    </div>
-                  )}
-                  {/* Face match indicator */}
-                  {rider.user?.id_face_confidence != null && (
-                    <div className="flex items-center gap-1 text-[10px]">
-                      <Fingerprint className="w-3 h-3" />
-                      <span className={rider.user.id_face_confidence >= 0.7 ? 'text-success font-medium' : 'text-warning font-medium'}>
-                        Face Match: {Math.round(rider.user.id_face_confidence * 100)}%
-                      </span>
-                      {rider.user?.id_face_identical != null && (
-                        <span className={rider.user.id_face_identical ? 'text-success' : 'text-destructive'}>
-                          ({rider.user.id_face_identical ? 'Identical' : 'Not Identical'})
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="text-[10px] text-muted-foreground">
-                    Submitted: {formatDateTime(rider.oldestDocDate)}
-                    {rider.idAnalyzerDocs > 0 && (
-                      <span className="ml-2 text-success">• {rider.idAnalyzerDocs} IDAnalyzer docs</span>
-                    )}
-                    {rider.legacyDocs > 0 && (
-                      <span className="ml-2 text-amber-600">• {rider.legacyDocs} legacy docs</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right: Docs and Action */}
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-orange-600">{rider.docCount}</p>
-                    <p className="text-xs text-muted-foreground">documents</p>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                </div>
-              </div>
-
-              {/* Document Types */}
-              {rider.docTypes.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {rider.docTypes.slice(0, 4).map(type => (
-                    <span key={type} className="text-[10px] px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                      {type.replace(/_/g, ' ')}
-                    </span>
-                  ))}
-                  {rider.docTypes.length > 4 && (
-                    <span className="text-[10px] px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                      +{rider.docTypes.length - 4}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+            <ComplianceRiderCard key={rider.user_id} rider={rider} onSelect={onSelectRider} />
           ))}
         </div>
       )}

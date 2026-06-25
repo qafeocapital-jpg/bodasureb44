@@ -6,6 +6,29 @@
 
 ---
 
+### [2026-06-25] Fix N+1 query in ComplianceDashboard
+**Context**: ComplianceDashboard had a known N+1 query performance issue — iterating over KYC docs and sequentially fetching User/Vehicle/Wallet per unique rider.
+**Decision**: Collect unique user_ids first, then fetch all rider data in parallel via `Promise.all(userIds.map(...))`. Each rider's 3 sub-fetches (User.get, Vehicle.filter, Wallet.filter) are already parallel within their group.
+**Rationale**: Reduces N sequential groups of 3 calls to 1 parallel batch of N×3 calls — massive improvement at scale (50 riders = 150 parallel calls instead of 50 sequential groups).
+**Impact**: `components/admin/ComplianceDashboard.jsx`
+**Status**: Active
+
+### [2026-06-25] Fix stale requestId on OTP resend
+**Context**: When a user tapped "Resend OTP" in PhasePersonalOtp, the backend generates a new requestId but the frontend didn't capture it — so the confirm step sent the old (invalid) requestId and failed.
+**Decision**: Added `onRequestIdUpdated` callback to PhasePersonalOtp that updates the requestId in the PhasePersonal orchestrator parent state.
+**Rationale**: The requestId must match the latest OTP sent by SasaPay. Without this fix, any resend attempt would silently fail.
+**Impact**: `components/rider/onboarding/PhasePersonalOtp.jsx`, `components/rider/onboarding/PhasePersonal.jsx`
+**Status**: Active
+
+### [2026-06-25] Refactor Compliance.jsx and ComplianceDashboard.jsx
+**Context**: Both files exceeded 300 lines and mixed data loading, business logic, and rendering.
+**Decision**: Split Compliance.jsx into ComplianceTabToggle, CompliancePenaltyList + shared lib/compliance.js. Split ComplianceDashboard.jsx into ComplianceStatusCards, ComplianceRiderCard + fixed N+1 query.
+**Rationale**: Each file under 150 lines; business logic in shared lib for reuse; rendering in focused components.
+**Impact**: `pages/rider/Compliance.jsx`, `components/admin/ComplianceDashboard.jsx`, new files listed above.
+**Status**: Active
+
+---
+
 ## How to Add a Decision
 
 ```markdown

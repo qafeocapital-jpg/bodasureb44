@@ -1,6 +1,5 @@
 // Home orchestrator: data loading + state management, delegates rendering to sub-components
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import PageSkeleton from '@/components/rider/PageSkeleton';
@@ -12,8 +11,7 @@ import HomeOwnerActions from '@/components/rider/home/HomeOwnerActions';
 import HomeNavGrid from '@/components/rider/home/HomeNavGrid';
 
 export default function Home() {
-  const { user, refreshUser } = useAuth();
-  const location = useLocation();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [balance, setBalance] = useState(0);
   const [walletActive, setWalletActive] = useState(false);

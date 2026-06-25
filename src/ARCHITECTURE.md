@@ -210,7 +210,11 @@ BodaSure is a fintech super-app for Kenyan bodaboda (motorcycle taxi) riders. It
 
 ```
 Phase 0: Personal Profile + Wallet Activation
-  → PhasePersonal component
+  → PhasePersonal orchestrator → delegates to:
+    → PhasePersonalForm (name, phone, national_id, county)
+    → PhasePersonalOtp (OTP entry + resend with onRequestIdUpdated callback)
+    → PhasePersonalPin (4-digit PIN creation)
+    → PhasePersonalSuccess (activation confirmation)
   → sasapayPersonalOnboarding (init → confirm → PIN)
   → User fields: full_name, phone, national_id, county_id, middle_name
   → Wallet created with sasapay_account_number
@@ -233,7 +237,7 @@ Phase 4: SACCO Membership
   → GroupMember created (pending → approved)
 
 Phase 5: KYC Verification (DocuPass)
-  → PhaseVerification component
+  → PhaseVerification orchestrator → delegates to SubTaskIdentity, SubTaskBikePhotos, SubTaskPhoneOTP, SubTaskOwner
   → createDocupassSession → user scans → idAnalyzerCallback
   → KycDocument statuses updated to approved
   → completeVerification sets user.verification_complete = true
@@ -345,4 +349,4 @@ src/
 ├── lib/                       # Utilities, auth, phone, payments
 ├── hooks/
 └── agents/                    # AI agent configs
-``
+`

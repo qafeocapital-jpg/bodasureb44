@@ -1,11 +1,11 @@
 // Step 0: Profile details form with phone/ID uniqueness checks and wallet activation
 import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { splitFullName, joinFullName } from '@/lib/nameUtils';
+import { joinFullName } from '@/lib/nameUtils';
 import { base44 } from '@/api/base44Client';
 import { normalizePhone, isValidKenyanPhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
-import { ChevronRight, ChevronLeft, Loader2, AlertTriangle, CheckCircle2, Check, Smartphone } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Loader2, AlertTriangle, CheckCircle2, Smartphone } from 'lucide-react';
 
 export default function PhasePersonalForm({ user, counties, form, setForm, onDraftChange, onWalletInitiated, onBack }) {
   const { refreshUser } = useAuth();

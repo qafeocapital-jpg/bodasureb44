@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import { ChevronRight, Loader2, AlertTriangle, Shield } from 'lucide-react';
 
-export default function PhasePersonalOtp({ requestId, onOtpConfirmed, onBack }) {
+export default function PhasePersonalOtp({ requestId, onRequestIdUpdated, onOtpConfirmed, onBack }) {
   const { refreshUser } = useAuth();
   const [otp, setOtp] = useState('');
   const [saving, setSaving] = useState(false);
@@ -41,6 +41,9 @@ export default function PhasePersonalOtp({ requestId, onOtpConfirmed, onBack }) 
         requestId,
       });
       if (res.data?.success) {
+        if (res.data?.requestId && onRequestIdUpdated) {
+          onRequestIdUpdated(res.data.requestId);
+        }
         setOtp('');
         setWalletError('');
       } else {

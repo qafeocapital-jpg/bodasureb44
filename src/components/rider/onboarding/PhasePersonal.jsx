@@ -1,8 +1,6 @@
 // PhasePersonal orchestrator: holds step state + form data, delegates rendering to step components
 import { useState } from 'react';
-import { useAuth } from '@/lib/AuthContext';
 import { splitFullName, joinFullName } from '@/lib/nameUtils';
-import { normalizePhone } from '@/lib/phone';
 import { Shield, KeyRound, Check, Smartphone } from 'lucide-react';
 import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 import PhasePersonalForm from '@/components/rider/onboarding/PhasePersonalForm';
@@ -86,6 +84,7 @@ export default function PhasePersonal({ user, counties, initialValues, onDraftCh
       {step === 1 && (
         <PhasePersonalOtp
           requestId={requestId}
+          onRequestIdUpdated={(newId) => setRequestId(newId)}
           onOtpConfirmed={() => setStep(2)}
           onBack={() => setStep(0)}
         />
