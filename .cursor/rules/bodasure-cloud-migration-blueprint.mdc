@@ -1,0 +1,16 @@
+---
+description: Applied automatically when modifying backend models, authentication layers, or handling deployment routing
+alwaysApply: false
+globs: ["supabase/**/*", "src/api/**/*", "src/lib/AuthContext*", "package.json", "vite.config.js"]
+---
+
+# BodaSure Target Architecture & Cloud Migration Blueprint
+
+## Technology Stack Transition Rules
+- **Data Layer Migration:** Move away from Base44 JSON schemas (`base44/entities/`). Convert them into standard PostgreSQL tables inside Supabase. All database setups must include strict Row-Level Security (RLS) policies to protect our 7 user portals.
+- **Backend Handlers:** Transition Base44 serverless functions over to **Supabase Edge Functions** using the native Deno runtime. Keep existing fintech integrations (SasaPay, Africa's Talking, IDAnalyzer, PlateRecognizer) fully intact.
+- **Hosting Strategy:** The React frontend will compile via Vite and deploy to **Render**. All server configurations must be optimized specifically for the **Frankfurt region** to ensure the lowest possible network latency for our end-users in Kenya.
+
+## Legacy Code Safety
+- Protect the live payment webhooks verification loops. Keep the internal ecosystem simulation engine (`mockPayments.js`) fully operational during early migration phases to maintain testing stability.
+- Cross-reference `FEATURE_CONTRACTS.md` and `DECISIONS.md` before changing data properties.
