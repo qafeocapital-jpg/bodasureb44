@@ -27,7 +27,6 @@ import LipaCounty from './pages/rider/LipaCounty';
 import LipaOwner from './pages/rider/LipaOwner';
 import Groups from './pages/rider/Groups';
 import Chama from './pages/rider/Chama';
-import Stage from './pages/rider/Stage';
 import Insurance from './pages/rider/Insurance';
 import Services from './pages/rider/Services';
 import Disputes from './pages/rider/Disputes';
@@ -132,7 +131,6 @@ const AuthenticatedApp = () => {
         <Route path="/app/lipa-owner" element={<LipaOwner />} />
         <Route path="/app/groups" element={<Groups />} />
         <Route path="/app/chama" element={<Chama />} />
-        <Route path="/app/stage" element={<Stage />} />
         <Route path="/app/insurance" element={<Insurance />} />
         <Route path="/app/services" element={<Services />} />
         <Route path="/app/disputes" element={<Disputes />} />
