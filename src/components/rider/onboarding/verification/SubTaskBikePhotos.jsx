@@ -88,7 +88,7 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
   const allUploaded = uploadedCount === 2;
   const currentAngle = BIKE_ANGLES[activeAngle];
   const hasPlateMismatch = kycDocs.some(d =>
-    ['bike_left', 'bike_rear'].includes(d.document_type) &&
+    d.document_type === 'bike_rear' &&
     d.rejection_reason &&
     d.rejection_reason.startsWith('plate_mismatch')
   );
