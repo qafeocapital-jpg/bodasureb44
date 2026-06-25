@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * Phase 6 Verification Completion — checks all 4 sub-tasks
+ * Phase 6 Verification Completion — checks all 3 sub-tasks
  * and sets verification_complete = true via service role.
  *
  * Sub-tasks (3 tasks):
