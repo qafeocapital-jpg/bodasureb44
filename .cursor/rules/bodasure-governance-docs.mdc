@@ -1,0 +1,69 @@
+---
+description: Mandatory pre-flight workflow for any BodaSure code change — read governance docs, map contracts, and state blast radius before editing
+alwaysApply: true
+---
+
+# BodaSure Governance & Documentation-First Workflow
+
+## Non-Negotiable Pre-Flight (Every Code Session)
+
+Before writing or editing **any** BodaSure source file, read these documents in order:
+
+1. `src/ARCHITECTURE.md` — system overview, entity map, integrations, function catalog, portal matrix
+2. `src/DECISIONS.md` — locked architectural decisions (append-only; never contradict Active entries)
+3. `src/FEATURE_CONTRACTS.md` — caller→callee contracts; if you change a CALLEE, update ALL listed CALLERS
+4. `src/QA_CHECKLISTS.md` — when touching onboarding, payments, KYC, SMS, or compliance flows
+
+If the task touches production secrets or environment switching, also read `src/PRODUCTION_SETUP.md`.
+
+## Repository Truth Map (Do Not Guess Paths)
+
+| What | Canonical location |
+|---|---|
+| Entity schemas (31) | `base44/entities/*.jsonc` |
+| Backend functions (40) | `base44/functions/*/entry.ts` |
+| React frontend | `src/` (pages, components, lib, api) |
+| SDK client singleton | `src/api/base44Client.js` |
+| Auth bootstrap | `src/lib/AuthContext.jsx` |
+| Onboarding phase logic | `src/lib/onboarding.js` |
+| Verification tasks | `src/lib/verification.js` |
+| Service unlock matrix | `src/lib/serviceAccess.js` |
+| Payment abstraction | `src/lib/payments.js` |
+
+**Do not** create or reference `src/entities/` or `src/functions/` — they do not exist. Backend lives only under `base44/`.
+
+## Blast-Radius Checklist (State Before Coding)
+
+For every planned change, explicitly list:
+
+- **Entities touched** — which `base44/entities/*.jsonc` schemas or runtime records change
+- **Functions touched** — which `base44/functions/*` handlers change (webhooks, onboarding, payments, SMS, KYC)
+- **Frontend callers** — which pages/components invoke `base44.functions.invoke()` or read/write entities
+- **Contracts at risk** — cross-reference `FEATURE_CONTRACTS.md` for every CALLEE you modify
+- **Decisions at risk** — cross-reference `DECISIONS.md` for conflicts (duplicate blocking, name lock-in, idempotent webhooks, E.164 phones, etc.)
+- **Portals affected** — rider `/app`, county `/county`, sacco `/sacco`, merchant `/merchant`, agent `/agent`, stage `/stage`, admin `/admin`, public `/verify/:riderId`
+
+## Documentation Update Obligations
+
+When your change alters behavior, contracts, entities, functions, secrets, or portal access:
+
+- Update `FEATURE_CONTRACTS.md` if any caller→callee payload, response shape, or MUST NOT CHANGE clause shifts
+- Append a new dated entry to the **top** of `DECISIONS.md` if you make a new locked decision (never edit or delete past entries)
+- Update `ARCHITECTURE.md` if entity fields, function inventory, integration endpoints, or portal matrix changes
+- Update `QA_CHECKLISTS.md` if manual test steps need new or revised coverage
+
+## Scope Discipline
+
+- **Minimal diff:** solve the stated problem only; do not refactor unrelated files
+- **No silent behavior changes** to onboarding phases, wallet activation, KYC callbacks, SasaPay webhooks, or SMS delivery without explicit PM approval
+- **User-facing copy:** say "BodaSure Wallet" — not "SasaPay" — in rider-facing UI (`src/pages/rider/`, `src/components/rider/`); backend logs may retain SasaPay for technical clarity per DECISIONS.md
+
+## When to Stop and Escalate
+
+Halt and ask the PM before proceeding if the task would:
+
+- Remove hard-blocks on duplicate phone/national ID or reintroduce SasaPay account recovery
+- Weaken webhook verification (SasaPay HMAC-SHA512, IDAnalyzer shared secret)
+- Change `getOnboardingPhase()` phase order or gate conditions without a migration plan
+- Alter verification task indices (0=identity, 1=bike, 2=owner) or KycDocument document_type enums
+- Switch SMS or SasaPay to production (`AT_ENVIRONMENT`, `SASAPAY_ENVIRONMENT`) without explicit approval

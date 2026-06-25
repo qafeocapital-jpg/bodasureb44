@@ -1,0 +1,99 @@
+---
+description: Backend rules for Base44 Deno functions, entity schemas, webhooks, and third-party integrations under base44/
+globs: base44/**/*
+alwaysApply: false
+---
+
+# BodaSure Backend — Base44 Functions & Entity Schemas
+
+## Platform Model
+
+- Backend handlers are **Deno serverless functions** at `base44/functions/<name>/entry.ts`
+- Entity schemas are JSON at `base44/entities/<Name>.jsonc`
+- Functions are invoked from the frontend via `base44.functions.invoke('<name>', payload)` or called directly as webhook HTTP endpoints at `{BASE44_APP_URL}/functions/<name>`
+- Use `createClientFromRequest(req)` from `@base44/sdk` inside every function entry point
+
+## Function Entry Pattern (Required)
+
+Every function must:
+
+1. Create client: `const base44 = createClientFromRequest(req)`
+2. Authenticate user for user-scoped actions: `const user = await base44.auth.me()` — return 401 if missing (except public webhooks)
+3. Parse and validate input JSON — return 400 with clear error messages
+4. Use `base44.asServiceRole.entities.*` for admin writes, webhook processing, audit logs, and cross-user lookups
+5. Wrap handler in try/catch — log errors, return structured JSON `{ success, error }` with appropriate HTTP status
+6. Document at file top: purpose, READS, WRITES, and pointer to `FEATURE_CONTRACTS.md` section
+
+## Locked Security Rules
+
+### SasaPay Webhook (`sasapayWebhook`)
+- Verify HMAC-SHA512 signature using `SASAPAY_CLIENT_ID` with **constant-time** comparison
+- Find transactions by `checkout_request_id` — never trust client-supplied wallet IDs from webhook payload alone
+- Callback URL must be `{BASE44_APP_URL}/functions/sasapayWebhook` with **no secrets in query strings**
+
+### IDAnalyzer Callback (`idAnalyzerCallback`)
+- Validate `IDANALYZER_WEBHOOK_SECRET`
+- Process **idempotently** keyed on `transactionId` + decision status
+- Return HTTP 500 on API re-fetch failure to trigger IDAnalyzer retry
+- Only update KycDocuments that have `provider_reference` set
+
+### SMS Delivery (`smsDeliveryCallback`)
+- No auth on callback — validate by `at_message_id` lookup in SmsLog
+
+## Data Integrity Rules
+
+### Phone numbers
+- Normalize to E.164 `254XXXXXXXXX` before **every** SasaPay and Africa's Talking API call
+- Strip non-digits, remove leading `0` or `254`, prepend `254`
+
+### SasaPay wallet onboarding (`sasapayPersonalOnboarding`)
+- **Hard-block** duplicate phone, duplicate national_id, and existing SasaPay wallet — no recovery/relink path
+- Coerce `accountNumber` to **string**: `String(data.data.accountNumber)` before Wallet entity write
+- On successful OTP confirm: service-role write-back of `full_name` and `middle_name` to User (name lock-in)
+- Log all failures to AuditLog with `action: 'wallet_onboarding_failed'` for Admin SasaPay dashboard
+- Support actions: `init`, `confirm`, `resendOtp` — resend re-calls init and returns new `requestId`
+
+### Wallet entity
+- `sasapay_account_status` enum: `ACTIVE`, `AWAITING_KYC_UPLOAD`, `PENDING`, `REJECTED`
+- On confirm: set `tier: 1`, `status: 'active'`
+- Lazy-create Wallet at confirm time if missing
+
+### Transactions & settlements
+- Transaction `type` enum: `deposit`, `withdraw`, `send`, `lipisha`, `lipa_county`, `lipa_owner`, `chama`, `insurance`, `utility`, `penalty`
+- Amounts stored as **integer cents** in `amount_cents` and `balance_cents`
+- `sasapayProcessPayment` / `sasapayWebhook` create WalletSnapshot and TransactionLeg settlement splits per FeeRule
+
+## Entity Schema Changes
+
+When editing `base44/entities/*.jsonc`:
+
+- Preserve existing field names consumed by frontend and functions unless explicitly migrating
+- Add new fields with sensible defaults; document in ARCHITECTURE.md entity table
+- Required arrays and enums must stay backward-compatible with existing records
+- User entity: distinguish `role` (single portal role) vs `roles` (array) vs `staff_type`
+
+## Environment Secrets (Never Hardcode)
+
+| Secret | Used for |
+|---|---|
+| `SASAPAY_CLIENT_ID`, `SASAPAY_CLIENT_SECRET`, `SASAPAY_MERCHANT_CODE`, `SASAPAY_ENVIRONMENT` | SasaPay OAuth, STK, onboarding |
+| `IDANALYZER_API_KEY`, `IDANALYZER_PROFILE_ID`, `IDANALYZER_WEBHOOK_SECRET` | DocuPass KYC |
+| `AT_API_KEY`, `AT_USERNAME`, `AT_ENVIRONMENT`, `AT_API_KEY_PRODUCTION`, `AT_USERNAME_PRODUCTION` | SMS |
+| `PLATERECOGNIZER_API_TOKEN` | Plate OCR |
+| `BASE44_APP_URL` | Callback URLs for SasaPay init/STK |
+
+SMS functions switch credentials based on `AT_ENVIRONMENT === 'production'`.
+
+## Function Inventory (Do Not Duplicate)
+
+Existing functions include: `sasapayPersonalOnboarding`, `sasapayStkPush`, `sasapayProcessPayment`, `sasapayWebhook`, `setWalletPin`, `verifyWalletPin`, `createDocupassSession`, `idAnalyzerCallback`, `processKycDecision`, `processKycDecisionV2`, `completeOnboarding`, `completeVerification`, `checkPhoneUniqueness`, `checkNationalIdUniqueness`, `sendOtp`, `sendSms`, `sendBulkSms`, `createSmsCampaign`, `smsDeliveryCallback`, `verifyOtpCode`, `processSettlements`, `expirePermits`, `verifyPlateRecognizer`, `getMapboxToken`, and admin/reporting helpers.
+
+Before adding a new function, confirm an existing one cannot be extended with a new `action` parameter.
+
+## Testing Backend Changes
+
+After edits, verify against `QA_CHECKLISTS.md` sections:
+- New User Onboarding (Phase 0 → 6)
+- Duplicate Registration Blocking
+- Payments Flow (STK Push → Webhook → Settlement)
+- KYC / DocuPass callback idempotency
