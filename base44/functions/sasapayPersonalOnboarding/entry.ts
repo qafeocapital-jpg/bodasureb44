@@ -249,6 +249,17 @@ async function confirmPersonalOnboarding(base44, user, otp, requestId) {
     });
   }
 
+  // Second lock-in: re-write full_name and middle_name via service-role to prevent
+  // OAuth token refresh from clobbering the user-entered name on subsequent auth.me() calls
+  try {
+    await base44.asServiceRole.entities.User.update(user.id, {
+      full_name: user.full_name,
+      middle_name: user.middle_name || '',
+    });
+  } catch (e) {
+    console.warn('[confirm] Failed to re-write user name:', e.message);
+  }
+
   // Create audit log
   await base44.asServiceRole.entities.AuditLog.create({
     user_id: user.id,
