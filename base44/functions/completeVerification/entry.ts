@@ -38,10 +38,9 @@ Deno.serve(async (req) => {
       );
     const identityDone = identityApproved;
 
-    // Sub-task 2: Bike Photos — 2 angles (bike_left, bike_rear)
-    const hasBikeLeft = kycDocs.some(d => d.document_type === 'bike_left' && d.file_url);
-    const hasBikeRear = kycDocs.some(d => d.document_type === 'bike_rear' && d.file_url);
-    const bikeDone = hasBikeLeft && hasBikeRear;
+    // Sub-task 2: Bike Photos — both angles must be admin-approved
+    const bikeDone = kycDocs.some(d => d.document_type === 'bike_left' && d.status === 'approved') &&
+                     kycDocs.some(d => d.document_type === 'bike_rear' && d.status === 'approved');
 
     // Sub-task 3: Owner Verification
     const ownerDone = vehicle ? (vehicle.is_owner_rider === true || vehicle.owner_verified === true) : false;

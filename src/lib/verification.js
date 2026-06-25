@@ -25,16 +25,16 @@ export function getTaskStatuses(kycDocs = [], user, vehicle, wallet) {
     : allThreeProcessed ? 'submitted'
     : 'not_started';
 
-  // Task 1: Bike Photos — 2 angles (bike_left, bike_rear)
-  // 'submitted' when both uploaded; 'verified' when rear photo has plate match (provider_reference + no plate_mismatch flag)
-  const bikeTypes = ['bike_left', 'bike_rear'];
-  const bikeDocs = bikeTypes.map(t => kycDocs.find(d => d.document_type === t && d.file_url));
-  const bikeUploaded = bikeDocs.filter(Boolean).length;
-  const rearDoc = kycDocs.find(d => d.document_type === 'bike_rear' && d.file_url);
-  const plateVerified = rearDoc?.provider_reference && !(rearDoc?.rejection_reason || '').startsWith('plate_mismatch');
-  const bikeStatus = bikeUploaded === 2
-    ? (plateVerified ? 'verified' : 'submitted')
-    : bikeUploaded > 0 ? 'in_progress'
+  // Task 1: Bike Photos — both angles must be admin-approved for 'verified'
+  const bikeLeftDoc = kycDocs.find(d => d.document_type === 'bike_left' && d.file_url);
+  const bikeRearDoc = kycDocs.find(d => d.document_type === 'bike_rear' && d.file_url);
+  const bikeLeftApproved = bikeLeftDoc?.status === 'approved';
+  const bikeRearApproved = bikeRearDoc?.status === 'approved';
+  const bikeAnyRejected = [bikeLeftDoc, bikeRearDoc].some(d => d?.status === 'rejected');
+  const bikeStatus = (bikeLeftApproved && bikeRearApproved) ? 'verified'
+    : bikeAnyRejected ? 'rejected'
+    : (bikeLeftDoc && bikeRearDoc) ? 'submitted'
+    : (bikeLeftDoc || bikeRearDoc) ? 'in_progress'
     : 'not_started';
 
   // Task 2: Owner Verification

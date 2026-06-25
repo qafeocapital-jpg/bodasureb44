@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Bike, ChevronLeft, Check, AlertTriangle, RotateCw, Loader2, Camera } from 'lucide-react';
+import { Bike, ChevronLeft, Check, AlertTriangle, Loader2, Camera, Clock, ShieldCheck } from 'lucide-react';
 import CameraCapture from '@/components/rider/onboarding/CameraCapture';
 import PlateInput from '@/components/rider/onboarding/PlateInput';
 import NtsaConfirmDialog from '@/components/rider/onboarding/NtsaConfirmDialog';
@@ -17,13 +17,14 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
   const [activeAngle, setActiveAngle] = useState(0);
   const [showNtsaDialog, setShowNtsaDialog] = useState(false);
   const [verifyingPlate, setVerifyingPlate] = useState(false);
-  const [plateMismatch, setPlateMismatch] = useState(null);
+  const [plateAdvisory, setPlateAdvisory] = useState(null);
+  const [forceCamera, setForceCamera] = useState(false);
 
   async function handleUpload(docType, fileUrl) {
     setError('');
-    setPlateMismatch(null);
+    setPlateAdvisory(null);
     try {
-      // Plate recognition for bike_rear — soft warning, always saves the photo
+      // Plate recognition for bike_rear — soft signal, always saves photo as pending
       if (docType === 'bike_rear' && vehicle?.plate_number) {
         setVerifyingPlate(true);
         const res = await base44.functions.invoke('verifyPlateRecognizer', {
@@ -32,16 +33,16 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
         });
         setVerifyingPlate(false);
         const detectedPlate = res.data?.detectedPlate || '';
-        const score = res.data?.score?.toFixed(2) || '0.00';
-        const providerRef = `${detectedPlate}|${score}`;
+        const score = res.data?.score || 0;
         const isMatch = res.data?.match === true;
+        const providerRef = JSON.stringify({ detectedPlate, score, match: isMatch });
 
         const docData = {
           file_url: fileUrl,
           status: 'pending',
           provider_name: 'platerecognizer',
           provider_reference: providerRef,
-          rejection_reason: isMatch ? null : `plate_mismatch: detected ${detectedPlate}`,
+          rejection_reason: null,
         };
 
         const existing = kycDocs.find(d => d.document_type === docType);
@@ -50,10 +51,11 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
         } else {
           await base44.entities.KycDocument.create({ user_id: user.id, document_type: docType, ...docData });
         }
+        setForceCamera(false);
         await onDataChange();
 
-        if (!isMatch && detectedPlate) {
-          setPlateMismatch({ detectedPlate, enteredPlate: vehicle.plate_number });
+        if (!isMatch) {
+          setPlateAdvisory({ detectedPlate, enteredPlate: vehicle.plate_number, hasPlate: !!detectedPlate });
         }
         return;
       }
@@ -65,6 +67,7 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
       } else {
         await base44.entities.KycDocument.create({ user_id: user.id, document_type: docType, file_url: fileUrl, status: 'pending' });
       }
+      setForceCamera(false);
       await onDataChange();
     } catch (e) {
       setError(e.message || 'Failed to save photo');
@@ -76,7 +79,7 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
     setSavingPlate(true);
     try {
       await base44.entities.Vehicle.update(vehicle.id, { plate_number: plateNumber.trim() });
-      setPlateMismatch(null);
+      setPlateAdvisory(null);
       await onDataChange();
     } catch (e) {
       setError(e.message);
@@ -84,14 +87,25 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
     setSavingPlate(false);
   }
 
-  const uploadedCount = BIKE_ANGLES.filter(a => kycDocs.find(d => d.document_type === a.key && d.file_url)).length;
-  const allUploaded = uploadedCount === 2;
+  function selectAngle(i) {
+    setActiveAngle(i);
+    setForceCamera(false);
+    setPlateAdvisory(null);
+  }
+
+  function getDocState(angleKey) {
+    const doc = kycDocs.find(d => d.document_type === angleKey && d.file_url);
+    if (!doc) return { state: 'none', doc: null };
+    if (doc.status === 'approved') return { state: 'approved', doc };
+    if (doc.status === 'rejected') return { state: 'rejected', doc };
+    return { state: 'pending', doc };
+  }
+
+  const approvedCount = BIKE_ANGLES.filter(a => getDocState(a.key).state === 'approved').length;
+  const allApproved = approvedCount === 2;
   const currentAngle = BIKE_ANGLES[activeAngle];
-  const hasPlateMismatch = kycDocs.some(d =>
-    d.document_type === 'bike_rear' &&
-    d.rejection_reason &&
-    d.rejection_reason.startsWith('plate_mismatch')
-  );
+  const currentDocState = getDocState(currentAngle.key);
+  const showCamera = forceCamera || currentDocState.state === 'none';
 
   return (
     <div className="space-y-4">
@@ -105,7 +119,7 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
         </div>
         <div>
           <h3 className="font-heading font-bold text-sm">Bike Photos</h3>
-          <p className="text-[10px] text-muted-foreground">Capture 2 photos ({uploadedCount}/2 done)</p>
+          <p className="text-[10px] text-muted-foreground">{approvedCount}/2 approved</p>
         </div>
       </div>
 
@@ -126,33 +140,97 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
       {/* Angle selector */}
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
         {BIKE_ANGLES.map((angle, i) => {
-          const doc = kycDocs.find(d => d.document_type === angle.key && d.file_url);
+          const ds = getDocState(angle.key);
           const isActive = i === activeAngle;
+          const badgeClass = ds.state === 'approved'
+            ? 'bg-success/10 text-success border border-success/20'
+            : ds.state === 'rejected'
+            ? 'bg-destructive/10 text-destructive border border-destructive/20'
+            : 'bg-muted text-muted-foreground';
           return (
             <button
               key={angle.key}
-              onClick={() => setActiveAngle(i)}
+              onClick={() => selectAngle(i)}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                isActive ? 'bg-primary text-primary-foreground' : doc ? 'bg-success/10 text-success border border-success/20' : 'bg-muted text-muted-foreground'
+                isActive ? 'bg-primary text-primary-foreground' : badgeClass
               }`}
             >
-              {doc && <Check className="w-3 h-3" />}
+              {ds.state === 'approved' && <Check className="w-3 h-3" />}
+              {ds.state === 'rejected' && <AlertTriangle className="w-3 h-3" />}
               {angle.label}
             </button>
           );
         })}
       </div>
 
-      {/* Active angle camera */}
+      {/* Active angle content — 4-state rendering */}
       <div className="space-y-1.5">
         <p className="text-xs font-semibold">{currentAngle.label}</p>
-        <CameraCapture
-          overlayType="rect-wide"
-          label={`Position: ${currentAngle.label}`}
-          sublabel={currentAngle.sublabel}
-          existingUrl={kycDocs.find(d => d.document_type === currentAngle.key)?.file_url}
-          onUploaded={url => handleUpload(currentAngle.key, url)}
-        />
+
+        {showCamera ? (
+          /* State: no doc or retake mode → show camera */
+          <CameraCapture
+            overlayType="rect-wide"
+            label={`Position: ${currentAngle.label}`}
+            sublabel={currentAngle.sublabel}
+            existingUrl={null}
+            onUploaded={url => handleUpload(currentAngle.key, url)}
+          />
+        ) : currentDocState.state === 'approved' ? (
+          /* State: approved → hard-locked view */
+          <div className="space-y-2">
+            <div className="relative">
+              <img src={currentDocState.doc.file_url} alt={currentAngle.label} className="w-full object-cover rounded-lg border-2 border-success/30" />
+              <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-success/90 text-white rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                <ShieldCheck className="w-3 h-3" /> Approved
+              </div>
+            </div>
+            <div className="bg-success/5 border border-success/20 rounded-xl p-3 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-success flex-shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-success">Approved — Locked</p>
+                <p className="text-[10px] text-muted-foreground">Contact support to change.</p>
+              </div>
+            </div>
+          </div>
+        ) : currentDocState.state === 'rejected' ? (
+          /* State: rejected → show photo + reason + retake button */
+          <div className="space-y-2">
+            <img src={currentDocState.doc.file_url} alt={currentAngle.label} className="w-full object-cover rounded-lg border-2 border-destructive/30" />
+            <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-destructive">Photo Rejected</p>
+                  <p className="text-xs text-muted-foreground mt-1">{currentDocState.doc.rejection_reason}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setForceCamera(true)}
+                className="w-full flex items-center justify-center gap-1.5 bg-primary text-primary-foreground rounded-lg py-2 text-xs font-semibold"
+              >
+                <Camera className="w-3.5 h-3.5" /> Retake Photo
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* State: pending → under review, no action needed */
+          <div className="space-y-2">
+            <div className="relative">
+              <img src={currentDocState.doc.file_url} alt={currentAngle.label} className="w-full object-cover rounded-lg border-2 border-border" />
+              <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-muted/90 text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                <Clock className="w-3 h-3" /> Under Review
+              </div>
+            </div>
+            <div className="bg-muted/50 border border-border rounded-xl p-3 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">Under Review</p>
+                <p className="text-[10px] text-muted-foreground">No action needed — our team is reviewing your photo.</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {verifyingPlate && (
@@ -162,57 +240,51 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
         </div>
       )}
 
-      {/* Plate mismatch warning — non-blocking, photo already saved */}
-      {plateMismatch && (
+      {/* Plate advisory — soft, non-blocking */}
+      {plateAdvisory && (
         <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 space-y-3">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-semibold text-warning">Plate Mismatch</p>
+              <p className="text-xs font-semibold text-warning">Plate Advisory</p>
               <p className="text-xs text-muted-foreground mt-1">
-                The plate on your photo ({plateMismatch.detectedPlate}) does not match the plate you entered ({plateMismatch.enteredPlate}). You can retake the photo or update your plate number.
+                {plateAdvisory.hasPlate
+                  ? 'We noticed a plate issue — our team will review. You may retake if you wish.'
+                  : "We couldn't detect a plate in your photo — our team will review. You may retake if you wish."}
               </p>
             </div>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => { setPlateMismatch(null); setActiveAngle(BIKE_ANGLES.findIndex(a => a.key === 'bike_rear')); }}
+              onClick={() => { setPlateAdvisory(null); setForceCamera(true); }}
               className="flex-1 flex items-center justify-center gap-1 border border-border rounded-lg py-2 text-xs font-semibold"
             >
               <Camera className="w-3.5 h-3.5" /> Retake Photo
             </button>
             <button
-              onClick={() => { setPlateMismatch(null); }}
-              className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-lg py-2 text-xs font-semibold"
+              onClick={() => setPlateAdvisory(null)}
+              className="flex-1 bg-muted text-muted-foreground rounded-lg py-2 text-xs font-semibold"
             >
-              Update Plate Number
+              Keep & Continue
             </button>
           </div>
         </div>
       )}
 
-      {/* Persistent mismatch flag */}
-      {hasPlateMismatch && !plateMismatch && (
-        <div className="bg-warning/5 border border-warning/20 rounded-xl p-2.5 flex items-center gap-2">
-          <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0" />
-          <p className="text-[10px] text-warning font-medium">Plate mismatch detected — update your plate number or retake the rear photo.</p>
-        </div>
-      )}
-
       {/* Next angle button */}
-      {!allUploaded && activeAngle < 1 && (
+      {!allApproved && activeAngle < 1 && (
         <button
-          onClick={() => setActiveAngle(activeAngle + 1)}
+          onClick={() => selectAngle(activeAngle + 1)}
           className="w-full flex items-center justify-center gap-1 border border-border rounded-xl py-2.5 text-sm font-semibold"
         >
-          Next: {BIKE_ANGLES[activeAngle + 1].label} <RotateCw className="w-3.5 h-3.5" />
+          Next: {BIKE_ANGLES[activeAngle + 1].label}
         </button>
       )}
 
-      {allUploaded && (
+      {allApproved && (
         <div className="bg-success/5 border border-success/20 rounded-xl p-3 flex items-center gap-2">
           <Check className="w-4 h-4 text-success" />
-          <p className="text-xs text-success font-medium">Both bike photos uploaded.</p>
+          <p className="text-xs text-success font-medium">Both bike photos approved.</p>
         </div>
       )}
 
@@ -222,6 +294,7 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
           <p className="text-xs text-destructive">{error}</p>
         </div>
       )}
+
       <NtsaConfirmDialog
         open={showNtsaDialog}
         plate={plateNumber}

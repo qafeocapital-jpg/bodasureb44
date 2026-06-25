@@ -70,6 +70,20 @@ Deno.serve(async (req) => {
         event_type: 'bulk_custom',
         is_system: true,
       },
+      {
+        template_key: 'bike_photo_approved',
+        name: 'Bike Photo Approved',
+        body: 'Hi {name}, your bike photo has been approved on BodaSure. Your verification is progressing — keep it up!',
+        event_type: 'kyc_approved',
+        is_system: true,
+      },
+      {
+        template_key: 'bike_photo_rejected',
+        name: 'Bike Photo Rejected',
+        body: 'Hi {name}, your bike photo was rejected: {reason}. Please open the BodaSure app to retake it.',
+        event_type: 'kyc_rejected',
+        is_system: true,
+      },
     ];
 
     const created = await base44.asServiceRole.entities.SmsTemplate.bulkCreate(templates);

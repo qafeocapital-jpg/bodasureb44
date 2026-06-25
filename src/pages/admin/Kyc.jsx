@@ -3,11 +3,12 @@ import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDateTime } from '@/lib/format';
 import { auditLog } from '@/lib/audit';
-import { FileCheck, CheckCircle2, XCircle, Clock, Users, Wrench } from 'lucide-react';
+import { FileCheck, CheckCircle2, XCircle, Clock, Users, Wrench, Bike } from 'lucide-react';
 import ManualRecoveryModal from '@/components/admin/ManualRecoveryModal';
 import ComplianceDashboard from '@/components/admin/ComplianceDashboard';
 import VerificationDetailSheet from '@/components/admin/VerificationDetailSheet';
 import VerificationBadge from '@/components/admin/VerificationBadge';
+import BikePhotoQueue from '@/components/admin/BikePhotoQueue';
 import { getTaskStatuses, VERIFICATION_TASKS, TASK_STATUS_CONFIG } from '@/lib/verification';
 
 export default function AdminKyc() {
@@ -22,8 +23,31 @@ export default function AdminKyc() {
   const [phase6Loading, setPhase6Loading] = useState(false);
   const [detailRiderId, setDetailRiderId] = useState(null);
   const [showRecovery, setShowRecovery] = useState(false);
+  const [bikePhotoDocs, setBikePhotoDocs] = useState([]);
+  const [bikePhotoLoading, setBikePhotoLoading] = useState(false);
 
   useEffect(() => { load(); }, []);
+
+  async function loadBikePhotos() {
+    setBikePhotoLoading(true);
+    try {
+      const left = await base44.entities.KycDocument.filter({ document_type: 'bike_left', status: 'pending' }, 'created_date', 50);
+      const rear = await base44.entities.KycDocument.filter({ document_type: 'bike_rear', status: 'pending' }, 'created_date', 50);
+      const merged = [...left, ...rear].sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
+      const userIds = [...new Set(merged.map(d => d.user_id))];
+      const [usersData, vehiclesData] = await Promise.all([
+        Promise.all(userIds.map(id => base44.entities.User.filter({ id }).then(u => u[0] || null))),
+        Promise.all(userIds.map(id => base44.entities.Vehicle.filter({ rider_id: id }).then(v => v[0] || null))),
+      ]);
+      const userMap = {};
+      const vehicleMap = {};
+      userIds.forEach((id, i) => { userMap[id] = usersData[i]; vehicleMap[id] = vehiclesData[i]; });
+      setBikePhotoDocs(merged.map(doc => ({ ...doc, rider: userMap[doc.user_id], vehicle: vehicleMap[doc.user_id] })));
+    } catch (e) {
+      console.error('loadBikePhotos error:', e);
+    }
+    setBikePhotoLoading(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -109,6 +133,12 @@ export default function AdminKyc() {
           <Users className="w-4 h-4" /> Phase 6 Submissions
         </button>
         <button
+          onClick={() => { setTab('bike_photos'); loadBikePhotos(); }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${tab === 'bike_photos' ? 'bg-orange-600 text-white' : 'bg-card border border-border text-muted-foreground'}`}
+        >
+          <Bike className="w-4 h-4" /> Bike Photos
+        </button>
+        <button
           onClick={() => setShowRecovery(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-card border border-border text-muted-foreground hover:bg-accent ml-auto"
         >
@@ -118,6 +148,8 @@ export default function AdminKyc() {
 
       {tab === 'dashboard' ? (
         <ComplianceDashboard onSelectRider={(riderId) => setDetailRiderId(riderId)} />
+      ) : tab === 'bike_photos' ? (
+        <BikePhotoQueue docs={bikePhotoDocs} loading={bikePhotoLoading} onRefresh={loadBikePhotos} />
       ) : (
         /* Phase 6 Submissions */
         phase6Loading ? (

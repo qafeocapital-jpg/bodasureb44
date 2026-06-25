@@ -8,7 +8,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const admin = await base44.auth.me();
     if (!admin?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (admin.role !== 'super_admin') return Response.json({ error: 'Forbidden: super admin only' }, { status: 403 });
+    if (!['super_admin', 'bodasure_staff'].includes(admin.role)) return Response.json({ error: 'Forbidden: admin only' }, { status: 403 });
 
     const { docId, userId, action, reason, provider = PROVIDER } = await req.json();
 
@@ -104,6 +104,11 @@ async function processManualReview(base44, docId, userId, action, reason, adminI
       },
     });
 
+    // Send SMS for bike photo approvals
+    if (['bike_left', 'bike_rear'].includes(doc.document_type)) {
+      await sendBikePhotoSms(base44, userId, 'bike_photo_approved', {});
+    }
+
     return {
       success: true,
       action: 'approve',
@@ -143,6 +148,11 @@ async function processManualReview(base44, docId, userId, action, reason, adminI
       },
     });
 
+    // Send SMS for bike photo rejections
+    if (['bike_left', 'bike_rear'].includes(doc.document_type)) {
+      await sendBikePhotoSms(base44, userId, 'bike_photo_rejected', { reason: reason.trim() });
+    }
+
     return {
       success: true,
       action: 'reject',
@@ -150,5 +160,42 @@ async function processManualReview(base44, docId, userId, action, reason, adminI
       walletUpgraded: false,
       walletTier: 0,
     };
+  }
+}
+
+async function sendBikePhotoSms(base44, userId, templateKey, variables) {
+  try {
+    const users = await base44.asServiceRole.entities.User.filter({ id: userId });
+    const rider = users[0];
+    if (!rider?.phone) {
+      console.warn('[sendBikePhotoSms] No phone for user', userId);
+      return;
+    }
+
+    const templates = await base44.asServiceRole.entities.SmsTemplate.filter({
+      template_key: templateKey,
+      is_active: true,
+    });
+    if (templates.length === 0) {
+      console.warn('[sendBikePhotoSms] Template not found:', templateKey);
+      return;
+    }
+
+    let body = templates[0].body;
+    const allVars = { name: rider.full_name || 'Rider', ...variables };
+    Object.entries(allVars).forEach(([key, value]) => {
+      body = body.replace(`{${key}}`, String(value));
+    });
+
+    const eventType = templateKey === 'bike_photo_approved' ? 'kyc_approved' : 'kyc_rejected';
+    await base44.functions.invoke('sendSms', {
+      phone: rider.phone,
+      message: body,
+      templateKey,
+      eventType,
+      metadata: { ...allVars, rider_id: userId },
+    });
+  } catch (e) {
+    console.error('Failed to send bike photo SMS:', e.message);
   }
 }
