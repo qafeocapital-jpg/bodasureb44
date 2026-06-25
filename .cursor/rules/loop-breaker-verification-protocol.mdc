@@ -1,0 +1,18 @@
+---
+description: Triggered on all debugging tasks, code updates, and feature builds to prevent loops and guarantee stability
+alwaysApply: false
+globs: ["**/*"]
+---
+
+# Loop Breaker & Cloud Automation Verification Protocol
+
+## Automated Cloud Testing
+- Before declaring any task finished, you must run the project's compilation script (e.g., `npm run build`) inside your cloud virtual machine. You are forbidden from submitting code that contains active TypeScript compilation or linting errors.
+- Whenever a user interface component is updated, utilize your cloud **Computer Use / Chrome DevTools automation** to open a virtual browser instance. Click through the new fields or buttons, test the underlying logic states, and ensure no layout shifts or broken UI elements exist.
+
+## The Two-Strike Loop Breaker
+- If you make two consecutive attempts to resolve an error or bug and fail, **STOP immediately**.
+- Do not make a third attempt. Present the user with a "Bottleneck Diagnostic Report":
+  1. Explain what the error is in simple terms.
+  2. Detail the two approaches you tried and why they failed.
+  3. Propose two structural alternatives and wait for direct instruction.
