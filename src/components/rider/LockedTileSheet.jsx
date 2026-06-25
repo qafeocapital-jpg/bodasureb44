@@ -1,15 +1,23 @@
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, X } from 'lucide-react';
 
-export default function LockedTileSheet({ open, onClose, tileLabel, featureDescription }) {
+export default function LockedTileSheet({ open, onClose, tileLabel, featureDescription, title, message, actionLabel, actionLink }) {
   const navigate = useNavigate();
 
   const handleVerify = () => {
     onClose();
-    navigate('/app/profile', { state: { jumpToPhase: 5 } });
+    if (actionLink) {
+      navigate(actionLink);
+    } else {
+      navigate('/app/profile', { state: { jumpToPhase: 5 } });
+    }
   };
 
   if (!open) return null;
+
+  const heading = title || tileLabel;
+  const subMessage = message || 'This feature requires Tier 2 verification';
+  const ctaLabel = actionLabel || 'Complete Verification';
 
   return (
     <>
@@ -47,25 +55,27 @@ export default function LockedTileSheet({ open, onClose, tileLabel, featureDescr
 
           {/* Title */}
           <h2 className="text-lg font-heading font-bold text-center mb-2">
-            {tileLabel}
+            {heading}
           </h2>
 
           {/* Message */}
           <p className="text-sm text-muted-foreground text-center mb-4">
-            This feature requires Tier 2 verification
+            {subMessage}
           </p>
 
           {/* Description */}
-          <p className="text-sm text-foreground text-center mb-6">
-            {featureDescription}
-          </p>
+          {featureDescription && (
+            <p className="text-sm text-foreground text-center mb-6">
+              {featureDescription}
+            </p>
+          )}
 
           {/* CTA Button */}
           <button
             onClick={handleVerify}
             className="w-full bg-orange-600 text-white py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 hover:bg-orange-700 transition-colors"
           >
-            Complete Verification <span className="text-lg">→</span>
+            {ctaLabel} <span className="text-lg">→</span>
           </button>
         </div>
       </div>

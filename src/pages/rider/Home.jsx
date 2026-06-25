@@ -124,6 +124,7 @@ export default function Home() {
       />
       <HomeNavGrid
         user={user}
+        walletActive={walletActive}
         lockedTile={lockedTile}
         setLockedTile={setLockedTile}
         servicesExpanded={servicesExpanded}

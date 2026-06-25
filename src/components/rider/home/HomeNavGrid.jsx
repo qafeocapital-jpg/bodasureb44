@@ -5,7 +5,7 @@ import { getKycLevel } from '@/components/ui/KycLevelBadge';
 import { Lock, ChevronDown, ChevronRight } from 'lucide-react';
 import LockedTileSheet from '@/components/rider/LockedTileSheet';
 
-export default function HomeNavGrid({ user, lockedTile, setLockedTile, servicesExpanded, setServicesExpanded }) {
+export default function HomeNavGrid({ user, walletActive, lockedTile, setLockedTile, servicesExpanded, setServicesExpanded }) {
   return (
     <>
       {/* Locked Tile Sheet */}
@@ -14,11 +14,15 @@ export default function HomeNavGrid({ user, lockedTile, setLockedTile, servicesE
           open={!!lockedTile}
           onClose={() => setLockedTile(null)}
           tileLabel={lockedTile.label}
-          featureDescription={{
+          featureDescription={lockedTile.lockType === 'wallet' ? undefined : ({
             'Pay Owner': 'Pay bike owners directly for use and rental.',
             'Contributions': 'Join group savings and SACCO contributions.',
             'Insurance': 'Protect yourself with comprehensive coverage.',
-          }[lockedTile.label] || 'This feature requires Tier 2 verification.'}
+          }[lockedTile.label] || 'This feature requires Tier 2 verification.')}
+          title={lockedTile.lockType === 'wallet' ? 'Activate Your Wallet' : undefined}
+          message={lockedTile.lockType === 'wallet' ? 'Activate your BodaSure Wallet to start collecting fares.' : undefined}
+          actionLabel={lockedTile.lockType === 'wallet' ? 'Activate Wallet' : undefined}
+          actionLink={lockedTile.lockType === 'wallet' ? '/app/profile' : undefined}
         />
       )}
 
@@ -33,24 +37,30 @@ export default function HomeNavGrid({ user, lockedTile, setLockedTile, servicesE
           const renderTile = (tile) => {
             const Icon = tile.icon;
             const isSoon = tile.status === 'soon';
-            const isLocked = tile.requiresTier2 && getKycLevel(user) < 2;
-            const TileElement = isSoon || isLocked ? 'div' : Link;
+            const isWalletLocked = tile.requiresWallet && !walletActive;
+            const isLocked = !isWalletLocked && tile.requiresTier2 && getKycLevel(user) < 2;
+            const isAnyLocked = isWalletLocked || isLocked;
+            const TileElement = isSoon || isAnyLocked ? 'div' : Link;
 
             const tileConfig = {
-              to: isSoon || isLocked ? undefined : tile.path,
-              onClick: isLocked ? () => setLockedTile(tile) : undefined,
+              to: isSoon || isAnyLocked ? undefined : tile.path,
+              onClick: isWalletLocked
+                ? () => setLockedTile({ ...tile, lockType: 'wallet' })
+                : isLocked
+                ? () => setLockedTile(tile)
+                : undefined,
               className: 'flex flex-col items-center gap-1.5 cursor-pointer',
             };
 
             return (
               <TileElement key={tile.label} {...tileConfig}>
                 <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-150 ease-out ${
-                  isLocked ? 'bg-slate-100 text-slate-400 active:scale-110' :
+                  isAnyLocked ? 'bg-slate-100 text-slate-400 active:scale-110' :
                   isSoon ? 'bg-slate-100 text-slate-400 active:scale-110' :
                   `${tileColors[tile.color]} active:scale-110`
                 }`}>
                   <Icon className="w-6 h-6" strokeWidth={2} />
-                  {isLocked && (
+                  {isAnyLocked && (
                     <span className="absolute -top-2 -right-2 bg-orange-600 text-white rounded-full p-1">
                       <Lock className="w-3 h-3" />
                     </span>
@@ -61,7 +71,7 @@ export default function HomeNavGrid({ user, lockedTile, setLockedTile, servicesE
                     </span>
                   )}
                 </div>
-                <span className={`text-[10px] text-center font-medium leading-tight ${isLocked || isSoon ? 'text-slate-400' : 'text-foreground'}`}>
+                <span className={`text-[10px] text-center font-medium leading-tight ${isAnyLocked || isSoon ? 'text-slate-400' : 'text-foreground'}`}>
                   {tile.label}
                 </span>
               </TileElement>
