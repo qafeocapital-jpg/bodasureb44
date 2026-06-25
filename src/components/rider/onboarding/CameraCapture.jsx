@@ -1,14 +1,19 @@
-import { useRef, useState, useEffect } from 'react';
+import { useId, useState, useEffect } from 'react';
 import { Camera, Image as ImageIcon, Loader2, Check, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
 /**
  * Reusable camera/upload component with animated overlay guides.
  * overlayType: 'rect' (ID cards), 'rect-wide' (bike photos), 'circle' (selfie)
+ *
+ * Uses native <label htmlFor> + sr-only <input> instead of programmatic .click()
+ * on a hidden input — Chrome Android, Samsung Internet, and iOS Safari block
+ * programmatic clicks on display:none inputs as non-user-gesture, so the camera
+ * would never open. The label pattern forwards the tap directly to the input.
  */
 export default function CameraCapture({ overlayType = 'rect', label, sublabel, onUploaded, existingUrl }) {
-  const cameraRef = useRef(null);
-  const galleryRef = useRef(null);
+  const cameraInputId = useId();
+  const galleryInputId = useId();
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(existingUrl || null);
   const [error, setError] = useState('');
@@ -76,37 +81,40 @@ export default function CameraCapture({ overlayType = 'rect', label, sublabel, o
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       {!preview && (
-        <div className="flex gap-2">
-          <button
-            onClick={() => cameraRef.current?.click()}
-            disabled={uploading}
-            className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-primary-foreground rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50"
-          >
-            <Camera className="w-4 h-4" /> Take Photo
-          </button>
-          <button
-            onClick={() => galleryRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center justify-center gap-1.5 border border-border rounded-xl py-2.5 px-4 text-sm font-semibold disabled:opacity-50"
-          >
-            <ImageIcon className="w-4 h-4" /> Gallery
-          </button>
-        </div>
+        <>
+          <div className={`flex gap-2 ${uploading ? 'pointer-events-none opacity-50' : ''}`}>
+            <label
+              htmlFor={cameraInputId}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-primary-foreground rounded-xl py-2.5 text-sm font-semibold cursor-pointer"
+            >
+              <Camera className="w-4 h-4" /> Take Photo
+            </label>
+            <label
+              htmlFor={galleryInputId}
+              className="flex items-center justify-center gap-1.5 border border-border rounded-xl py-2.5 px-4 text-sm font-semibold cursor-pointer"
+            >
+              <ImageIcon className="w-4 h-4" /> Gallery
+            </label>
+          </div>
+          <p className="text-[10px] text-muted-foreground text-center">
+            Allow camera access when prompted, or use Gallery to upload from your phone.
+          </p>
+        </>
       )}
 
       <input
-        ref={cameraRef}
+        id={cameraInputId}
         type="file"
         accept="image/*"
         capture="environment"
-        className="hidden"
+        className="sr-only"
         onChange={e => { handleFile(e.target.files?.[0]); e.target.value = ''; }}
       />
       <input
-        ref={galleryRef}
+        id={galleryInputId}
         type="file"
         accept="image/*"
-        className="hidden"
+        className="sr-only"
         onChange={e => { handleFile(e.target.files?.[0]); e.target.value = ''; }}
       />
     </div>
