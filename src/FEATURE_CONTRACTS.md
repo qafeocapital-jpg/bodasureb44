@@ -146,6 +146,29 @@ idAnalyzerCallback → base44.asServiceRole.entities.User.update(userId, { kyc_s
 ```
 PhaseVerification → base44.functions.invoke('completeVerification', { ... })
   MUST NOT CHANGE: Sets user.verification_complete = true. Home.jsx and KycTierStatus read this flag.
+  Backend function checks 3 tasks: identity (IDAnalyzer-approved), bike (bike_left + bike_rear uploaded), owner.
+  Wallet and Phone OTP tasks removed — completed in earlier onboarding phases.
+```
+
+### Verification Task Model (3 tasks)
+```
+VERIFICATION_TASKS in lib/verification.js:
+  0: identity — Identity Verification (IDAnalyzer DocuPass: id_front + id_back + selfie)
+  1: bike — Bike Photos (bike_left + bike_rear only; bike_front and bike_right removed)
+  2: owner — Owner Verification (vehicle.is_owner_rider OR vehicle.owner_verified)
+
+  Bike status logic:
+    - bikeUploaded === 2 → 'submitted'
+    - bike_rear has provider_reference AND no 'plate_mismatch' in rejection_reason → 'verified'
+    - plate_mismatch in rejection_reason → stays 'submitted' (soft flag, not a block)
+
+  Plate mismatch handling:
+    - KycDocument.rejection_reason set to 'plate_mismatch: detected PLATE' (surfaces in AdminFlags)
+    - Non-blocking: photo is always saved; rider sees warning with retake/update options
+    - provider_reference stores 'DETECTED_PLATE|SCORE' from PlateRecognizer
+
+  MUST NOT CHANGE: Task indices (0=identity, 1=bike, 2=owner).
+                   KycDocument document_type for bike photos: only 'bike_left' and 'bike_rear'.
 ```
 
 ---
@@ -327,4 +350,4 @@ Compliance.jsx → computeComplianceScore(user, vehicle, kycDocs, groupMembers) 
                    tier string values (used for CSS class matching in ComplianceTierHero and OfficerModeOverlay).
   Also used by: ComplianceDashboard.jsx indirectly via ComplianceRiderCard
                 (reads user.kyc_status — not calling this function directly, but relies on the same tier logic).
-``
+`

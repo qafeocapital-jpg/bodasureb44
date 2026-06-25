@@ -4,11 +4,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * Phase 6 Verification Completion — checks all 4 sub-tasks
  * and sets verification_complete = true via service role.
  *
- * Sub-tasks (consolidated from 5 → 4):
- * 1. Identity Verification (id_front + id_back + selfie uploaded)
- * 2. Bike Photos (bike_front + bike_left + bike_rear + bike_right uploaded)
- * 3. Phone OTP (user.phone_verified === true)
- * 4. Owner Verification (vehicle.is_owner_rider OR vehicle.owner_verified)
+ * Sub-tasks (3 tasks):
+ * 1. Identity Verification (id_front + id_back + selfie approved with provider_reference)
+ * 2. Bike Photos (bike_left + bike_rear uploaded)
+ * 3. Owner Verification (vehicle.is_owner_rider OR vehicle.owner_verified)
  */
 Deno.serve(async (req) => {
   try {
@@ -39,26 +38,21 @@ Deno.serve(async (req) => {
       );
     const identityDone = identityApproved;
 
-    // Sub-task 2: Bike Photos
-    const hasBikeFront = kycDocs.some(d => d.document_type === 'bike_front' && d.file_url);
+    // Sub-task 2: Bike Photos — 2 angles (bike_left, bike_rear)
     const hasBikeLeft = kycDocs.some(d => d.document_type === 'bike_left' && d.file_url);
     const hasBikeRear = kycDocs.some(d => d.document_type === 'bike_rear' && d.file_url);
-    const hasBikeRight = kycDocs.some(d => d.document_type === 'bike_right' && d.file_url);
-    const bikeDone = hasBikeFront && hasBikeLeft && hasBikeRear && hasBikeRight;
+    const bikeDone = hasBikeLeft && hasBikeRear;
 
-    // Sub-task 3: Phone OTP
-    const phoneDone = fullUser.phone_verified === true;
-
-    // Sub-task 4: Owner Verification
+    // Sub-task 3: Owner Verification
     const ownerDone = vehicle ? (vehicle.is_owner_rider === true || vehicle.owner_verified === true) : false;
 
-    const allDone = identityDone && bikeDone && phoneDone && ownerDone;
+    const allDone = identityDone && bikeDone && ownerDone;
 
     if (!allDone) {
       return Response.json({
         success: false,
         verification_complete: false,
-        tasks: { identity: identityDone, bike: bikeDone, phone: phoneDone, owner: ownerDone },
+        tasks: { identity: identityDone, bike: bikeDone, owner: ownerDone },
       });
     }
 
@@ -74,7 +68,7 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       verification_complete: true,
-      tasks: { identity: identityDone, bike: bikeDone, phone: phoneDone, owner: ownerDone },
+      tasks: { identity: identityDone, bike: bikeDone, owner: ownerDone },
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

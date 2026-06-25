@@ -1,8 +1,6 @@
 export const VERIFICATION_TASKS = [
-  { id: 'wallet', name: 'Activate BodaSure Wallet', short: 'Wallet' },
   { id: 'identity', name: 'Identity Verification', short: 'Identity' },
   { id: 'bike', name: 'Bike Photos', short: 'Bike' },
-  { id: 'phone', name: 'Phone OTP', short: 'Phone' },
   { id: 'owner', name: 'Owner Verification', short: 'Owner' },
 ];
 
@@ -11,10 +9,7 @@ export const VERIFICATION_TASKS = [
  * @returns Array of { id, status } where status is: not_started | in_progress | submitted | verified
  */
 export function getTaskStatuses(kycDocs = [], user, vehicle, wallet) {
-  // Task 0: BodaSure Wallet — always completed by Phase 5 since Phase 0 guarantees tier 1 / active
-  const walletStatus = (wallet?.status === 'active' && wallet?.tier >= 1) ? 'verified' : 'not_started';
-
-  // Task 1: Identity Verification (IDAnalyzer DocuPass only)
+  // Task 0: Identity Verification (IDAnalyzer DocuPass only)
   // Only consider docs with provider_reference (IDAnalyzer-processed)
   const idFrontProcessed = kycDocs.find(d => d.document_type === 'id_front' && d.provider_reference);
   const idBackProcessed = kycDocs.find(d => d.document_type === 'id_back' && d.provider_reference);
@@ -25,26 +20,24 @@ export function getTaskStatuses(kycDocs = [], user, vehicle, wallet) {
     idBackProcessed?.status === 'approved' &&
     selfieProcessed?.status === 'approved';
   const anyIdRejected = [idFrontProcessed, idBackProcessed, selfieProcessed].some(d => d?.status === 'rejected');
-  // M5 fix: remove attempt_count-based 'processing' state — let UI component manage in-progress display
   const identityStatus = allThreeApproved ? 'verified'
     : anyIdRejected ? 'rejected'
     : allThreeProcessed ? 'submitted'
     : 'not_started';
 
-  // Task 2: Bike Photos
-  const bikeTypes = ['bike_front', 'bike_left', 'bike_rear', 'bike_right'];
+  // Task 1: Bike Photos — 2 angles (bike_left, bike_rear)
+  // 'submitted' when both uploaded; 'verified' when rear photo has plate match (provider_reference + no plate_mismatch flag)
+  const bikeTypes = ['bike_left', 'bike_rear'];
   const bikeDocs = bikeTypes.map(t => kycDocs.find(d => d.document_type === t && d.file_url));
   const bikeUploaded = bikeDocs.filter(Boolean).length;
-  const bikeAllApproved = bikeTypes.every(t => kycDocs.some(d => d.document_type === t && d.status === 'approved'));
-  const bikeStatus = bikeAllApproved ? 'verified'
-    : bikeUploaded === 4 ? 'submitted'
+  const rearDoc = kycDocs.find(d => d.document_type === 'bike_rear' && d.file_url);
+  const plateVerified = rearDoc?.provider_reference && !(rearDoc?.rejection_reason || '').startsWith('plate_mismatch');
+  const bikeStatus = bikeUploaded === 2
+    ? (plateVerified ? 'verified' : 'submitted')
     : bikeUploaded > 0 ? 'in_progress'
     : 'not_started';
 
-  // Task 3: Phone OTP
-  const phoneStatus = user?.phone_verified ? 'verified' : 'not_started';
-
-  // Task 4: Owner Verification
+  // Task 2: Owner Verification
   const ownerStatus = vehicle
     ? (vehicle.is_owner_rider === true || vehicle.owner_verified === true)
       ? 'verified'
@@ -52,10 +45,8 @@ export function getTaskStatuses(kycDocs = [], user, vehicle, wallet) {
     : 'not_started';
 
   return [
-    { id: 'wallet', status: walletStatus },
     { id: 'identity', status: identityStatus },
     { id: 'bike', status: bikeStatus },
-    { id: 'phone', status: phoneStatus },
     { id: 'owner', status: ownerStatus },
   ];
 }

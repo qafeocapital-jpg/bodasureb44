@@ -1,20 +1,19 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2, CreditCard, Bike, UserCircle, Smartphone, UserCheck, Wallet } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2, CreditCard, Bike, UserCheck, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import VerificationMiniStepper from '@/components/rider/onboarding/VerificationMiniStepper';
 import VerificationComplete from '@/components/rider/onboarding/VerificationComplete';
 import SubTaskIdentity from '@/components/rider/onboarding/verification/SubTaskIdentity';
 import SubTaskBikePhotos from '@/components/rider/onboarding/verification/SubTaskBikePhotos';
-import SubTaskPhoneOTP from '@/components/rider/onboarding/verification/SubTaskPhoneOTP';
 import SubTaskOwner from '@/components/rider/onboarding/verification/SubTaskOwner';
 import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 import { VERIFICATION_TASKS, getTaskStatuses, isAllSubmitted, TASK_STATUS_CONFIG } from '@/lib/verification';
 import TierBenefitsCard from '@/components/rider/TierBenefitsCard';
 import { getKycLevel } from '@/components/ui/KycLevelBadge';
 
-const TASK_ICONS = [Wallet, CreditCard, Bike, Smartphone, UserCheck];
+const TASK_ICONS = [CreditCard, Bike, UserCheck];
 
 export default function PhaseVerification({ user, vehicle, wallet, onCompleted, onBack, readOnly, onExitReadOnly }) {
   const navigate = useNavigate();
@@ -53,18 +52,6 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
       });
     }
   }, [user?.kyc_just_approved, refreshUser]);
-
-  // L1 fix: Auto-verify phone via backend function (not client-side updateMe)
-  // C2 fix: Add refreshUser to dependency array
-  useEffect(() => {
-    if (wallet?.status === 'active' && wallet?.tier >= 1 && user && !user.phone_verified) {
-      base44.functions.invoke('checkWalletPhoneVerified', { userId: user.id })
-        .then(() => {
-          if (refreshUser) refreshUser();
-        })
-        .catch((e) => console.warn('[PhaseVerification] Phone verification failed:', e.message));
-    }
-  }, [wallet?.status, wallet?.tier, user?.phone_verified, refreshUser]);
 
   // Check completion state
   const tasks = getTaskStatuses(kycDocs, user, vehicle, wallet);
@@ -138,8 +125,7 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     switch (activeTask) {
       case 0: return <SubTaskIdentity {...props} />;
       case 1: return <SubTaskBikePhotos {...props} />;
-      case 2: return <SubTaskPhoneOTP {...props} />;
-      case 3: return <SubTaskOwner {...props} />;
+      case 2: return <SubTaskOwner {...props} />;
       default: return null;
     }
   };
@@ -173,6 +159,10 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
             const status = tasks[i]?.status || 'not_started';
             const config = TASK_STATUS_CONFIG[status];
             const Icon = TASK_ICONS[i];
+            const hasPlateMismatch = task.id === 'bike' && kycDocs.some(d =>
+              ['bike_left', 'bike_rear'].includes(d.document_type) &&
+              d.rejection_reason && d.rejection_reason.startsWith('plate_mismatch')
+            );
             return (
               <button
                 key={task.id}
@@ -185,8 +175,12 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold">{task.name}</p>
-                  <p className={`text-[10px] ${config.className}`}>{config.label}</p>
+                  <p className={`text-[10px] ${config.className}`}>
+                    {config.label}
+                    {hasPlateMismatch && <span className="text-warning ml-1">• Plate mismatch</span>}
+                  </p>
                 </div>
+                {hasPlateMismatch && <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0" />}
                 <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               </button>
             );
