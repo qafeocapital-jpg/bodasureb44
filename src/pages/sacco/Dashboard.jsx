@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES } from '@/lib/format';
-import { Users, Bike, Banknote, UserPlus, BadgeCheck, MapPin, AlertTriangle } from 'lucide-react';
+import { Users, Bike, Banknote, UserPlus, BadgeCheck, Map, AlertTriangle } from 'lucide-react';
 
 export default function SaccoDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ members: 0, bikes: 0, dividends: 0, applications: 0, complianceRate: 0, compliantBikes: 0, nonCompliantBikes: 0, stageCompliance: [] });
+  const [stats, setStats] = useState({ members: 0, bikes: 0, dividends: 0, applications: 0, complianceRate: 0, compliantBikes: 0, nonCompliantBikes: 0, wardCompliance: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,27 +31,27 @@ export default function SaccoDashboard() {
             : base44.entities.Settlement.filter({ entity_type: 'sacco', status: 'pending' }),
           base44.entities.GroupMember.filter({ group_id: saccoGroupId, status: 'pending' }).catch(() => []),
         ]);
-        // Fetch permits scoped to SACCO member bikes + stages for compliance widgets
+        // Fetch permits scoped to SACCO member bikes + wards for compliance widgets
         const bikeIds = new Set(bikes.map(b => b.id));
-        const [allPermits, allStages] = await Promise.all([
+        const [allPermits, allWards] = await Promise.all([
           countyId ? base44.entities.Permit.filter({ county_id: countyId }) : base44.entities.Permit.filter({}),
-          countyId ? base44.entities.Stage.filter({ county_id: countyId }).catch(() => []) : [],
+          countyId ? base44.entities.Ward.filter({ county_id: countyId }).catch(() => []) : [],
         ]);
 
         const activePermits = allPermits.filter(p => p.status === 'active' && p.vehicle_id && bikeIds.has(p.vehicle_id));
         const compliantBikes = bikes.filter(b => activePermits.some(p => p.vehicle_id === b.id));
         const complianceRate = bikes.length > 0 ? Math.round((compliantBikes.length / bikes.length) * 100) : 0;
 
-        const stageCompliance = allStages.map(stage => {
-          const stageBikes = bikes.filter(b => b.stage_id === stage.id);
-          const stageCompliant = stageBikes.filter(b => activePermits.some(p => p.vehicle_id === b.id)).length;
+        const wardCompliance = allWards.map(ward => {
+          const wardBikes = bikes.filter(b => b.ward_id === ward.id);
+          const wardCompliant = wardBikes.filter(b => activePermits.some(p => p.vehicle_id === b.id)).length;
           return {
-            name: stage.name,
-            total: stageBikes.length,
-            compliant: stageCompliant,
-            rate: stageBikes.length > 0 ? Math.round((stageCompliant / stageBikes.length) * 100) : 0,
+            name: ward.name,
+            total: wardBikes.length,
+            compliant: wardCompliant,
+            rate: wardBikes.length > 0 ? Math.round((wardCompliant / wardBikes.length) * 100) : 0,
           };
-        });
+        }).sort((a, b) => a.rate - b.rate); // worst first
 
         setStats({
           members: groupMembers.length,
@@ -61,7 +61,7 @@ export default function SaccoDashboard() {
           complianceRate,
           compliantBikes: compliantBikes.length,
           nonCompliantBikes: bikes.length - compliantBikes.length,
-          stageCompliance,
+          wardCompliance,
         });
       } catch (e) {}
       setLoading(false);
@@ -129,19 +129,19 @@ export default function SaccoDashboard() {
           </div>
         </div>
 
-        {/* Stage Compliance */}
+        {/* Ward Compliance */}
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
-            <MapPin className="w-5 h-5 text-blue-600" />
-            <h2 className="font-heading font-bold">Stage Compliance</h2>
+            <Map className="w-5 h-5 text-blue-600" />
+            <h2 className="font-heading font-bold">Ward Compliance</h2>
           </div>
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-4">...</p>
-          ) : stats.stageCompliance.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No stages</p>
+          ) : stats.wardCompliance.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No ward data</p>
           ) : (
             <div className="space-y-2">
-              {stats.stageCompliance.slice(0, 5).map((s, i) => (
+              {stats.wardCompliance.slice(0, 5).map((s, i) => (
                 <div key={i} className="flex items-center justify-between">
                   <span className="text-sm truncate flex-1">{s.name}</span>
                   <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ml-2 ${s.rate >= 75 ? 'bg-success/10 text-success' : s.rate >= 50 ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive'}`}>{s.rate}%</span>

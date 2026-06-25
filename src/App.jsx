@@ -47,7 +47,6 @@ import SaccoMembers from './pages/sacco/Members';
 import SaccoBikes from './pages/sacco/Bikes';
 import SaccoSettlements from './pages/sacco/Settlements';
 import SaccoCompliance from './pages/sacco/Compliance';
-import SaccoStages from './pages/sacco/Stages';
 import SaccoApplications from './pages/sacco/Applications';
 import MerchantProducts from './pages/merchant/Products';
 import MerchantPolicies from './pages/merchant/Policies';
@@ -159,7 +158,6 @@ const AuthenticatedApp = () => {
         <Route path="/sacco/members" element={<SaccoMembers />} />
         <Route path="/sacco/bikes" element={<SaccoBikes />} />
         <Route path="/sacco/compliance" element={<SaccoCompliance />} />
-        <Route path="/sacco/stages" element={<SaccoStages />} />
         <Route path="/sacco/applications" element={<SaccoApplications />} />
         <Route path="/sacco/settlements" element={<SaccoSettlements />} />
       </Route>
