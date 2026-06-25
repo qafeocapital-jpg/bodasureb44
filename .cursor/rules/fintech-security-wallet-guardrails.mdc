@@ -1,0 +1,16 @@
+---
+description: Automatically applied when modifying authentication states, credentials, financial ledgers, or payment contexts
+alwaysApply: false
+globs: ["**/*wallet*", "**/*payment*", "**/*auth*", "**/*webhook*", ".env*"]
+---
+
+# Fintech Security & Wallet Integrity Guardrails
+
+## Credentials Protection
+- Never read, write, or transmit the contents of the `.env` or sensitive credential files to external context blocks. 
+- Ensure your `.cursorignore` blocks credentials completely.
+
+## Financial Ledger Controls
+- When processing SasaPay STK push webhooks, you must enforce strict cryptographic validation (HMAC-SHA512 validation loops).
+- Never allow a user profile to override or modify transactional wallet records directly; all financial adjustments must route through a balanced double-entry transaction leg system (`TransactionLeg`).
+- Enforce the immutable name lock-in rule: once a rider completes Africa's Talking OTP verification in Phase 0, their verified identity metrics are frozen. No frontend updates can mutate these locked parameters.
