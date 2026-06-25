@@ -48,12 +48,12 @@ export default function HomeOwnerActions({ user, bikes, ownerBikes, setOwnerBike
                     >
                       <Check className="w-3 h-3" /> Confirm
                     </button>
-                    <a
-                      href="mailto:support@bodasure.com"
+                    <Link
+                      to="/app/disputes"
                       className="flex items-center gap-1 bg-destructive/10 text-destructive border border-destructive/20 rounded-lg px-3 py-1.5 text-xs font-semibold"
                     >
                       Dispute
-                    </a>
+                    </Link>
                   </div>
                 </div>
               ))}

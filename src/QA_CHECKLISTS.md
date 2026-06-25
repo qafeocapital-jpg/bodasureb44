@@ -29,18 +29,19 @@
 | 9 | Click "Activate Wallet" | Loading spinner → OTP step appears | ☐ PASS ☐ FAIL |
 | 10 | Wait for OTP SMS on phone | OTP SMS received within 60 seconds | ☐ PASS ☐ FAIL |
 | 11 | Enter wrong OTP → click Verify | Red error: "Verification failed. Check your code" | ☐ PASS ☐ FAIL |
-| 12 | Enter correct OTP → click Verify | Success → PIN step appears | ☐ PASS ☐ FAIL |
-| 13 | Enter 4-digit PIN, mismatch confirm | Red error: "PINs do not match" | ☐ PASS ☐ FAIL |
-| 14 | Enter matching 4-digit PINs → click Set PIN | Success screen with green checkmark | ☐ PASS ☐ FAIL |
-| 15 | Click "Continue to Bike Registration" | Phase 1 (Bike Registration) appears | ☐ PASS ☐ FAIL |
-| 16 | Complete bike registration form | Bike details saved, proceed to Phase 2 | ☐ PASS ☐ FAIL |
-| 17 | Complete map bike location | Sub-county, ward, stage selected, proceed to Phase 3 | ☐ PASS ☐ FAIL |
-| 18 | Complete stage assignment | Stage confirmed, proceed to Phase 4 | ☐ PASS ☐ FAIL |
-| 19 | Complete SACCO membership | SACCO joined (pending), proceed to Phase 5 | ☐ PASS ☐ FAIL |
-| 20 | Complete KYC DocuPass scan | Identity documents processed, proceed to Phase 6 | ☐ PASS ☐ FAIL |
-| 21 | Land on Completion Screen | "Account Configured" success message shown | ☐ PASS ☐ FAIL |
-| 22 | Click "Go to Dashboard" | Home page loads with wallet active, all tiles visible | ☐ PASS ☐ FAIL |
-| 23 | Check Home greeting shows user-entered name | Greeting uses the name entered in Step 3 (not OAuth name) | ☐ PASS ☐ FAIL |
+| 12 | Tap Resend OTP → backend returns new requestId → new OTP SMS received → enter NEW OTP → Verify | requestId updated via onRequestIdUpdated callback; old OTP rejected; new OTP works | ☐ PASS ☐ FAIL |
+| 13 | Enter correct OTP → click Verify | Success → PIN step appears | ☐ PASS ☐ FAIL |
+| 14 | Enter 4-digit PIN, mismatch confirm | Red error: "PINs do not match" | ☐ PASS ☐ FAIL |
+| 15 | Enter matching 4-digit PINs → click Set PIN | Success screen with green checkmark | ☐ PASS ☐ FAIL |
+| 16 | Click "Continue to Bike Registration" | Phase 1 (Bike Registration) appears | ☐ PASS ☐ FAIL |
+| 17 | Complete bike registration form | Bike details saved, proceed to Phase 2 | ☐ PASS ☐ FAIL |
+| 18 | Complete map bike location | Sub-county, ward, stage selected, proceed to Phase 3 | ☐ PASS ☐ FAIL |
+| 19 | Complete stage assignment | Stage confirmed, proceed to Phase 4 | ☐ PASS ☐ FAIL |
+| 20 | Complete SACCO membership | SACCO joined (pending), proceed to Phase 5 | ☐ PASS ☐ FAIL |
+| 21 | Complete KYC DocuPass scan | Identity documents processed, proceed to Phase 6 | ☐ PASS ☐ FAIL |
+| 22 | Land on Completion Screen | "Account Configured" success message shown | ☐ PASS ☐ FAIL |
+| 23 | Click "Go to Dashboard" | Home page loads with wallet active, all tiles visible | ☐ PASS ☐ FAIL |
+| 24 | Check Home greeting shows user-entered name | Greeting uses the name entered in Step 3 (not OAuth name) | ☐ PASS ☐ FAIL |
 
 ---
 

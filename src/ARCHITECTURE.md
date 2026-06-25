@@ -341,12 +341,23 @@ src/
 │   │   ├── onboarding/        # 7-phase onboarding components
 │   │   │   ├── verification/  # Phase 5 sub-tasks
 │   │   │   ├── map/           # Stage picker map
+│   │   ├── home/              # Home dashboard sub-components
 │   ├── staff/                 # Staff portal layout
 │   ├── admin/                 # Admin components
+│   │   ├── compliance/        # ComplianceDashboard sub-components
+│   │   │   ├── ComplianceStatusCards
+│   │   │   └── ComplianceRiderCard
+│   ├── compliance/            # Compliance page sub-components
+│   │   ├── ComplianceTierHero
+│   │   ├── ComplianceTabToggle
+│   │   ├── CompliancePenaltyList
+│   │   ├── ComplianceChecklist
+│   │   ├── RiderIdentitySummary
+│   │   └── OfficerModeOverlay
 │   ├── ui/                    # shadcn/ui components
 ├── entities/                  # JSON schemas (30+ files)
 ├── functions/                 # Deno backend functions (35+ files)
 ├── lib/                       # Utilities, auth, phone, payments
+│   └── compliance.js          # computeComplianceScore + compliance helpers
 ├── hooks/
 └── agents/                    # AI agent configs
-`

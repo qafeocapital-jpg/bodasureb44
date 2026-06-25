@@ -28,17 +28,17 @@ PhasePersonal.handleInitWallet() → base44.functions.invoke('sasapayPersonalOnb
   Response expected: { success: boolean, requestId?: string, error?: string, conflictType?: string }
 ```
 
-### PhasePersonal → sasapayPersonalOnboarding (confirm)
+### PhasePersonalOtp → sasapayPersonalOnboarding (confirm)
 ```
-PhasePersonal.handleConfirmOtp() → base44.functions.invoke('sasapayPersonalOnboarding', { action: 'confirm', otp, requestId })
+PhasePersonalOtp.handleConfirmOtp() → base44.functions.invoke('sasapayPersonalOnboarding', { action: 'confirm', otp, requestId })
   Payload: { action: 'confirm', otp: string, requestId: string }
   MUST NOT CHANGE: action must be 'confirm'. otp and requestId are required.
   Response expected: { success: boolean, accountNumber?: string, displayName?: string, accountStatus?: string, error?: string }
 ```
 
-### PhasePersonal → sasapayPersonalOnboarding (resendOtp)
+### PhasePersonalOtp → sasapayPersonalOnboarding (resendOtp)
 ```
-PhasePersonal (resend button) → base44.functions.invoke('sasapayPersonalOnboarding', { action: 'resendOtp', requestId })
+PhasePersonalOtp (resend button) → base44.functions.invoke('sasapayPersonalOnboarding', { action: 'resendOtp', requestId })
   Payload: { action: 'resendOtp', requestId: string }
   MUST NOT CHANGE: action must be 'resendOtp'. Backend re-calls init with same user data to generate new OTP.
   Response expected: { success: boolean, requestId?: string, error?: string }
@@ -61,9 +61,9 @@ sasapayPersonalOnboarding (confirm) → base44.asServiceRole.entities.User.updat
                   full_name and middle_name are read from the authenticated user's current state.
 ```
 
-### PhasePersonal → setWalletPin
+### PhasePersonalPin → setWalletPin
 ```
-PhasePersonal.handleSetPin() → base44.functions.invoke('setWalletPin', { pin })
+PhasePersonalPin.handleSetPin() → base44.functions.invoke('setWalletPin', { pin })
   Payload: { pin: string } (4 digits)
   MUST NOT CHANGE: pin must be 4-digit string. Function auto-looks up walletId by authenticated user.
   Response expected: { success: boolean, error?: string }
@@ -311,4 +311,20 @@ AuthContext.navigateToLogin() → base44.auth.redirectToLogin('/app')
 ProtectedRoute accepts: unauthenticatedElement, fallback
   Renders <Outlet /> when authenticated, unauthenticatedElement when not.
   MUST NOT CHANGE: Used as layout route wrapping all authenticated pages in App.jsx.
+```
+
+---
+
+## Compliance Score
+
+### Compliance.jsx → computeComplianceScore
+```
+Compliance.jsx → computeComplianceScore(user, vehicle, kycDocs, groupMembers) in lib/compliance.js
+  Args: (user: object, vehicle: object|undefined, kycDocs: KycDocument[], groupMembers: GroupMember[])
+  Returns: { score: number (0-100), tier: string, breakdown: object }
+  tier values: 'Non-Compliant' | 'Partial' | 'Road-Ready' | 'Fully Verified'
+  MUST NOT CHANGE: function signature (4 positional args), return field names (score, tier, breakdown),
+                   tier string values (used for CSS class matching in ComplianceTierHero and OfficerModeOverlay).
+  Also used by: ComplianceDashboard.jsx indirectly via ComplianceRiderCard
+                (reads user.kyc_status — not calling this function directly, but relies on the same tier logic).
 ``
