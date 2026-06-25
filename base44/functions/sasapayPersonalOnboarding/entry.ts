@@ -1,3 +1,22 @@
+/**
+ * sasapayPersonalOnboarding — Personal wallet activation (SasaPay WAAS)
+ *
+ * FUNCTION MAP:
+ *   Deno.serve handler        — routes by action: init | confirm | resendOtp
+ *   initializePersonalOnboarding — validates user fields, checks phone/ID uniqueness,
+ *                                 calls SasaPay init API, stores requestId on Wallet
+ *   confirmPersonalOnboarding  — calls SasaPay OTP confirmation, creates/updates Wallet,
+ *                                 locks in user-entered name via service-role write
+ *   resendPersonalOtp          — re-calls initializePersonalOnboarding to generate new OTP
+ *   getSasaPayToken            — OAuth2 client_credentials token fetch
+ *   getSasaPayApiUrl           — returns SasaPay API base URL based on environment
+ *   logOnboardingError         — writes failed onboarding attempts to AuditLog for Admin dashboard
+ *
+ * READS:  User, Wallet
+ * WRITES: Wallet, AuditLog, User (name lock-in)
+ *
+ * CONTRACT: See FEATURE_CONTRACTS.md — PhasePersonal → sasapayPersonalOnboarding
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 Deno.serve(async (req) => {
@@ -31,6 +50,12 @@ Deno.serve(async (req) => {
   }
 });
 
+// ============================================================
+// SECTION: initializePersonalOnboarding
+// Validates user fields, normalizes phone, checks phone/ID uniqueness,
+// calls SasaPay personal-onboarding init API, stores requestId on Wallet.
+// Hard-blocks on duplicate phone, ID, or existing SasaPay wallet.
+// ============================================================
 async function initializePersonalOnboarding(base44, user) {
   // Validate required user fields
   if (!user.full_name || !user.phone || !user.national_id) {
@@ -178,6 +203,11 @@ async function initializePersonalOnboarding(base44, user) {
   });
 }
 
+// ============================================================
+// SECTION: confirmPersonalOnboarding
+// Calls SasaPay OTP confirmation, creates/updates Wallet with account details,
+// coerces accountNumber to string, performs name lock-in via service-role write.
+// ============================================================
 async function confirmPersonalOnboarding(base44, user, otp, requestId) {
   const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
   const token = await getSasaPayToken();
@@ -282,6 +312,10 @@ async function confirmPersonalOnboarding(base44, user, otp, requestId) {
   });
 }
 
+// ============================================================
+// SECTION: getSasaPayToken
+// Fetches OAuth2 access token using client_credentials grant.
+// ============================================================
 async function getSasaPayToken() {
   const clientId = Deno.env.get('SASAPAY_CLIENT_ID');
   const clientSecret = Deno.env.get('SASAPAY_CLIENT_SECRET');
@@ -307,17 +341,31 @@ async function getSasaPayToken() {
   return data.access_token;
 }
 
+// ============================================================
+// SECTION: getSasaPayApiUrl
+// Returns SasaPay API v2 base URL based on SASAPAY_ENVIRONMENT.
+// ============================================================
 function getSasaPayApiUrl() {
   const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
   return `https://${env}.sasapay.app/api/v2`;
 }
 
+// ============================================================
+// SECTION: resendPersonalOtp
+// SasaPay generates a new OTP by re-calling the init endpoint
+// with the same user data. Returns a new requestId + OTP.
+// ============================================================
 async function resendPersonalOtp(base44, user, requestId) {
   // SasaPay uses re-init to generate a new OTP: calling the init endpoint
   // again with the same user data produces a new requestId + OTP.
   return await initializePersonalOnboarding(base44, user);
 }
 
+// ============================================================
+// SECTION: logOnboardingError
+// Writes failed onboarding attempts to AuditLog for Admin dashboard visibility.
+// Called on: duplicate_phone, duplicate_id, duplicate_sasapay_wallet, sasapay_error
+// ============================================================
 async function logOnboardingError(base44, user, errorCode, errorMessage, phone, nationalId) {
   try {
     await base44.asServiceRole.entities.AuditLog.create({
