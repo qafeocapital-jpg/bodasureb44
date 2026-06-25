@@ -4,7 +4,6 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import { useToast } from '@/components/ui/use-toast';
-import HomeWalletActivateGate from '@/components/rider/home/HomeWalletActivateGate';
 import HomeHero from '@/components/rider/home/HomeHero';
 import HomeStatusBanners from '@/components/rider/home/HomeStatusBanners';
 import HomeOwnerActions from '@/components/rider/home/HomeOwnerActions';
@@ -109,8 +108,6 @@ export default function Home() {
   }, [user]);
 
   if (loading) return <PageSkeleton variant="hero-grid" />;
-
-  if (!walletActive) return <HomeWalletActivateGate />;
 
   return (
     <div className="animate-fade-in">

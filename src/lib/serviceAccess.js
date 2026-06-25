@@ -32,8 +32,8 @@ export function checkServiceAccess(service, { user, wallet, bikes, countyLive })
       actionLink: '/app/compliance',
     },
     lipa_county: {
-      unlocked: walletActive && hasBike,
-      title: 'Register Your Bike',
+      unlocked: hasBike,
+      title: 'Register Your Bike First',
       message: 'You need a registered and approved bike before paying county fees.',
       actionLabel: 'Register Bike',
       actionLink: '/app/bikes/register',

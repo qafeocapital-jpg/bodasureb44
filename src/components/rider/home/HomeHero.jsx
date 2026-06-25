@@ -46,7 +46,7 @@ export default function HomeHero({ user, balance, walletActive, bikes }) {
             <span className="text-xs font-medium">Wallet Active · {KYC_LEVEL_CONFIG[getKycLevel(user)].label}</span>
           </div>
         ) : (
-          <Link to="/app/wallet/activate" className="flex items-center gap-1.5 bg-white text-primary rounded-full px-3 py-1.5 font-semibold text-xs hover:bg-orange-50 transition-colors">
+          <Link to="/app/profile" className="flex items-center gap-1.5 bg-white text-primary rounded-full px-3 py-1.5 font-semibold text-xs hover:bg-orange-50 transition-colors animate-pulse-glow">
             <AlertCircle className="w-4 h-4" />
             Activate Wallet
           </Link>
