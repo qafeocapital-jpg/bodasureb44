@@ -9,7 +9,7 @@ import ScrollToTop from './components/ScrollToTop';
 import { Navigate } from 'react-router-dom';
 import RiderLayout from './components/rider/RiderLayout';
 import StaffLayout from './components/staff/StaffLayout';
-import { countyNav, saccoNav, merchantNav, agentNav, stageNav, adminNav, commsNav } from './lib/staffNav';
+import { countyNav, saccoNav, merchantNav, agentNav, adminNav, commsNav } from './lib/staffNav';
 import Home from './pages/rider/Home';
 import Wallet from './pages/rider/Wallet';
 import Bikes from './pages/rider/Bikes';
@@ -181,7 +181,7 @@ const AuthenticatedApp = () => {
       </Route>
 
       {/* Stage Portal (blue) */}
-      <Route element={<StaffLayout accent="blue" portalName="Stage" navItems={stageNav} requiredRole="stage_admin" />}>
+      <Route element={<StaffLayout accent="blue" portalName="Stage" navItems={[]} requiredRole="stage_admin" />}>
         <Route path="/stage/dashboard" element={<StageDashboard />} />
         <Route path="/stage/members" element={<StageMembers />} />
         <Route path="/stage/compliance" element={<StageCompliance />} />

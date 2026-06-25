@@ -3,7 +3,7 @@ import { Check } from 'lucide-react';
 import { ONBOARDING_PHASES } from '@/lib/onboarding';
 
 export default function ProgressBar({ currentPhase, completedPhase, onJumpBack, onboardingComplete }) {
-  const isDone = currentPhase >= 6;
+  const isDone = currentPhase >= ONBOARDING_PHASES.length;
   const activePhase = isDone ? null : ONBOARDING_PHASES[currentPhase];
 
   return (
@@ -22,12 +22,12 @@ export default function ProgressBar({ currentPhase, completedPhase, onJumpBack, 
                 {isDone ? 'Setup Complete!' : activePhase.name}
               </p>
               <p className="text-[10px] text-muted-foreground font-medium">
-                {isDone ? 'You can now access all features' : `Step ${currentPhase + 1} of 6`}
+                {isDone ? 'You can now access all features' : `Step ${currentPhase + 1} of ${ONBOARDING_PHASES.length}`}
               </p>
             </div>
           </div>
           <span className="text-xs font-bold text-muted-foreground">
-            {isDone ? '6/6' : `${currentPhase + 1}/6`}
+            {isDone ? `${ONBOARDING_PHASES.length}/${ONBOARDING_PHASES.length}` : `${currentPhase + 1}/${ONBOARDING_PHASES.length}`}
           </span>
         </div>
       </div>

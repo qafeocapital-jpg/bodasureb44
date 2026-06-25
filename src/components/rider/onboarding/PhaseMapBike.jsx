@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { ChevronRight, ChevronLeft, Loader2, MapPin, AlertTriangle } from 'lucide-react';
-import StageSearchPicker from '@/components/rider/onboarding/StageSearchPicker';
 import MapCountyConfirmation from '@/components/rider/onboarding/MapCountyConfirmation';
 import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
 
@@ -9,11 +8,9 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
   const [county, setCounty] = useState(null);
   const [subCounties, setSubCounties] = useState([]);
   const [wards, setWards] = useState([]);
-  const [stages, setStages] = useState([]);
   const [form, setForm] = useState({
     sub_county_id: initialValues?.sub_county_id || '',
     ward_id: initialValues?.ward_id || '',
-    stage_id: initialValues?.stage_id || '',
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -38,10 +35,6 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
         if (vehicle?.sub_county_id) {
           const ws = await base44.entities.Ward.filter({ sub_county_id: vehicle.sub_county_id });
           setWards(ws);
-          if (vehicle?.ward_id) {
-            const sts = await base44.entities.Stage.filter({ ward_id: vehicle.ward_id });
-            setStages(sts);
-          }
         }
       } catch (e) {}
     }
@@ -49,8 +42,8 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
   }, [user, vehicle]);
 
   async function handleSubCountyChange(subCountyId) {
-    updateForm({ sub_county_id: subCountyId, ward_id: '', stage_id: '' });
-    setWards([]); setStages([]);
+    updateForm({ sub_county_id: subCountyId, ward_id: '' });
+    setWards([]);
     if (subCountyId) {
       const ws = await base44.entities.Ward.filter({ sub_county_id: subCountyId });
       setWards(ws);
@@ -58,15 +51,10 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
   }
 
   async function handleWardChange(wardId) {
-    updateForm({ ward_id: wardId, stage_id: '' });
-    setStages([]);
-    if (wardId) {
-      const sts = await base44.entities.Stage.filter({ ward_id: wardId });
-      setStages(sts);
-    }
+    updateForm({ ward_id: wardId });
   }
 
-  const canProceed = () => form.sub_county_id && form.ward_id && form.stage_id;
+  const canProceed = () => form.sub_county_id && form.ward_id;
 
   async function handleSave() {
     setSaving(true);
@@ -75,7 +63,6 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
       await base44.entities.Vehicle.update(vehicle.id, {
         sub_county_id: form.sub_county_id,
         ward_id: form.ward_id,
-        stage_id: form.stage_id,
       });
       setShowConfirmation(true);
     } catch (e) {
@@ -96,7 +83,6 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
   if (showConfirmation) {
     const subCounty = subCounties.find(s => s.id === form.sub_county_id);
     const ward = wards.find(w => w.id === form.ward_id);
-    const stage = stages.find(s => s.id === form.stage_id);
     return (
       <MapCountyConfirmation
         user={user}
@@ -104,7 +90,6 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
         county={county}
         subCounty={subCounty}
         ward={ward}
-        stage={stage}
         onContinue={onSaved}
         onBack={() => setShowConfirmation(false)}
       />
@@ -147,21 +132,6 @@ export default function PhaseMapBike({ user, vehicle, initialValues, onDraftChan
           <option value="">Select ward</option>
           {wards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
-      </div>
-
-      <div>
-        <label className="text-xs font-medium text-muted-foreground">Select Your Stage</label>
-        <p className="text-[10px] text-muted-foreground mb-2">Search for your stage or location on the map, or tap to pin a new stage</p>
-        <StageSearchPicker
-          wardId={form.ward_id}
-          countyId={user?.county_id}
-          countyName={county?.name}
-          wardName={wards.find(w => w.id === form.ward_id)?.name}
-          stages={stages}
-          selectedStageId={form.stage_id}
-          onSelect={(id) => updateForm({ stage_id: id })}
-          onStagesChange={setStages}
-        />
       </div>
 
       {saveError && (

@@ -44,7 +44,6 @@ export const riderTileSections = [
       { label: 'Pay License', icon: BadgeCheck, color: 'blue', path: '/app/lipa-county', status: 'live' },
       { label: 'My QR Code', icon: QrCode, color: 'green', path: '/app/bikes', status: 'live' },
       { label: 'Pay Owner', icon: UserCheck, color: 'violet', path: '/app/lipa-owner', status: 'live', requiresWallet: true, requiresTier2: true },
-      { label: 'My Stage', icon: MapPin, color: 'amber', path: '/app/stage', status: 'live' },
       { label: 'Insurance', icon: ShieldCheck, color: 'rose', path: '/app/insurance', status: 'live', requiresWallet: true, requiresTier2: true },
     ]
   },

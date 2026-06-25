@@ -1,6 +1,6 @@
-import { Check, ChevronRight, User, Bike, MapPin, Flag } from 'lucide-react';
+import { Check, ChevronRight, User, Bike, MapPin } from 'lucide-react';
 
-export default function MapCountyConfirmation({ user, vehicle, county, subCounty, ward, stage, onContinue, onBack }) {
+export default function MapCountyConfirmation({ user, vehicle, county, subCounty, ward, onContinue, onBack }) {
   const summarySections = [
     {
       icon: User,
@@ -30,13 +30,6 @@ export default function MapCountyConfirmation({ user, vehicle, county, subCounty
         { label: 'County', value: county?.name },
         { label: 'Sub-County', value: subCounty?.name },
         { label: 'Ward', value: ward?.name },
-      ],
-    },
-    {
-      icon: Flag,
-      title: 'Stage',
-      items: [
-        { label: 'Stage', value: stage?.name },
       ],
     },
   ];

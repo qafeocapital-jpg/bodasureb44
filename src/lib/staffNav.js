@@ -23,7 +23,6 @@ export const saccoNav = [
   { label: 'Members', path: '/sacco/members', icon: Users },
   { label: 'Bikes', path: '/sacco/bikes', icon: Bike },
   { label: 'Compliance', path: '/sacco/compliance', icon: BadgeCheck },
-  { label: 'Stages', path: '/sacco/stages', icon: Map },
   { label: 'Applications', path: '/sacco/applications', icon: ClipboardList },
   { label: 'Settlements', path: '/sacco/settlements', icon: Banknote },
 ];
@@ -38,12 +37,6 @@ export const agentNav = [
   { label: 'Dashboard', path: '/agent/dashboard', icon: LayoutDashboard },
   { label: 'Invite Rider', path: '/agent/invite', icon: UserPlus },
   { label: 'History', path: '/agent/history', icon: History },
-];
-
-export const stageNav = [
-  { label: 'Dashboard', path: '/stage/dashboard', icon: LayoutDashboard },
-  { label: 'Members', path: '/stage/members', icon: Users },
-  { label: 'Compliance', path: '/stage/compliance', icon: BadgeCheck },
 ];
 
 export const commsNav = [

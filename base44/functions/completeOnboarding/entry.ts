@@ -17,19 +17,14 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'No bike registered. Please finish Phase 2.' }, { status: 400 });
     }
     const vehicle = vehicles[0];
-    if (!vehicle.sub_county_id || !vehicle.ward_id || !vehicle.stage_id) {
-      return Response.json({ error: 'Bike is not mapped to a stage. Please finish Phase 3.' }, { status: 400 });
+    if (!vehicle.sub_county_id || !vehicle.ward_id) {
+      return Response.json({ error: 'Bike is not mapped to a ward. Please finish Phase 2.' }, { status: 400 });
     }
 
-    // 3. Verify user has a stage_id set
-    if (!user.stage_id) {
-      return Response.json({ error: 'Stage not confirmed. Please finish Phase 4.' }, { status: 400 });
-    }
-
-    // 4. Verify exactly one group membership (1-rider-1-group policy)
+    // 3. Verify exactly one group membership (1-rider-1-group policy)
     const memberships = await base44.entities.GroupMember.filter({ user_id: user.id });
     if (!memberships || memberships.length === 0) {
-      return Response.json({ error: 'No SACCO/group selected. Please finish Phase 5.' }, { status: 400 });
+      return Response.json({ error: 'No SACCO/group selected. Please finish Phase 3.' }, { status: 400 });
     }
     if (memberships.length > 1) {
       // Enforce 1-rider-1-group: keep only the most recent, delete extras

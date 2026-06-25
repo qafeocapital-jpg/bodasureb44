@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { getAccessiblePortals } from '@/lib/portals';
-import { User, FileCheck, Bell, Lock, Headphones, LogOut, ChevronRight, ShieldCheck, Layers, MapPin } from 'lucide-react';
+import { User, FileCheck, Bell, Lock, Headphones, LogOut, ChevronRight, ShieldCheck, Layers } from 'lucide-react';
 import { formatPhoneDisplay } from '@/lib/phone';
 import KycLevelBadge from '@/components/ui/KycLevelBadge';
 
@@ -108,14 +108,6 @@ export default function Account() {
               <p className="text-xs text-blue-600">Self-register your group for admin review</p>
             </div>
             <ChevronRight className="w-4 h-4 text-blue-600" />
-          </Link>
-          <Link to="/app/account/stage-apply" className="w-full flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 hover:bg-emerald-100/50 transition-colors">
-            <MapPin className="w-5 h-5 text-emerald-600" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-emerald-900">Apply as Stage Leader</p>
-              <p className="text-xs text-emerald-600">Lead a stage in your area</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-emerald-600" />
           </Link>
         </div>
       </div>

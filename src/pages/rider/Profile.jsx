@@ -10,7 +10,6 @@ import ProgressBar from '@/components/rider/onboarding/ProgressBar';
 import PhasePersonal from '@/components/rider/onboarding/PhasePersonal';
 import PhaseBike from '@/components/rider/onboarding/PhaseBike';
 import PhaseMapBike from '@/components/rider/onboarding/PhaseMapBike';
-import PhaseStage from '@/components/rider/onboarding/PhaseStage';
 import PhaseSacco from '@/components/rider/onboarding/PhaseSacco';
 import PhaseVerification from '@/components/rider/onboarding/PhaseVerification';
 import CompletionScreen from '@/components/rider/onboarding/CompletionScreen';
@@ -106,7 +105,7 @@ export default function Profile() {
           setCurrentPhase(viewStep);
           setReadOnly(true);
         } else {
-          setCurrentPhase(Math.min(phase, 6));
+          setCurrentPhase(Math.min(phase, 5));
           setReadOnly(false);
         }
       } catch (e) {}
@@ -132,8 +131,8 @@ export default function Profile() {
 
   async function handlePhaseComplete() {
     await refreshData();
-    setCurrentPhase(p => Math.min(p + 1, 6));
-    setCompletedPhase(p => Math.min(p + 1, 6));
+    setCurrentPhase(p => Math.min(p + 1, 5));
+    setCompletedPhase(p => Math.min(p + 1, 5));
   }
 
   const phaseInitialValues = (phase) => {
@@ -162,7 +161,6 @@ export default function Profile() {
       return {
         sub_county_id: v?.sub_county_id || draft.sub_county_id || '',
         ward_id: v?.ward_id || draft.ward_id || '',
-        stage_id: v?.stage_id || draft.stage_id || '',
       };
     }
     return draft;
@@ -176,7 +174,7 @@ export default function Profile() {
     setReadOnly(false);
     const phase = getOnboardingPhase(user, vehicles, groupMembers, wallet);
     setCompletedPhase(phase);
-    setCurrentPhase(Math.min(phase, 6));
+    setCurrentPhase(Math.min(phase, 5));
     navigate('/app/profile', { replace: true, state: {} });
   };
 
@@ -279,39 +277,29 @@ export default function Profile() {
           />
         )}
         {currentPhase === 3 && (
-          <PhaseStage
-            user={user}
-            vehicle={vehicles[0]}
-            onSaved={handlePhaseComplete}
-            onBack={() => setCurrentPhase(2)}
-            readOnly={readOnly}
-            onExitReadOnly={handleExitReadOnly}
-          />
-        )}
-        {currentPhase === 4 && (
           <PhaseSacco
             user={user}
             counties={counties}
             groupMembers={groupMembers}
             vehicle={vehicles[0]}
             onJoined={handlePhaseComplete}
+            onBack={() => setCurrentPhase(2)}
+            readOnly={readOnly}
+            onExitReadOnly={handleExitReadOnly}
+          />
+        )}
+        {currentPhase === 4 && (
+          <PhaseVerification
+            user={user}
+            vehicle={vehicles[0]}
+            wallet={wallet}
+            onCompleted={() => setCurrentPhase(5)}
             onBack={() => setCurrentPhase(3)}
             readOnly={readOnly}
             onExitReadOnly={handleExitReadOnly}
           />
         )}
-        {currentPhase === 5 && (
-          <PhaseVerification
-            user={user}
-            vehicle={vehicles[0]}
-            wallet={wallet}
-            onCompleted={() => setCurrentPhase(6)}
-            onBack={() => setCurrentPhase(4)}
-            readOnly={readOnly}
-            onExitReadOnly={handleExitReadOnly}
-          />
-        )}
-        {currentPhase >= 6 && (
+        {currentPhase >= 5 && (
           <CompletionScreen onDone={() => navigate('/app')} verificationComplete={user?.verification_complete} />
         )}
       </div>
