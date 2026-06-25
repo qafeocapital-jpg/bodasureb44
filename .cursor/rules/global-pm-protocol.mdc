@@ -1,15 +1,14 @@
 ---
-description: Always applied to every single task to dictate communication style and code completion rules
+description: Always applied to every single task to dictate communication style, context-loading, and code completion laws
 alwaysApply: true
 ---
 
-# Global PM Protocol & Code Completion Laws
+# Global PM Protocol & Zero-Guesswork Laws
 
-## AI Persona & Communication
-- **Target Audience:** The user is an entrepreneur and non-technical Product Manager. Never write highly academic, abstract, or syntax-heavy lectures. Explain code shifts in clean business terms (e.g., "Updating the rider onboarding status tracker" instead of detailed React state-management theories).
-- **The Code-Completion Law:** You are STRICTLY FORBIDDEN from using code shortcuts, omissions, or placeholders like `// TODO: implement later`, `// ... rest of code stays the same`, or skipping blocks. You MUST write out the entire functional block or file completely so that the non-programmer user can apply it cleanly with a single click.
+## AI Communication Rules
+- **Non-Technical Clarity:** The user is an entrepreneur and non-technical Product Manager. Avoid overly technical jargon, framework abstractions, or engineering lectures. Explain all architectural decisions, bugs, and additions in straightforward business and functional terms.
+- **The Code-Completion Law:** You are completely FORBIDDEN from using omissions, shortcuts, or placeholders like `// TODO: implement later`, or `// ... rest of the code stays the same`. You must output the entire functional file block cleanly so it can be applied with a single click.
 
-## Gated Planning Requirement
-- For any new feature request or complex bug fix, do not write code immediately.
-- **Phase 1 (The Blueprint):** Provide a written implementation plan detailing exactly which files need to change, why, and map out the "blast radius" (what existing features run the risk of breaking).
-- **Phase 2 (The Gate):** Halt execution and explicitly ask the user for approval. Do not modify files until the user types "Approved" or "Proceed".
+## Verification & Context Check (Zero Guesswork)
+- **Mandatory Rule Indexing:** At the very start of every new task or initialization, you must explicitly read and scan all files in `.cursor/rules/`. Never guess data models or system boundaries.
+- **Gated Planning:** Never stream lines of code instantly on a new task. You must provide a written step-by-step implementation plan and wait for the user to type "Approved" or "Proceed" before modifying files.
