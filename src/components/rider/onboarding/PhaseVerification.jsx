@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2, CreditCard, Bike, UserCheck, AlertTriangle } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2, CreditCard, Bike, UserCheck } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import VerificationMiniStepper from '@/components/rider/onboarding/VerificationMiniStepper';
 import VerificationComplete from '@/components/rider/onboarding/VerificationComplete';
@@ -9,7 +9,7 @@ import SubTaskIdentity from '@/components/rider/onboarding/verification/SubTaskI
 import SubTaskBikePhotos from '@/components/rider/onboarding/verification/SubTaskBikePhotos';
 import SubTaskOwner from '@/components/rider/onboarding/verification/SubTaskOwner';
 import { ReadOnlyBanner, ReadOnlyBackButton } from '@/components/rider/onboarding/ReadOnlyBanner';
-import { VERIFICATION_TASKS, getTaskStatuses, isAllSubmitted, TASK_STATUS_CONFIG } from '@/lib/verification';
+import { VERIFICATION_TASKS, getTaskStatuses, TASK_STATUS_CONFIG } from '@/lib/verification';
 import TierBenefitsCard from '@/components/rider/TierBenefitsCard';
 import { getKycLevel } from '@/components/ui/KycLevelBadge';
 
@@ -22,7 +22,6 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState(null);
   const [completing, setCompleting] = useState(false);
-  const [allDone, setAllDone] = useState(false);
 
   const refreshData = useCallback(async () => {
     try {
@@ -53,15 +52,10 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     }
   }, [user?.kyc_just_approved, refreshUser]);
 
-  // Check completion state
+  // Check completion state — all tasks must be admin-verified (not just submitted)
   const tasks = getTaskStatuses(kycDocs, user, vehicle, wallet);
-  const submitted = isAllSubmitted(tasks);
-
-  useEffect(() => {
-    if (submitted && !allDone) {
-      setAllDone(true);
-    }
-  }, [submitted, allDone]);
+  const allVerified = tasks.length > 0 && tasks.every(t => t.status === 'verified');
+  const allSubmittedNotVerified = tasks.length > 0 && tasks.every(t => t.status === 'submitted' || t.status === 'verified') && !allVerified;
 
   async function handleComplete() {
     setCompleting(true);
@@ -93,13 +87,13 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     return <VerificationComplete onDone={() => navigate('/app')} />;
   }
 
-  // If all tasks submitted, show completion card
-  if (allDone && !readOnly) {
+  // If all tasks verified, show completion card
+  if (allVerified && !readOnly) {
     return (
       <div className="space-y-4">
         <div className="bg-success/5 border border-success/20 rounded-2xl p-6 text-center">
           <CheckCircle2 className="w-12 h-12 mx-auto text-success mb-3" />
-          <p className="text-sm font-semibold text-success mb-1">All verification tasks submitted!</p>
+          <p className="text-sm font-semibold text-success mb-1">All verification tasks approved!</p>
           <p className="text-xs text-muted-foreground">Tap below to complete your verification.</p>
         </div>
         <button
@@ -133,6 +127,12 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   return (
     <div className="space-y-4">
       {readOnly && <ReadOnlyBanner />}
+      {allSubmittedNotVerified && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+          <p className="text-xs text-blue-700 font-medium">Your photos are under review — you'll be notified by SMS once approved.</p>
+        </div>
+      )}
       {user?.kyc_just_approved && (
         <div className="bg-success/5 border border-success/20 rounded-2xl p-4 text-center animate-fade-in">
           <CheckCircle2 className="w-8 h-8 mx-auto text-success mb-2" />
@@ -159,10 +159,6 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
             const status = tasks[i]?.status || 'not_started';
             const config = TASK_STATUS_CONFIG[status];
             const Icon = TASK_ICONS[i];
-            const hasPlateMismatch = task.id === 'bike' && kycDocs.some(d =>
-              ['bike_left', 'bike_rear'].includes(d.document_type) &&
-              d.rejection_reason && d.rejection_reason.startsWith('plate_mismatch')
-            );
             return (
               <button
                 key={task.id}
@@ -177,10 +173,8 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
                   <p className="text-sm font-semibold">{task.name}</p>
                   <p className={`text-[10px] ${config.className}`}>
                     {config.label}
-                    {hasPlateMismatch && <span className="text-warning ml-1">• Plate mismatch</span>}
                   </p>
                 </div>
-                {hasPlateMismatch && <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0" />}
                 <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               </button>
             );

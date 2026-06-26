@@ -5,7 +5,6 @@ import PdfReportCard from '@/components/admin/flags/PdfReportCard';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { getTaskStatuses, TASK_STATUS_CONFIG, VERIFICATION_TASKS } from '@/lib/verification';
 import { useToast } from '@/components/ui/use-toast';
-import { auditLog } from '@/lib/audit';
 
 const DOC_LABELS = {
   id_front: 'ID Front',
@@ -49,13 +48,11 @@ export default function VerificationDetailSheet({ riderId, onClose, canApprove =
 
   async function approveDoc(doc) {
     try {
-      const u = await base44.auth.me();
-      await base44.entities.KycDocument.update(doc.id, {
-        status: 'approved',
-        reviewed_by_id: u.id,
-        reviewed_at: new Date().toISOString(),
+      await base44.functions.invoke('processKycDecision', {
+        docId: doc.id,
+        userId: riderId,
+        action: 'approve',
       });
-      await auditLog({ userId: u.id, action: 'kyc_approved', entityType: 'KycDocument', entityId: doc.id, description: `Doc ${doc.document_type} approved for rider ${riderId}` });
       toast({ title: 'Document approved' });
       load();
     } catch (e) {
@@ -67,14 +64,12 @@ export default function VerificationDetailSheet({ riderId, onClose, canApprove =
     if (!rejectingDoc || rejectReason.trim().length < 10) return;
     setRejecting(true);
     try {
-      const u = await base44.auth.me();
-      await base44.entities.KycDocument.update(rejectingDoc.id, {
-        status: 'rejected',
-        rejection_reason: rejectReason.trim(),
-        reviewed_by_id: u.id,
-        reviewed_at: new Date().toISOString(),
+      await base44.functions.invoke('processKycDecision', {
+        docId: rejectingDoc.id,
+        userId: riderId,
+        action: 'reject',
+        reason: rejectReason.trim(),
       });
-      await auditLog({ userId: u.id, action: 'kyc_rejected', entityType: 'KycDocument', entityId: rejectingDoc.id, description: `Doc ${rejectingDoc.document_type} rejected: ${rejectReason.trim()}` });
       toast({ title: 'Document rejected' });
       setRejectingDoc(null);
       setRejectReason('');
