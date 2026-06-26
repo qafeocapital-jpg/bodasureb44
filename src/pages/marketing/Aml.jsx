@@ -1,0 +1,20 @@
+import LegalPage from '@/components/marketing/LegalPage';
+
+export default function Aml() {
+  return (
+    <LegalPage
+      title="AML / KYC Policy"
+      lastUpdated="June 2025"
+      intro="BodaSure Technologies Ltd is committed to preventing money laundering, terrorist financing, and financial crime. This Anti-Money Laundering (AML) and Know Your Customer (KYC) Policy outlines the procedures we follow to comply with Kenyan financial regulations, including the Proceeds of Crime and Anti-Money Laundering Act and Central Bank of Kenya (CBK) guidelines."
+      sections={[
+        { heading: '1. Identity Verification (KYC)', body: 'All BodaSure users must complete identity verification before accessing wallet services. This includes:\n\nNational ID verification: Users must upload their national ID (front and back) for AI-powered verification via IDAnalyzer.\n\nSelfie verification: A live selfie is compared against the ID photo using facial recognition technology.\n\nBiometric liveness check: Ensures the user is physically present during verification.\n\nSanctions screening: User details are screened against international sanctions lists.\n\nFor SACCOs and county government accounts, enhanced due diligence is performed, including verification of business registration, director identities, and beneficial ownership.' },
+        { heading: '2. Transaction Monitoring', body: 'BodaSure monitors all wallet transactions for suspicious activity, including:\n\nUnusually large transactions that are inconsistent with a user\'s profile.\n\nRapid movement of funds between accounts (structuring/smurfing patterns).\n\nTransactions involving high-risk jurisdictions.\n\nMultiple failed or reversed transactions.\n\nTransactions flagged by our automated risk scoring system.\n\nSuspicious transactions are reviewed by our compliance team and may be reported to the Financial Reporting Centre (FRC) of Kenya.' },
+        { heading: '3. Reporting Obligations', body: 'Under Kenyan law, BodaSure is required to report:\n\nSuspicious Transaction Reports (STRs) to the Financial Reporting Centre within 7 days of detection.\n\nCash Transaction Reports (CTRs) for transactions above the statutory threshold.\n\nTerrorist Property Reports if we identify any property owned or controlled by a terrorist entity.\n\nWe are prohibited from tipping off any person who is the subject of a suspicious transaction report.' },
+        { heading: '4. Risk Assessment', body: 'BodaSure conducts periodic risk assessments to identify and mitigate money laundering and terrorist financing risks. Risk factors include:\n\nCustomer risk (e.g., PEPs, high-risk occupations).\n\nGeographic risk (e.g., high-risk jurisdictions).\n\nProduct risk (e.g., anonymous transactions, cross-border transfers).\n\nTransaction risk (e.g., large cash transactions, rapid fund movement).\n\nUsers are assigned a risk rating that determines the level of due diligence and monitoring applied to their account.' },
+        { heading: '5. Record Keeping', body: 'BodaSure maintains records of all identity verification documents, transaction records, and compliance reports for a minimum of 7 years, as required by Kenyan law. Records are stored securely and are available to regulatory authorities upon request.' },
+        { heading: '6. Employee Training', body: 'All BodaSure employees receive regular AML/KYC training to ensure they understand their obligations and can identify suspicious activity. Training covers:\n\nKenyan AML laws and regulations.\n\nIdentifying red flags and suspicious patterns.\n\nProcedures for reporting suspicious activity.\n\nSanctions screening and PEP identification.' },
+        { heading: '7. Compliance Officer', body: 'BodaSure has appointed a designated Compliance Officer responsible for overseeing the AML/KYC program. The Compliance Officer reports to senior management and regulatory authorities as required.\n\nFor AML/KYC inquiries, contact: compliance@bodasure.co.ke' },
+      ]}
+    />
+  );
+}

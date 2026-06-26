@@ -72,6 +72,20 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 
+import MarketingLayout from './components/marketing/MarketingLayout';
+import MarketingHome from './pages/marketing/Home';
+import Counties from './pages/marketing/Counties';
+import Saccos from './pages/marketing/Saccos';
+import Riders from './pages/marketing/Riders';
+import About from './pages/marketing/About';
+import Pricing from './pages/marketing/Pricing';
+import SecurityPage from './pages/marketing/Security';
+import Privacy from './pages/marketing/Privacy';
+import Terms from './pages/marketing/Terms';
+import Cookies from './pages/marketing/Cookies';
+import Aml from './pages/marketing/Aml';
+import AcceptableUse from './pages/marketing/AcceptableUse';
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
 
@@ -224,7 +238,23 @@ function App() {
 
             {/* Public routes */}
             <Route path="/verify/:riderId" element={<RiderVerify />} />
-            
+
+            {/* Marketing website routes */}
+            <Route element={<MarketingLayout />}>
+              <Route path="/" element={<MarketingHome />} />
+              <Route path="/counties" element={<Counties />} />
+              <Route path="/saccos" element={<Saccos />} />
+              <Route path="/riders" element={<Riders />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/security" element={<SecurityPage />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/cookies" element={<Cookies />} />
+              <Route path="/aml" element={<Aml />} />
+              <Route path="/acceptable-use" element={<AcceptableUse />} />
+            </Route>
+
             {/* Protected app routes */}
             <Route path="*" element={<AuthenticatedApp />} />
           </Routes>

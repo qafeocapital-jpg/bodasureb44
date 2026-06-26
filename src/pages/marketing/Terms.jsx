@@ -1,0 +1,23 @@
+import LegalPage from '@/components/marketing/LegalPage';
+
+export default function Terms() {
+  return (
+    <LegalPage
+      title="Terms of Service"
+      lastUpdated="June 2025"
+      intro={'These Terms of Service ("Terms") govern your use of the BodaSure platform, including our website, mobile application, and all related services. By creating an account or using BodaSure, you agree to these Terms.'}
+      sections={[
+        { heading: '1. Eligibility', body: 'You must be at least 18 years old and a resident of Kenya to use BodaSure. By registering, you confirm that you are legally eligible to use our services and that all information provided is accurate and truthful.' },
+        { heading: '2. Account Registration', body: 'To use BodaSure, you must complete the registration process, including:\n\nProviding accurate personal information (name, national ID, phone number).\n\nCompleting identity verification via IDAnalyzer.\n\nCompleting bike and ownership verification (for riders).\n\nSetting up a wallet PIN.\n\nYou are responsible for maintaining the confidentiality of your account credentials and PIN. Notify us immediately of any unauthorized access.' },
+        { heading: '3. BodaSure Wallet', body: "The BodaSure Wallet is a digital wallet powered by our payment partner (SasaPay). By using the wallet, you agree to:\n\nMaintain sufficient funds for all transactions.\n\nNot use the wallet for illegal or fraudulent activities.\n\nAuthorize us to deduct applicable fees from your wallet for transactions.\n\nWallet balances are held by our licensed payment partner. BodaSure does not hold customer funds directly.\n\nWallet limits and fees are published on our Pricing page and may be updated from time to time." },
+        { heading: '4. Permitted Use', body: "You agree to use BodaSure only for lawful purposes. You must not:\n\nUse the platform for money laundering, fraud, or any illegal activity.\n\nAttempt to bypass identity verification or provide false information.\n\nUse another person's identity, vehicle, or wallet without authorization.\n\nReverse engineer, decompile, or attempt to access the source code of the platform.\n\nSpam, harass, or harm other users.\n\nViolation of these terms may result in immediate account suspension and legal action." },
+        { heading: '5. Fees & Charges', body: 'BodaSure charges transaction fees for certain services, including:\n\nCounty fee payments (lipa county).\n\nOwner payments (lipa owner).\n\nFare collection (lipisha).\n\nP2P transfers.\n\nAll fees are transparently displayed before each transaction. Fee structures may be updated with 30 days notice.\n\nPremium rider features (loans, investments, health cover) are available at KES 99/month.' },
+        { heading: '6. Liability', body: "BodaSure provides the platform as a service. We are not liable for:\n\nDisputes between riders and motorcycle owners.\n\nDisputes between riders and passengers.\n\nCounty permit or compliance decisions.\n\nLoan or insurance decisions made by third-party providers.\n\nOur liability is limited to the transaction fees collected for the specific service in question.\n\nWe are not liable for indirect, incidental, or consequential damages." },
+        { heading: '7. Dispute Resolution', body: 'Any disputes arising from these Terms or your use of BodaSure shall be resolved through:\n\nFirst, contacting our support team for resolution.\n\nSecond, mediation through a mutually agreed mediator in Nairobi, Kenya.\n\nFinally, arbitration under the Arbitration Act of Kenya, with Nairobi as the seat of arbitration.\n\nThese Terms are governed by the laws of the Republic of Kenya.' },
+        { heading: '8. Account Suspension & Termination', body: 'We reserve the right to suspend or terminate your account if you violate these Terms, engage in fraudulent activity, or if required by law or regulatory authorities. You may close your account at any time by contacting support. Outstanding wallet balances will be settled within 14 days of account closure.' },
+        { heading: '9. Changes to Terms', body: 'We may update these Terms from time to time. Material changes will be communicated via SMS or email at least 30 days before they take effect. Continued use of BodaSure after changes take effect constitutes acceptance of the updated Terms.' },
+        { heading: '10. Contact', body: 'For questions about these Terms, contact us at legal@bodasure.co.ke.' },
+      ]}
+    />
+  );
+}

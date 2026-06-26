@@ -1,0 +1,21 @@
+import LegalPage from '@/components/marketing/LegalPage';
+
+export default function Privacy() {
+  return (
+    <LegalPage
+      title="Privacy Policy"
+      lastUpdated="June 2025"
+      intro={'BodaSure Technologies Ltd ("BodaSure", "we", "us") is committed to protecting the privacy and personal data of all users of our platform. This Privacy Policy explains how we collect, use, store, and share your personal information in accordance with the Kenya Data Protection Act, 2019.'}
+      sections={[
+        { heading: '1. Information We Collect', body: 'We collect the following types of personal information:\n\nIdentity Information: Full name, national ID number, date of birth, gender, and ID photo.\n\nContact Information: Phone number, email address, and physical address.\n\nVehicle Information: Motorcycle plate number, logbook details, and owner information.\n\nFinancial Information: Wallet transaction history, payment details, and bank account information.\n\nBiometric Data: Selfie photos for identity verification and facial recognition.\n\nUsage Data: Device information, IP address, app usage patterns, and location data.' },
+        { heading: '2. How We Use Your Information', body: 'We use your personal information for the following purposes:\n\nTo verify your identity and prevent fraud.\n\nTo create and manage your BodaSure Wallet and process transactions.\n\nTo issue digital permits and compliance certificates.\n\nTo comply with legal and regulatory requirements, including AML/KYC obligations.\n\nTo provide customer support and resolve disputes.\n\nTo improve our services and develop new features.\n\nTo send you important notifications about your account, transactions, and regulatory updates.' },
+        { heading: '3. Data Storage & Security', body: 'Your personal data is stored on secure, cloud-hosted infrastructure with AES-256 encryption at rest and TLS 1.3 in transit. Access to personal data is strictly controlled and logged. We retain personal data for the duration of your account and for the period required by law (typically 7 years for financial records).\n\nBiometric data used for identity verification is processed by our verified third-party provider (IDAnalyzer) and is not stored on our servers beyond the verification result.' },
+        { heading: '4. Data Sharing', body: "We may share your personal information with:\n\nCounty Governments — for registration, compliance, and revenue collection purposes.\n\nSACCOs and Welfare Groups — for membership management, with your consent.\n\nRegulatory Authorities — including the Central Bank of Kenya, NTSA, and the Office of the Data Protection Commissioner, when legally required.\n\nThird-party Service Providers — including payment processors (SasaPay), SMS providers (Africa's Talking), and identity verification providers (IDAnalyzer), under strict data protection agreements.\n\nWe never sell your personal data to third parties." },
+        { heading: '5. Your Rights', body: 'Under the Kenya Data Protection Act 2019, you have the right to:\n\nAccess: Request a copy of the personal data we hold about you.\n\nRectification: Request correction of inaccurate or incomplete data.\n\nErasure: Request deletion of your personal data, subject to legal retention requirements.\n\nObjection: Object to the processing of your data for specific purposes.\n\nData Portability: Receive your data in a structured, machine-readable format.\n\nTo exercise any of these rights, contact us at privacy@bodasure.co.ke.' },
+        { heading: '6. Cookies', body: 'Our website uses cookies to improve user experience, analyze traffic, and provide security. See our Cookie Policy for details on the types of cookies we use and how to manage them.' },
+        { heading: '7. Changes to This Policy', body: 'We may update this Privacy Policy from time to time. We will notify you of any material changes via SMS or email. The latest version is always available on our website.' },
+        { heading: '8. Contact', body: 'If you have any questions about this Privacy Policy or how we handle your data, contact our Data Protection Officer at privacy@bodasure.co.ke or write to us at BodaSure Technologies Ltd, Nairobi, Kenya.' },
+      ]}
+    />
+  );
+}
