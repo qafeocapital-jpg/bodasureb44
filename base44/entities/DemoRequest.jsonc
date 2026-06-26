@@ -1,0 +1,38 @@
+{
+  "name": "DemoRequest",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "county": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "contacted",
+        "completed"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "name",
+    "county",
+    "role",
+    "phone",
+    "email",
+    "status"
+  ]
+}

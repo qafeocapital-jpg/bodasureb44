@@ -1,20 +1,27 @@
 import { useState } from 'react';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 
 export default function DemoRequestForm() {
   const [form, setForm] = useState({ name: '', county: '', role: '', phone: '', email: '' });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
 
-  const update = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const update = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setError(''); };
 
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
-    // Simulate submission (marketing site is static)
-    await new Promise(r => setTimeout(r, 1200));
+    setError('');
+    try {
+      const res = await base44.functions.invoke('submitDemoRequest', form);
+      if (res.data?.error) throw new Error(res.data.error);
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.message || 'Something went wrong. Please try again or email hello@bodasure.co.ke');
+    }
     setSubmitting(false);
-    setSubmitted(true);
   }
 
   if (submitted) {
@@ -76,6 +83,12 @@ export default function DemoRequestForm() {
       >
         {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : 'Request Demo'}
       </button>
+      {error && (
+        <div className="flex items-start gap-2 text-destructive text-sm bg-destructive/5 border border-destructive/20 rounded-xl p-3">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
     </form>
   );
 }

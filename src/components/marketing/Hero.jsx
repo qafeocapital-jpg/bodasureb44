@@ -2,6 +2,22 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 export default function Hero({ title, subtitle, primaryCta, secondaryCta, children }) {
+  const isHash = (to) => typeof to === 'string' && to.startsWith('#');
+
+  const CtaButton = ({ cta, primary }) => {
+    const className = primary
+      ? 'inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20'
+      : 'inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-background/30 text-background rounded-xl font-semibold text-sm hover:bg-background/10 transition-colors';
+    const content = (
+      <>
+        {cta.text} {primary && <ArrowRight className="w-4 h-4" />}
+      </>
+    );
+    return isHash(cta.to)
+      ? <a href={cta.to} className={className}>{content}</a>
+      : <Link to={cta.to} className={className}>{content}</Link>;
+  };
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-foreground via-foreground to-primary/15">
       {/* Decorative glow */}
@@ -24,22 +40,8 @@ export default function Hero({ title, subtitle, primaryCta, secondaryCta, childr
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            {primaryCta && (
-              <Link
-                to={primaryCta.to}
-                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
-              >
-                {primaryCta.text} <ArrowRight className="w-4 h-4" />
-              </Link>
-            )}
-            {secondaryCta && (
-              <Link
-                to={secondaryCta.to}
-                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-background/30 text-background rounded-xl font-semibold text-sm hover:bg-background/10 transition-colors"
-              >
-                {secondaryCta.text}
-              </Link>
-            )}
+            {primaryCta && <CtaButton cta={primaryCta} primary />}
+            {secondaryCta && <CtaButton cta={secondaryCta} primary={false} />}
           </div>
 
           {children}
