@@ -135,17 +135,13 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setAuthError(null);
+    // Clear tokens locally first, then redirect to marketing homepage.
+    // We do NOT call base44.auth.logout() here because it hard-reloads to /login.
     try {
-      // SDK logout clears the token and reloads the page
-      base44.auth.logout();
-    } catch (e) {
-      // Fallback: clear tokens and hard redirect to login if SDK logout throws
-      try {
-        localStorage.removeItem('base44_access_token');
-        localStorage.removeItem('token');
-      } catch (_) {}
-      window.location.href = '/login';
-    }
+      localStorage.removeItem('base44_access_token');
+      localStorage.removeItem('token');
+    } catch (_) {}
+    window.location.href = '/';
   };
 
   const navigateToLogin = () => {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -52,7 +53,7 @@ export default function RiderHeader() {
     <>
       <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[512px] z-50 bg-white/95 backdrop-blur-md border-b border-border">
         <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-1.5">
+          <Link to="/" className="flex items-center gap-1.5">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-heading font-extrabold text-lg">B</span>
             </div>
@@ -60,7 +61,7 @@ export default function RiderHeader() {
               <span className="text-foreground">Boda</span>
               <span className="text-primary">Sure</span>
             </h1>
-          </div>
+          </Link>
           <button onClick={() => setShowAnnouncements(true)} className="relative p-2 rounded-lg hover:bg-accent transition-colors">
             <Bell className="w-5 h-5 text-foreground" />
             {hasUnread && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full" />}
