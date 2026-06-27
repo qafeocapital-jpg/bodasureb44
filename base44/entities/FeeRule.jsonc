@@ -34,6 +34,10 @@
     "version": {
       "type": "integer",
       "default": 1
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
     }
   },
   "required": [

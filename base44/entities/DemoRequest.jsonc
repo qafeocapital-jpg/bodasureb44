@@ -25,6 +25,10 @@
         "completed"
       ],
       "default": "pending"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
     }
   },
   "required": [
