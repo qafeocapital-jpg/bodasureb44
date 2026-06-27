@@ -23,7 +23,6 @@ export default function GlobalNav() {
             <Link to="/counties" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">Counties</Link>
             <Link to="/saccos" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">SACCOs</Link>
             <Link to="/riders" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">Riders</Link>
-            <Link to="/how-it-works" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">How It Works</Link>
             <Link to="/about" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">About</Link>
             <Link to="/pricing" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">Pricing</Link>
           </div>
@@ -48,7 +47,6 @@ export default function GlobalNav() {
             <Link to="/counties" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">Counties</Link>
             <Link to="/saccos" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">SACCOs</Link>
             <Link to="/riders" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">Riders</Link>
-            <Link to="/how-it-works" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">How It Works</Link>
             <Link to="/about" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">About</Link>
             <Link to="/pricing" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">Pricing</Link>
             <div className="flex gap-2 pt-3">
