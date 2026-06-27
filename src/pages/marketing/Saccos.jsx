@@ -281,13 +281,13 @@ export default function Saccos() {
         title="Bring your group into the digital economy."
         subtitle="Register your SACCO or welfare group on BodaSure, or talk to us about how your group can start earning — not just collecting."
       >
-        <div id="demo" className="flex flex-col sm:flex-row gap-3 justify-center">
-          <a href="#demo" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link to="/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
             Register your group <ArrowRight className="w-4 h-4" />
-          </a>
-          <a href="#demo" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-foreground/20 text-foreground rounded-xl font-semibold text-sm hover:bg-foreground/5 transition-colors">
+          </Link>
+          <button onClick={() => window.reamaze && window.reamaze('contact')} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-background text-foreground rounded-xl font-semibold text-sm hover:bg-background/90 transition-colors shadow-lg">
             Talk to us
-          </a>
+          </button>
         </div>
       </CTASection>
     </>

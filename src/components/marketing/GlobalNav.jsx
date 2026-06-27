@@ -20,6 +20,7 @@ export default function GlobalNav() {
 
           {/* Desktop nav */}
           <div className="hidden lg:flex items-center gap-1">
+            <Link to="/" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">Home</Link>
             <Link to="/counties" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">Counties</Link>
             <Link to="/saccos" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">SACCOs</Link>
             <Link to="/riders" className="px-3 py-2 text-sm font-medium hover:text-primary transition-colors">Riders</Link>
@@ -44,6 +45,7 @@ export default function GlobalNav() {
       {mobileOpen && (
         <div className="lg:hidden border-t border-border bg-background animate-fade-in">
           <div className="px-4 py-3 space-y-1">
+            <Link to="/" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">Home</Link>
             <Link to="/counties" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">Counties</Link>
             <Link to="/saccos" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">SACCOs</Link>
             <Link to="/riders" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">Riders</Link>
