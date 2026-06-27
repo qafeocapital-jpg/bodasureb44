@@ -59,6 +59,7 @@ export const adminNav = [
   { label: 'Reconciliation', path: '/admin/reconciliation', icon: Scale },
   { label: 'Reports', path: '/admin/reports', icon: FileBarChart },
   { label: 'Audit Log', path: '/admin/audit', icon: ScrollText },
+  { label: 'Static Pages', path: '/admin/content/pages', icon: FileText },
   { label: 'Seed Data', path: '/admin/seed', icon: Database },
 ];
 

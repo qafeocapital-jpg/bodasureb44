@@ -66,6 +66,7 @@ import AdminSaccos from './pages/admin/AdminSaccos';
 import AdminFlags from './pages/admin/Flags';
 import Communications from './pages/admin/Communications';
 import SeedData from './pages/admin/SeedData';
+import ContentPages from './pages/admin/ContentPages';
 import RiderVerify from './pages/public/RiderVerify';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -214,6 +215,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/comms/logs" element={<Communications />} />
         <Route path="/admin/saccos" element={<AdminSaccos />} />
         <Route path="/admin/seed" element={<SeedData />} />
+        <Route path="/admin/content/pages" element={<ContentPages />} />
       </Route>
 
       <Route path="*" element={<PageNotFound />} />
