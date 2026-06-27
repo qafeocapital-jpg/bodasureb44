@@ -258,24 +258,21 @@ Deno.serve(async (req) => {
   ];
 
   const upsertData = {
-    status: docStatus,
+    status: effectiveDocStatus,
     provider_name: 'idanalyzer_docupass',
     provider_reference: transactionId,
   };
-  if (docStatus === 'approved') upsertData.reviewed_at = new Date().toISOString();
+  if (effectiveDocStatus === 'approved') upsertData.reviewed_at = new Date().toISOString();
   if (rejectionReason) upsertData.rejection_reason = rejectionReason;
+  // GAP 1: For mismatch_reject, set rejection_reason
+  if (isMismatchReject) upsertData.rejection_reason = mismatchReason;
 
   // Wrap KycDocument upsert in try-catch; return 500 on error so IDAnalyzer retries
-  // GAP 1: For mismatch_reject, also store rejection_reason in KycDocument
   try {
     await Promise.all(docTypes.map(async ({ type, url }) => {
       const existing = existingDocs.find(d => d.document_type === type);
       // FIX: fallback file_url to '' (empty string) not null — KycDocument.file_url is required string
       const recordData = { ...upsertData, file_url: url || existing?.file_url || '' };
-      // GAP 1: For mismatch_reject, set rejection_reason on KycDocument
-      if (isMismatchReject && !recordData.rejection_reason) {
-        recordData.rejection_reason = mismatchReason;
-      }
       if (existing) {
         await base44.asServiceRole.entities.KycDocument.update(existing.id, recordData);
       } else {
@@ -345,6 +342,9 @@ Deno.serve(async (req) => {
     isMismatchReject = true;
     console.log('[idAnalyzerCallback] MISMATCH DETECTED - overriding accept to mismatch_reject:', mismatchReason);
   }
+
+  // GAP 1 FIX: For mismatch_reject, override docStatus to 'rejected' (not 'approved')
+  const effectiveDocStatus = isMismatchReject ? 'rejected' : docStatus;
 
   // --- 7. Hydrate User with essential fields + auto-set verification status ---
   // This is SYNCHRONOUS (before returning 200) because the frontend polls for these fields.

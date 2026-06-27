@@ -97,45 +97,7 @@ export default function DocupassResultScreen({
     );
   }
 
-  // GAP 4: Mismatch reject UI - profile data doesn't match ID card
-  if (decision === 'mismatch_reject') {
-    const mismatchReason = user?.kyc_mismatch_reason || 'Details on your profile do not match your ID card.';
-    
-    return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6 animate-fade-in">
-        <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
-          <AlertTriangle className="w-12 h-12 text-destructive" />
-        </div>
-        <h1 className="text-2xl font-heading font-bold text-center mb-2">Details Don't Match</h1>
-        <p className="text-sm text-muted-foreground text-center mb-4">
-          The information on your profile doesn't match your ID card.
-        </p>
-
-        <div className="w-full max-w-sm bg-destructive/5 border border-destructive/20 rounded-xl p-4 mb-6">
-          <p className="text-xs text-destructive font-medium mb-2">Mismatch Details</p>
-          <div className="space-y-2 text-xs">
-            {mismatchReason.split(' | ').map((reason, idx) => (
-              <div key={idx} className="bg-background rounded-lg p-2">
-                <p className="text-destructive">{reason}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <button
-          onClick={() => navigate('/app/profile')}
-          className="w-full max-w-sm flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold text-sm mb-3"
-        >
-          Update Profile
-        </button>
-        
-        <p className="text-xs text-muted-foreground text-center">
-          After updating, return here to try again.
-        </p>
-      </div>
-    );
-  }
-
+  // GAP 4: Mismatch reject UI - profile data doesn't match ID document
   if (decision === 'mismatch_reject') {
     const mismatchReason = user?.kyc_mismatch_reason || 'Details on your profile do not match your ID document.';
     const mismatchParts = mismatchReason.split(' | ');
