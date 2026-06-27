@@ -3,11 +3,11 @@ import { User, Bike, MapPin, Users, ShieldCheck } from 'lucide-react';
 import WizardStepCard from './WizardStepCard';
 
 const STEPS = [
-  { name: 'Activate Wallet & Profile', icon: User, color: 'bg-orange-50 text-orange-600', route: '/app/profile', state: { phase: 0 } },
+  { name: 'Activate Wallet & Profile', icon: User, color: 'bg-orange-50 text-orange-600', route: '/app/profile', state: { targetPhase: 0 } },
   { name: 'Register Your Bike', icon: Bike, color: 'bg-blue-50 text-blue-600', route: '/app/bikes/register', state: null },
-  { name: 'Map to County & Stage', icon: MapPin, color: 'bg-violet-50 text-violet-600', route: '/app/profile', state: { phase: 2 } },
+  { name: 'Map to County & Stage', icon: MapPin, color: 'bg-violet-50 text-violet-600', route: '/app/profile', state: { targetPhase: 2 } },
   { name: 'Join Your SACCO', icon: Users, color: 'bg-blue-50 text-blue-600', route: '/app/groups/register-sacco', state: null },
-  { name: 'Identity Verification', icon: ShieldCheck, color: 'bg-emerald-50 text-emerald-600', route: '/app/profile', state: { phase: 4 } },
+  { name: 'Identity Verification', icon: ShieldCheck, color: 'bg-emerald-50 text-emerald-600', route: '/app/profile', state: { targetPhase: 4 } },
 ];
 
 export default function WizardStepOverview({ phase, onNavigate, onClose }) {

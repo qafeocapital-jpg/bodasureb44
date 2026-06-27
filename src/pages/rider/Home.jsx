@@ -31,6 +31,7 @@ export default function Home() {
   const [wallet, setWallet] = useState(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStartScreen, setWizardStartScreen] = useState(0);
+  const [phase, setPhase] = useState(null);
 
   // Check for Tier 2 celebration on mount and when kyc_status changes
   useEffect(() => {
@@ -48,20 +49,6 @@ export default function Home() {
     }
     setPrevKycStatus(user.kyc_status);
   }, [user?.kyc_status, user?.id, prevKycStatus, toast]);
-
-  // Auto-open onboarding wizard on first visit
-  useEffect(() => {
-    if (!user || loading) return;
-    const phase = getOnboardingPhase(user, bikes, groupMembers, wallet);
-    if (phase < 5) {
-      const seenKey = `bodasure_wizard_seen_${user.id}`;
-      if (!localStorage.getItem(seenKey)) {
-        setWizardStartScreen(0);
-        setWizardOpen(true);
-        localStorage.setItem(seenKey, 'true');
-      }
-    }
-  }, [user, bikes, groupMembers, wallet, loading]);
 
   useEffect(() => {
     let unsub;
@@ -102,6 +89,7 @@ export default function Home() {
           unsub = base44.entities.Wallet.subscribe((event) => {
             if (event.id === wallets[0].id) {
               setWalletActive(event.data?.status === 'active' || event.data?.tier > 0);
+              setWallet(prev => ({ ...prev, ...event.data }));
             }
           });
         }
@@ -120,6 +108,18 @@ export default function Home() {
         });
         const nonWelcome = visible.filter(a => !a.title?.toLowerCase().includes('welcome to bodasure'));
         if (nonWelcome.length > 0) setLatestAnnouncement(nonWelcome[0]);
+
+        // Compute phase from local variables (not stale state) to avoid race condition
+        const _phase = getOnboardingPhase(user, merged, gms, wallets[0] ?? null);
+        setPhase(_phase);
+        if (_phase < 5) {
+          const seenKey = `bodasure_wizard_seen_${user.id}`;
+          if (!localStorage.getItem(seenKey)) {
+            setWizardStartScreen(0);
+            setWizardOpen(true);
+            localStorage.setItem(seenKey, 'true');
+          }
+        }
       } catch (e) {}
       clearTimeout(timeoutId);
       setLoading(false);
@@ -160,11 +160,13 @@ export default function Home() {
         wallet={wallet}
         startScreen={wizardStartScreen}
       />
-      <OnboardingFAB
-        phase={getOnboardingPhase(user, bikes, groupMembers, wallet)}
-        userId={user?.id}
-        onOpen={() => { setWizardStartScreen(1); setWizardOpen(true); }}
-      />
+      {phase !== null && (
+        <OnboardingFAB
+          phase={phase}
+          userId={user?.id}
+          onOpen={() => { setWizardStartScreen(1); setWizardOpen(true); }}
+        />
+      )}
     </div>
   );
 }
