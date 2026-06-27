@@ -1,6 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
+ * ⚠️ DEPRECATED — This function is no longer called.
+ * Provisional permits are now issued via LipaCounty payment flow with permit_type='provisional' stamp.
+ * Kept for audit purposes only. Do not use in new code.
+ * 
  * Issue provisional permit upon BASIC_ACTIVE achievement.
  * Called after payment success.
  */

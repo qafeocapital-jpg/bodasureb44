@@ -32,6 +32,7 @@ export default function Compliance() {
   const [group, setGroup] = useState(null);
   const [wallet, setWallet] = useState(null);
   const [penalties, setPenalties] = useState([]);
+  const [permits, setPermits] = useState([]);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -51,12 +52,13 @@ export default function Compliance() {
     async function load() {
       if (!user?.id) return;
       try {
-        const [vehicles, wallets, penaltiesData, kycDocsData, groupMembers] = await Promise.all([
+        const [vehicles, wallets, penaltiesData, kycDocsData, groupMembers, permitsData] = await Promise.all([
           base44.entities.Vehicle.filter({ rider_id: user.id }, '-created_date', 1),
           base44.entities.Wallet.filter({ user_id: user.id, entity_type: 'personal' }),
           base44.entities.Penalty.filter({ rider_id: user.id, status: 'pending' }, '-created_date', 20),
           base44.entities.KycDocument.filter({ user_id: user.id }, '-created_date'),
           base44.entities.GroupMember.filter({ user_id: user.id }),
+          base44.entities.Permit.filter({ rider_id: user.id, status: 'active' }, '-created_date', 1),
         ]);
 
         const v = vehicles[0];
@@ -66,6 +68,7 @@ export default function Compliance() {
         setPenalties(penaltiesData);
         setKycDocs(kycDocsData);
         setGroupMember(groupMembers[0]);
+        setPermits(permitsData);
 
         if (w) {
           const bal = await getWalletBalance(w.id);
@@ -221,7 +224,7 @@ export default function Compliance() {
           onClose={() => setIsOfficerMode(false)}
           user={user}
           vehicle={vehicle}
-          permit={null}
+          permit={permits[0] || null}
           group={group}
           kycDocs={kycDocs}
           tier={complianceTier}

@@ -147,7 +147,14 @@ export default function CountyPermits() {
                   <tr key={p.id} className="border-t border-border hover:bg-accent/50">
                     <td className="px-4 py-3 font-medium capitalize">{p.billing_cycle}</td>
                     <td className="px-4 py-3">{formatKES(p.amount_paid_cents)}</td>
-                    <td className="px-4 py-3"><span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${p.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>{p.status}</span></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${p.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>{p.status}</span>
+                        <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${p.permit_type === 'provisional' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                          {p.permit_type === 'provisional' ? 'Provisional' : 'Full'}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(p.start_date)}</td>
                     <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(p.end_date)}</td>
                     <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{p.issued_manually ? 'Manual' : 'Online'}</td>

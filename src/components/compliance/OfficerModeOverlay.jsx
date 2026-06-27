@@ -88,7 +88,13 @@ export default function OfficerModeOverlay({
           )}
           {permit && permit.end_date ? (
             <>
-              <p className="text-xs text-muted-foreground font-semibold mt-3">PERMIT VALID UNTIL</p>
+              <p className="text-xs text-muted-foreground font-semibold mt-3">PERMIT TYPE</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${permit.permit_type === 'provisional' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                  {permit.permit_type === 'provisional' ? 'Provisional' : 'Full'}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground font-semibold mt-3">VALID UNTIL</p>
               <p className="font-semibold">{formatDate(permit.end_date)}</p>
             </>
           ) : (

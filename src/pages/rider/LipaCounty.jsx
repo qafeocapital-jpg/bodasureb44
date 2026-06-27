@@ -116,7 +116,10 @@ export default function LipaCounty() {
       const end = new Date(now);
       end.setDate(end.getDate() + (durations[selectedCycle] || 30));
 
-      await base44.entities.Permit.create({
+      // Determine permit type: provisional for BASIC_ACTIVE riders, full for VERIFIED
+      const permitType = user?.account_state === 'BASIC_ACTIVE' ? 'provisional' : 'full';
+
+      const permit = await base44.entities.Permit.create({
         vehicle_id: selectedBike,
         rider_id: user?.id,
         county_id: selectedBikeObj.county_id,
@@ -128,6 +131,7 @@ export default function LipaCounty() {
         transaction_id: res.transaction.id,
         fee_schedule_id: selectedSchedule.id,
         qr_code_data: `BODASURE-${selectedBike}-${Date.now()}`,
+        permit_type: permitType,
       });
 
       // Process fee split — moves money to county, SACCO, and platform wallets
@@ -149,7 +153,7 @@ export default function LipaCounty() {
         });
       }
 
-      setResult({ success: true, amount: selectedSchedule.amount_cents, reference: res.reference, cycle: selectedCycle });
+      setResult({ success: true, amount: selectedSchedule.amount_cents, reference: res.reference, cycle: selectedCycle, permitType: permit.permit_type });
       const perms = await base44.entities.Permit.filter({ rider_id: user?.id }, '-created_date', 10);
       setPermits(perms);
       setSelectedBike('');
@@ -199,7 +203,12 @@ export default function LipaCounty() {
               <div>
                 <p className="text-sm font-bold text-success">License Paid!</p>
                 <p className="text-xs text-muted-foreground">{formatKES(result.amount)} · {result.cycle} permit · Ref: {result.reference}</p>
-                <p className="text-[10px] text-success mt-0.5">Your compliance is now active</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${result.permitType === 'provisional' ? 'bg-amber-50 text-amber-700' : 'bg-success/10 text-success'}`}>
+                    {result.permitType === 'provisional' ? 'Provisional' : 'Full'}
+                  </span>
+                  <p className="text-[10px] text-success">Your compliance is now active</p>
+                </div>
               </div>
             </div>
           )}
@@ -301,7 +310,12 @@ export default function LipaCounty() {
                 {permits.map(p => (
                   <div key={p.id} className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium capitalize">{p.billing_cycle} Permit</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium capitalize">{p.billing_cycle} Permit</p>
+                        <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${p.permit_type === 'provisional' ? 'bg-amber-50 text-amber-700' : 'bg-success/10 text-success'}`}>
+                          {p.permit_type === 'provisional' ? 'Provisional' : 'Full'}
+                        </span>
+                      </div>
                       <p className="text-xs text-muted-foreground">{formatDate(p.start_date)} → {formatDate(p.end_date)}</p>
                     </div>
                     <div className="text-right">
