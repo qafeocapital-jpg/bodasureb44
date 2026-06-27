@@ -36,8 +36,9 @@ const PRINCIPLES = [
 const COMPANY = [
   { label: 'Company', value: 'Mint Mobitech Ltd' },
   { label: 'Product', value: 'BodaSure' },
-  { label: 'Headquarters', value: 'Nairobi, Kenya' },
-  { label: 'Focus', value: 'The boda boda economy' },
+  { label: 'Headquarters', value: 'Trance Towers, Mombasa Road, Nairobi, Kenya' },
+  { label: 'Phone', value: '0701 200 500' },
+  { label: 'Website', value: 'bodasure.com' },
   { label: 'Contact', value: 'help@bodasure.com' },
 ];
 

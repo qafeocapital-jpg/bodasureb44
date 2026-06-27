@@ -42,7 +42,7 @@ export default function Footer() {
               <li><Link to="/about" className="text-sm text-background/70 hover:text-primary transition-colors">About</Link></li>
               <li><Link to="/security" className="text-sm text-background/70 hover:text-primary transition-colors">Security</Link></li>
               <li><a href="#" className="text-sm text-background/70 hover:text-primary transition-colors">Blog</a></li>
-              <li><a href="mailto:hello@bodasure.co.ke" className="text-sm text-background/70 hover:text-primary transition-colors">Contact</a></li>
+              <li><a href="mailto:help@bodasure.com" className="text-sm text-background/70 hover:text-primary transition-colors">Contact</a></li>
             </ul>
           </div>
 
@@ -59,9 +59,15 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-background/10 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-2">
+        <div className="border-t border-background/10 mt-10 pt-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-3">
+            <div className="flex flex-col sm:flex-row gap-4 text-xs text-background/50">
+              <a href="mailto:help@bodasure.com" className="hover:text-primary transition-colors">help@bodasure.com</a>
+              <a href="tel:0701200500" className="hover:text-primary transition-colors">0701 200 500</a>
+              <span>Trance Towers, Mombasa Road, Nairobi</span>
+            </div>
+          </div>
           <p className="text-xs text-background/50">© 2026 BodaSure by Mint Mobitech. All rights reserved.</p>
-          <p className="text-xs text-background/50">Nairobi, Kenya</p>
         </div>
       </div>
     </footer>

@@ -38,9 +38,9 @@ const faqs = [
 ];
 
 const contactOptions = [
-  { icon: Phone, label: 'Call Us', value: '0800 720 000', desc: 'Toll-free, Mon–Sat 7am–8pm', color: 'bg-green-50 text-green-600' },
-  { icon: Mail, label: 'Email', value: 'support@bodasure.co.ke', desc: 'Response within 24 hours', color: 'bg-blue-50 text-blue-600' },
-  { icon: MessageCircle, label: 'WhatsApp', value: '+254 700 000 000', desc: 'Chat with support', color: 'bg-emerald-50 text-emerald-600' },
+  { icon: Phone, label: 'Call Us', value: '0701 200 500', desc: 'Mon–Sat 7am–8pm', color: 'bg-green-50 text-green-600' },
+  { icon: Mail, label: 'Email', value: 'help@bodasure.com', desc: 'Response within 24 hours', color: 'bg-blue-50 text-blue-600' },
+  { icon: MessageCircle, label: 'WhatsApp', value: '+254 701 200 500', desc: 'Chat with support', color: 'bg-emerald-50 text-emerald-600' },
 ];
 
 const quickLinks = [
