@@ -121,4 +121,12 @@
   .animate-pulse-glow {
     animation: pulse-glow 1.5s infinite;
   }
+  @keyframes bodasure-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .animate-bodasure-spin {
+    animation: bodasure-spin 1.2s linear infinite;
+    transform-origin: center;
+  }
 }
