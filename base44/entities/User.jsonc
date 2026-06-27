@@ -74,6 +74,37 @@
       "type": "boolean",
       "default": false
     },
+    "account_state": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "BASIC_ACTIVE",
+        "KYC_PENDING",
+        "KYC_REVIEW",
+        "VERIFIED",
+        "KYC_REJECTED",
+        "SUSPENDED",
+        "DEACTIVATED"
+      ],
+      "default": "DRAFT"
+    },
+    "account_state_updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kyc_attempts": {
+      "type": "integer",
+      "default": 0
+    },
+    "onboarding_channel": {
+      "type": "string",
+      "enum": [
+        "self_serve",
+        "sacco_assisted",
+        "field_agent"
+      ],
+      "default": "self_serve"
+    },
     "staff_type": {
       "type": "string",
       "enum": [

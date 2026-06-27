@@ -332,6 +332,8 @@ Deno.serve(async (req) => {
       userUpdate.docupass_verified_at = new Date().toISOString();
       userUpdate.wallet_tier = 2;
       userUpdate.kyc_just_approved = true;
+      userUpdate.account_state = 'VERIFIED';
+      userUpdate.account_state_updated_at = new Date().toISOString();
 
       if (fieldValue('fullName')) userUpdate.id_extracted_name = fieldValue('fullName');
       if (fieldValue('dob')) {
@@ -344,16 +346,40 @@ Deno.serve(async (req) => {
     } else if (decision === 'reject') {
       userUpdate.kyc_status = 'rejected';
       userUpdate.verification_complete = false;
+      userUpdate.kyc_attempts = (userUpdate.kyc_attempts || 0) + 1;
+      // Don't set account_state here - transitionAccountState will handle it
     } else if (decision === 'review') {
       userUpdate.kyc_status = 'pending';
       userUpdate.verification_complete = false;
+      userUpdate.account_state = 'KYC_REVIEW';
+      userUpdate.account_state_updated_at = new Date().toISOString();
     }
 
     await base44.asServiceRole.entities.User.update(userId, userUpdate);
 
+    // Transition account state for reject decisions
+    if (decision === 'reject') {
+      try {
+        await base44.functions.invoke('transitionAccountState', {
+          userId,
+          event: 'KYC_REJECTED',
+          metadata: { transactionId, rejectionReason },
+        });
+      } catch (stateError) {
+        console.error('[idAnalyzerCallback] State transition failed:', stateError);
+      }
+    }
+
     // Wallet tier upgrade & AuditLog (SYNCHRONOUS before returning 200)
     // C1 fix: Return 500 on tier upgrade failure to trigger IDAnalyzer retry
     if (decision === 'accept') {
+      // Convert provisional permit to full
+      try {
+        await base44.functions.invoke('convertProvisionalPermit', { userId });
+      } catch (permitError) {
+        console.error('[idAnalyzerCallback] Permit conversion failed:', permitError);
+      }
+
       const tierUpgradeResult = await upgradeWalletTier(base44, userId);
       if (tierUpgradeResult?.success === false) {
         console.error('[idAnalyzerCallback] Wallet tier upgrade FAILED during KYC approval');

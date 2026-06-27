@@ -52,16 +52,52 @@ Deno.serve(async (req) => {
       return Response.json({ expired: 0, message: 'All active permits are within validity' });
     }
 
-    // Expire each permit
+    // Expire each permit and handle provisional permit consequences
     let expiredCount = 0;
+    let suspendedCount = 0;
+    const riderIdsToNotify = new Set();
+
     for (const permit of expiredPermits) {
       try {
         await b44.entities.Permit.update(permit.id, {
           status: 'expired',
         });
         expiredCount++;
+
+        // If provisional permit expired, check if rider needs suspension
+        if (permit.permit_type === 'provisional' && permit.rider_id) {
+          riderIdsToNotify.add(permit.rider_id);
+        }
       } catch (e) {
         console.error(`Failed to expire permit ${permit.id}: ${e.message}`);
+      }
+    }
+
+    // Suspend riders whose provisional permit expired without verification
+    for (const riderId of riderIdsToNotify) {
+      try {
+        const user = await b44.entities.User.get(riderId);
+        if (user && user.account_state === 'BASIC_ACTIVE' && !user.verification_complete) {
+          // Transition to SUSPENDED
+          await b44.functions.invoke('transitionAccountState', {
+            userId: riderId,
+            event: 'PROVISIONAL_EXPIRED',
+            metadata: { reason: 'provisional_permit_expired_without_verification' },
+          });
+          suspendedCount++;
+
+          // Send SMS notification
+          try {
+            await b44.functions.invoke('sendSms', {
+              to: user.phone,
+              message: 'Your BodaSure provisional permit has expired. Please complete identity verification to reinstate your account.',
+            });
+          } catch (smsError) {
+            console.error(`SMS failed for rider ${riderId}:`, smsError);
+          }
+        }
+      } catch (e) {
+        console.error(`Failed to suspend rider ${riderId}:`, e.message);
       }
     }
 
@@ -76,8 +112,9 @@ Deno.serve(async (req) => {
 
     return Response.json({
       expired: expiredCount,
+      suspended: suspendedCount,
       checked: allPermits.length,
-      message: `Expired ${expiredCount} permits out of ${allPermits.length} active permits checked`,
+      message: `Expired ${expiredCount} permits and suspended ${suspendedCount} riders`,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

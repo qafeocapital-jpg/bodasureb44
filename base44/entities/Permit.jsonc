@@ -53,6 +53,14 @@
       "type": "boolean",
       "default": false
     },
+    "permit_type": {
+      "type": "string",
+      "enum": [
+        "provisional",
+        "full"
+      ],
+      "default": "full"
+    },
     "description": {
       "type": "string",
       "maxLength": 1000

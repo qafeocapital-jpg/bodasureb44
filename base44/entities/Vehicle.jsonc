@@ -89,9 +89,17 @@
       "type": "boolean",
       "default": false
     },
-    "description": {
+    "bike_state": {
       "type": "string",
-      "maxLength": 1000
+      "enum": [
+        "REGISTERED",
+        "PHOTOS_SUBMITTED",
+        "PLATE_VERIFIED",
+        "PLATE_FLAGGED",
+        "LINKED",
+        "ARCHIVED"
+      ],
+      "default": "REGISTERED"
     }
   },
   "required": [

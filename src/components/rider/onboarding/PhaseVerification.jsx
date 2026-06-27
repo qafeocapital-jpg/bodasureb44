@@ -56,6 +56,12 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   const tasks = getTaskStatuses(kycDocs, user, vehicle, wallet);
   const allVerified = tasks.length > 0 && tasks.every(t => t.status === 'verified');
   const allSubmittedNotVerified = tasks.length > 0 && tasks.every(t => t.status === 'submitted' || t.status === 'verified') && !allVerified;
+  
+  // KYC rejection state
+  const identityTask = tasks.find(t => t.id === 'identity');
+  const identityRejected = identityTask?.status === 'rejected';
+  const kycAttemptsRemaining = 3 - (user?.kyc_attempts || 0);
+  const identityUnderReview = user?.docupass_decision === 'review' || user?.kyc_status === 'pending';
 
   async function handleComplete() {
     setCompleting(true);
@@ -85,6 +91,45 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   // If verification already complete
   if (user?.verification_complete && !readOnly) {
     return <VerificationComplete onDone={() => navigate('/app')} />;
+  }
+
+  // Identity rejected - show retry UI
+  if (identityRejected && !readOnly) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-destructive/5 border border-destructive/20 rounded-2xl p-6 text-center">
+          <CheckCircle2 className="w-12 h-12 mx-auto text-destructive mb-3" />
+          <p className="text-sm font-semibold text-destructive mb-1">Identity Verification Failed</p>
+          {kycAttemptsRemaining > 0 ? (
+            <>
+              <p className="text-xs text-muted-foreground mb-4">{kycAttemptsRemaining} attempt(s) remaining</p>
+              <button
+                onClick={() => setActiveTask(0)}
+                className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm"
+              >
+                Try Again <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground mb-4">Maximum attempts reached — our team will review your case.</p>
+              <a
+                href="mailto:help@bodasure.com"
+                className="w-full flex items-center justify-center gap-1 bg-muted text-foreground rounded-xl py-3 font-semibold text-sm"
+              >
+                Contact Support
+              </a>
+            </>
+          )}
+        </div>
+        <button
+          onClick={() => navigate('/app')}
+          className="w-full text-center text-sm text-muted-foreground font-semibold py-2"
+        >
+          Go to Dashboard
+        </button>
+      </div>
+    );
   }
 
   // If all tasks verified, show completion card
@@ -127,7 +172,13 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
   return (
     <div className="space-y-4">
       {readOnly && <ReadOnlyBanner />}
-      {allSubmittedNotVerified && (
+      {identityUnderReview && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-amber-600 animate-spin flex-shrink-0" />
+          <p className="text-xs text-amber-700 font-medium">Your identity is under manual review. We'll notify you within 48 hours.</p>
+        </div>
+      )}
+      {allSubmittedNotVerified && !identityUnderReview && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-2">
           <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
           <p className="text-xs text-blue-700 font-medium">Your photos are under review — you'll be notified by SMS once approved.</p>
