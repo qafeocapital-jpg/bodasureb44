@@ -1,9 +1,12 @@
-import { useEffect } from 'react';
-import { ArrowRight, ArrowDown, Check, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, ArrowDown, Check, X, Eye, Download } from 'lucide-react';
 import Hero from '@/components/marketing/Hero';
 import StatStrip from '@/components/marketing/StatStrip';
 import CTASection from '@/components/marketing/CTASection';
 import DemoRequestForm from '@/components/marketing/DemoRequestForm';
+import CountyBriefModal from '@/components/marketing/CountyBriefModal';
+
+const BRIEF_URL = '/assets/BodaSure-County-Brief.pdf';
 
 const DARK_STATS = [
   { value: '~66%', label: 'average share of OSR targets counties actually collect' },
@@ -67,6 +70,7 @@ const Eyebrow = ({ children }) => (
 );
 
 export default function Counties() {
+  const [briefOpen, setBriefOpen] = useState(false);
   useEffect(() => { document.title = 'BodaSure for Counties — Digital BodaBoda Management'; }, []);
 
   return (
@@ -76,7 +80,21 @@ export default function Counties() {
         title="Turn the boda boda sector into reliable revenue."
         subtitle="BodaSure gives your county a complete, digital operating system for the sector — registration, permits, enforcement, and revenue collection, all in one place and reconciled to the shilling."
         primaryCta={{ text: 'Request a Demo', to: '#demo' }}
-      />
+      >
+        <button
+          onClick={() => setBriefOpen(true)}
+          className="inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-background/30 text-background rounded-xl font-semibold text-sm hover:bg-background/10 transition-colors"
+        >
+          <Eye className="w-4 h-4" /> Preview Brief
+        </button>
+        <a
+          href={BRIEF_URL}
+          download
+          className="inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-background/30 text-background rounded-xl font-semibold text-sm hover:bg-background/10 transition-colors"
+        >
+          <Download className="w-4 h-4" /> Download Brief
+        </a>
+      </Hero>
 
       {/* Section 2 — Problem Statement */}
       <section className="py-20 lg:py-28">
@@ -231,6 +249,8 @@ export default function Counties() {
           <DemoRequestForm />
         </div>
       </CTASection>
+
+      <CountyBriefModal isOpen={briefOpen} onClose={() => setBriefOpen(false)} />
     </>
   );
 }

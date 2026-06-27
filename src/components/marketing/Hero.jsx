@@ -42,9 +42,8 @@ export default function Hero({ title, subtitle, primaryCta, secondaryCta, badge,
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             {primaryCta && <CtaButton cta={primaryCta} primary />}
             {secondaryCta && <CtaButton cta={secondaryCta} primary={false} />}
+            {children}
           </div>
-
-          {children}
         </div>
       </div>
     </section>
