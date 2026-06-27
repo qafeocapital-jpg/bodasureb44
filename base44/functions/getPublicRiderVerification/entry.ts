@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
         status: permit.status,
         end_date: permit.end_date,
         billing_cycle: permit.billing_cycle,
+        permit_type: permit.permit_type || 'full',
       } : null,
       policy: policy ? {
         status: policy.status,
