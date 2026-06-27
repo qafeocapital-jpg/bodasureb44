@@ -31,6 +31,8 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     } catch (e) {}
   }, [user.id, refreshUser]);
 
+  // GAP 3: Silent auto-refresh on mount - always fetch fresh user data
+  // This covers the case where IDAnalyzer webhook fires after the polling window expired
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -40,6 +42,14 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     load();
     return () => { mounted = false; };
   }, [refreshData]);
+
+  // GAP 3: Additional refresh if user is in KYC_REVIEW state with no decision yet
+  // Re-fetch on every mount to catch late webhook arrivals
+  useEffect(() => {
+    if (user?.account_state === 'KYC_REVIEW' && !user?.docupass_decision) {
+      refreshData();
+    }
+  }, [user?.account_state, user?.docupass_decision, refreshData]);
 
   // Clear kyc_just_approved flag after showing the celebration banner
   const clearingFlag = useRef(false);

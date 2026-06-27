@@ -266,11 +266,16 @@ Deno.serve(async (req) => {
   if (rejectionReason) upsertData.rejection_reason = rejectionReason;
 
   // Wrap KycDocument upsert in try-catch; return 500 on error so IDAnalyzer retries
+  // GAP 1: For mismatch_reject, also store rejection_reason in KycDocument
   try {
     await Promise.all(docTypes.map(async ({ type, url }) => {
       const existing = existingDocs.find(d => d.document_type === type);
       // FIX: fallback file_url to '' (empty string) not null — KycDocument.file_url is required string
       const recordData = { ...upsertData, file_url: url || existing?.file_url || '' };
+      // GAP 1: For mismatch_reject, set rejection_reason on KycDocument
+      if (isMismatchReject && !recordData.rejection_reason) {
+        recordData.rejection_reason = mismatchReason;
+      }
       if (existing) {
         await base44.asServiceRole.entities.KycDocument.update(existing.id, recordData);
       } else {
@@ -291,13 +296,60 @@ Deno.serve(async (req) => {
     console.warn('[idAnalyzerCallback] All outputImage URLs are empty — verify IDAnalyzer KYC Profile has "Return Output Image" enabled in settings');
   }
 
-  // --- 6. Hydrate User with essential fields + auto-set verification status ---
+  // --- 6. GAP 1: Fetch user profile BEFORE any accept-path writes for cross-check ---
+  let existingNationalId = null;
+  let userProfile = null;
+  try {
+    userProfile = await base44.asServiceRole.entities.User.get(userId);
+    existingNationalId = userProfile?.national_id || null;
+  } catch (e) {
+    console.error('[idAnalyzerCallback] Failed to fetch user profile:', e.message);
+    return Response.json({ error: 'User profile fetch failed' }, { status: 500 });
+  }
+
+  // --- GAP 1: Name & ID Number Hard Block (cross-check OCR vs profile) ---
+  const ocrFullName = fieldValue('fullName') || '';
+  const ocrDocumentNumber = fieldValue('documentNumber') || '';
+  const profileFullName = userProfile?.full_name || '';
+  const profileNationalId = userProfile?.national_id || '';
+
+  // Normalize both strings for comparison (case-insensitive, trimmed, collapse spaces)
+  const normalizeStr = (str) => String(str || '').toLowerCase().trim().replace(/\s+/g, ' ');
+  const ocrFullNameNorm = normalizeStr(ocrFullName);
+  const profileFullNameNorm = normalizeStr(profileFullName);
+  const ocrDocNumNorm = normalizeStr(ocrDocumentNumber);
+  const profileNationalIdNorm = normalizeStr(profileNationalId);
+
+  // Check for mismatches
+  const fullNameMismatch = ocrFullNameNorm && profileFullNameNorm && ocrFullNameNorm !== profileFullNameNorm;
+  const documentNumberMismatch = ocrDocNumNorm && profileNationalIdNorm && ocrDocNumNorm !== profileNationalIdNorm;
+
+  // Build mismatch reason if any field doesn't match
+  let mismatchReason = null;
+  if (fullNameMismatch || documentNumberMismatch) {
+    const reasons = [];
+    if (fullNameMismatch) {
+      reasons.push(`Full name on your profile: ${profileFullName || 'Not set'} / Full name on your ID: ${ocrFullName || 'Not extracted'}`);
+    }
+    if (documentNumberMismatch) {
+      reasons.push(`National ID on your profile: ${profileNationalId || 'Not set'} / National ID on your ID: ${ocrDocumentNumber || 'Not extracted'}`);
+    }
+    mismatchReason = reasons.join(' | ');
+  }
+
+  // --- GAP 1: If mismatch detected, override accept to mismatch_reject ---
+  let effectiveDecision = decision;
+  let isMismatchReject = false;
+  if (decision === 'accept' && (fullNameMismatch || documentNumberMismatch)) {
+    effectiveDecision = 'mismatch_reject';
+    isMismatchReject = true;
+    console.log('[idAnalyzerCallback] MISMATCH DETECTED - overriding accept to mismatch_reject:', mismatchReason);
+  }
+
+  // --- 7. Hydrate User with essential fields + auto-set verification status ---
   // This is SYNCHRONOUS (before returning 200) because the frontend polls for these fields.
   // Wrap in try-catch; return 500 on error so IDAnalyzer retries.
-  let existingNationalId = null;
   try {
-    const user = await base44.asServiceRole.entities.User.get(userId);
-    existingNationalId = user?.national_id || null;
     const userUpdate = {
       docupass_decision: decision,
       id_extracted_data: JSON.stringify(extractedData),
@@ -325,15 +377,16 @@ Deno.serve(async (req) => {
     }
 
     // Auto-set verification status based on decision
-    if (decision === 'accept') {
+    if (effectiveDecision === 'accept') {
       userUpdate.kyc_status = 'verified';
       userUpdate.verification_complete = true;
       userUpdate.phone_verified = true;
       userUpdate.docupass_verified_at = new Date().toISOString();
       userUpdate.wallet_tier = 2;
       userUpdate.kyc_just_approved = true;
-      userUpdate.account_state = 'VERIFIED';
-      userUpdate.account_state_updated_at = new Date().toISOString();
+      // GAP 2: Remove direct account_state write - transitionAccountState will handle it
+      // userUpdate.account_state = 'VERIFIED';
+      // userUpdate.account_state_updated_at = new Date().toISOString();
 
       if (fieldValue('fullName')) userUpdate.id_extracted_name = fieldValue('fullName');
       if (fieldValue('dob')) {
@@ -343,11 +396,18 @@ Deno.serve(async (req) => {
       if (fieldValue('documentNumber') && !existingNationalId) {
         userUpdate.national_id = fieldValue('documentNumber');
       }
+    } else if (effectiveDecision === 'mismatch_reject') {
+      // GAP 1: Mismatch reject - set kyc_status='rejected', store mismatch_reason, DON'T increment attempts
+      userUpdate.kyc_status = 'rejected';
+      userUpdate.verification_complete = false;
+      userUpdate.kyc_mismatch_reason = mismatchReason;
+      userUpdate.docupass_decision = 'mismatch_reject';
+      // Don't increment kyc_attempts - mismatch is a profile data problem, not document quality
     } else if (decision === 'reject') {
       userUpdate.kyc_status = 'rejected';
       userUpdate.verification_complete = false;
       // FIX 8: Increment from the fetched user object, not the fresh update object
-      userUpdate.kyc_attempts = (user.kyc_attempts || 0) + 1;
+      userUpdate.kyc_attempts = (userProfile.kyc_attempts || 0) + 1;
       // Don't set account_state here - transitionAccountState will handle it
     } else if (decision === 'review') {
       userUpdate.kyc_status = 'pending';
@@ -373,7 +433,7 @@ Deno.serve(async (req) => {
 
     // Wallet tier upgrade & AuditLog (SYNCHRONOUS before returning 200)
     // C1 fix: Return 500 on tier upgrade failure to trigger IDAnalyzer retry
-    if (decision === 'accept') {
+    if (effectiveDecision === 'accept') {
       // Convert provisional permit to full
       try {
         await base44.functions.invoke('convertProvisionalPermit', { userId });
@@ -391,6 +451,18 @@ Deno.serve(async (req) => {
         });
         // Return 500 to trigger IDAnalyzer retry
         return Response.json({ error: 'Wallet tier upgrade failed' }, { status: 500 });
+      }
+
+      // GAP 2: Route accept through transitionAccountState instead of direct account_state write
+      try {
+        await base44.functions.invoke('transitionAccountState', {
+          userId,
+          event: 'KYC_ACCEPTED',
+          metadata: { transactionId, faceConfidence, auditReportUrl },
+        });
+      } catch (stateError) {
+        console.error('[idAnalyzerCallback] State transition failed:', stateError);
+        // Don't fail the webhook - state transition is best-effort here since kyc_status is already set
       }
     }
     await base44.asServiceRole.entities.AuditLog.create({

@@ -273,7 +273,8 @@
       "enum": [
         "accept",
         "review",
-        "reject"
+        "reject",
+        "mismatch_reject"
       ]
     },
     "docupass_verified_at": {
@@ -289,6 +290,9 @@
     "docupass_report_fetched": {
       "type": "boolean",
       "default": false
+    },
+    "kyc_mismatch_reason": {
+      "type": "string"
     }
   }
 }
