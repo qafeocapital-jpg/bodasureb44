@@ -8,6 +8,9 @@ import HomeHero from '@/components/rider/home/HomeHero';
 import HomeStatusBanners from '@/components/rider/home/HomeStatusBanners';
 import HomeOwnerActions from '@/components/rider/home/HomeOwnerActions';
 import HomeNavGrid from '@/components/rider/home/HomeNavGrid';
+import OnboardingWizardModal from '@/components/rider/onboarding/OnboardingWizardModal';
+import OnboardingFAB from '@/components/rider/onboarding/OnboardingFAB';
+import { getOnboardingPhase } from '@/lib/onboarding';
 
 export default function Home() {
   const { user } = useAuth();
@@ -25,6 +28,9 @@ export default function Home() {
   const [lockedTile, setLockedTile] = useState(null);
   const [servicesExpanded, setServicesExpanded] = useState(false);
   const [prevKycStatus, setPrevKycStatus] = useState(null);
+  const [wallet, setWallet] = useState(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStartScreen, setWizardStartScreen] = useState(0);
 
   // Check for Tier 2 celebration on mount and when kyc_status changes
   useEffect(() => {
@@ -42,6 +48,20 @@ export default function Home() {
     }
     setPrevKycStatus(user.kyc_status);
   }, [user?.kyc_status, user?.id, prevKycStatus, toast]);
+
+  // Auto-open onboarding wizard on first visit
+  useEffect(() => {
+    if (!user || loading) return;
+    const phase = getOnboardingPhase(user, bikes, groupMembers, wallet);
+    if (phase < 5) {
+      const seenKey = `bodasure_wizard_seen_${user.id}`;
+      if (!localStorage.getItem(seenKey)) {
+        setWizardStartScreen(0);
+        setWizardOpen(true);
+        localStorage.setItem(seenKey, 'true');
+      }
+    }
+  }, [user, bikes, groupMembers, wallet, loading]);
 
   useEffect(() => {
     let unsub;
@@ -76,6 +96,7 @@ export default function Home() {
         }
 
         if (wallets.length > 0) {
+          setWallet(wallets[0]);
           setWalletActive(wallets[0].status === 'active' || wallets[0].tier > 0);
           if (snapshots.length > 0) setBalance(snapshots[0].balance_cents || 0);
           unsub = base44.entities.Wallet.subscribe((event) => {
@@ -129,6 +150,20 @@ export default function Home() {
         setLockedTile={setLockedTile}
         servicesExpanded={servicesExpanded}
         setServicesExpanded={setServicesExpanded}
+      />
+      <OnboardingWizardModal
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        user={user}
+        bikes={bikes}
+        groupMembers={groupMembers}
+        wallet={wallet}
+        startScreen={wizardStartScreen}
+      />
+      <OnboardingFAB
+        phase={getOnboardingPhase(user, bikes, groupMembers, wallet)}
+        userId={user?.id}
+        onOpen={() => { setWizardStartScreen(1); setWizardOpen(true); }}
       />
     </div>
   );
