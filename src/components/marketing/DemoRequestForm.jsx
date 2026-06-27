@@ -19,7 +19,7 @@ export default function DemoRequestForm() {
       if (res.data?.error) throw new Error(res.data.error);
       setSubmitted(true);
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again or email hello@bodasure.co.ke');
+      setError(err.message || 'Something went wrong. Please try again or email help@bodasure.com');
     }
     setSubmitting(false);
   }
