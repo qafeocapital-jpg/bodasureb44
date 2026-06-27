@@ -6,8 +6,8 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
-        <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-6">
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to BodaSure
+        <Link to="/" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border text-sm font-medium text-foreground bg-background hover:bg-accent transition-colors mb-6">
+          <ArrowLeft className="w-4 h-4" /> Back to BodaSure
         </Link>
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary mb-4">
