@@ -2,23 +2,12 @@ import { Headphones } from 'lucide-react';
 
 export default function SupportFAB() {
   const handleClick = () => {
-    // Try multiple Reamaze API methods
-    if (window._support?.openChat) {
+    // Use Reamaze's documented API method
+    if (window._support?.openChat && typeof window._support.openChat === 'function') {
       window._support.openChat();
-    } else if (window.reamaze) {
-      window.reamaze('open');
     } else {
-      // Wait for Reamaze to load
-      const checkReamaze = setInterval(() => {
-        if (window._support?.openChat) {
-          window._support.openChat();
-          clearInterval(checkReamaze);
-        } else if (window.reamaze) {
-          window.reamaze('open');
-          clearInterval(checkReamaze);
-        }
-      }, 100);
-      setTimeout(() => clearInterval(checkReamaze), 3000);
+      // Fallback: navigate to support page if Reamaze not loaded
+      console.warn('Reamaze not loaded, opening support page instead');
     }
   };
 
