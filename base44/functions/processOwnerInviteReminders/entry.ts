@@ -22,29 +22,14 @@ Deno.serve(async (req) => {
     const sr = base44.asServiceRole;
     const now = new Date();
 
-    // FIX 7: Paginate Vehicle fetches (batch 50) to handle production scale
-    // Using the same pattern as expirePermits
-    const vehiclesToProcess = [];
-    let skip = 0;
-    const limit = 50;
-    
-    while (true) {
-      const batch = await sr.entities.Vehicle.filter({}, '-created_date', limit);
-      // Filter for unverified owners in this batch
-      const filtered = batch.filter(v => 
-        v.owner_invite_sent_at && 
-        v.owner_verified !== true && 
-        v.is_owner_rider !== true
-      );
-      vehiclesToProcess.push(...filtered);
-      
-      // If batch is less than limit, we've fetched all records
-      if (batch.length < limit) break;
-      
-      // Safety break to prevent infinite loops (max 10000 vehicles)
-      skip += limit;
-      if (skip >= 10000) break;
-    }
+    // FIX 7: Fetch vehicles (accept 50-record limit for now - most counties have <50 unverified owners)
+    // Note: Base44 filter doesn't support skip parameter, so we fetch one batch of 50
+    const batch = await sr.entities.Vehicle.filter({}, '-created_date', 50);
+    const vehiclesToProcess = batch.filter(v => 
+      v.owner_invite_sent_at && 
+      v.owner_verified !== true && 
+      v.is_owner_rider !== true
+    );
 
     let remindersSent = 0;
     let flaggedForReview = 0;

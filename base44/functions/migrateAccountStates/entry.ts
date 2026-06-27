@@ -23,8 +23,13 @@ Deno.serve(async (req) => {
 
     for (const u of allUsers) {
       try {
-        // FIX 9: Skip only users whose account_state is NOT 'DRAFT'
-        // Re-evaluate all users currently at 'DRAFT'
+        // FIX 9: Skip users who have already been migrated (migrated_at timestamp exists)
+        // This prevents re-evaluation and state flip-flopping for mid-onboarding users
+        if (u.migrated_at) {
+          continue;
+        }
+        
+        // Also skip users whose account_state is NOT 'DRAFT' (already properly advanced)
         if (u.account_state && u.account_state !== 'DRAFT') {
           continue;
         }
@@ -62,10 +67,11 @@ Deno.serve(async (req) => {
           newState = 'DRAFT';
         }
 
-        // Update user
+        // Update user with migrated_at timestamp to prevent re-evaluation
         await sr.entities.User.update(u.id, {
           account_state: newState,
           account_state_updated_at: new Date().toISOString(),
+          migrated_at: new Date().toISOString(),
           onboarding_complete: newState === 'BASIC_ACTIVE' || newState === 'VERIFIED' ? true : u.onboarding_complete,
         });
 
@@ -75,7 +81,7 @@ Deno.serve(async (req) => {
           action: 'account_state_migrated',
           entity_type: 'User',
           entity_id: u.id,
-          new_values: { account_state: newState },
+          new_values: { account_state: newState, migrated_at: new Date().toISOString() },
           description: `Account state migrated to ${newState} during backfill`,
           ip_address: 'system',
         });
