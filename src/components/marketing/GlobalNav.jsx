@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, Bike } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function GlobalNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isAuthenticated, user } = useAuth();
+  const isLoggedIn = isAuthenticated && !!user;
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -30,8 +33,14 @@ export default function GlobalNav() {
 
           {/* Right side CTAs */}
           <div className="hidden lg:flex items-center gap-3">
-            <Link to="/login" className="px-5 py-2 text-sm font-semibold border border-border rounded-xl hover:bg-accent transition-colors">Login</Link>
-            <Link to="/register" className="px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity shadow-sm">Get Started</Link>
+            {isLoggedIn ? (
+              <Link to="/app" className="px-5 py-2 text-sm font-semibold border border-border rounded-xl hover:bg-accent transition-colors">My Account</Link>
+            ) : (
+              <>
+                <Link to="/login" className="px-5 py-2 text-sm font-semibold border border-border rounded-xl hover:bg-accent transition-colors">Login</Link>
+                <Link to="/register" className="px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity shadow-sm">Get Started</Link>
+              </>
+            )}
           </div>
 
           {/* Mobile hamburger */}
@@ -52,8 +61,14 @@ export default function GlobalNav() {
             <Link to="/about" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">About</Link>
             <Link to="/pricing" onClick={closeMobile} className="block px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-accent">Pricing</Link>
             <div className="flex gap-2 pt-3">
-              <Link to="/login" onClick={closeMobile} className="flex-1 text-center px-4 py-2.5 text-sm font-semibold border border-border rounded-xl">Login</Link>
-              <Link to="/register" onClick={closeMobile} className="flex-1 text-center px-4 py-2.5 text-sm font-semibold bg-primary text-primary-foreground rounded-xl">Get Started</Link>
+              {isLoggedIn ? (
+                <Link to="/app" onClick={closeMobile} className="flex-1 text-center px-4 py-2.5 text-sm font-semibold border border-border rounded-xl">My Account</Link>
+              ) : (
+                <>
+                  <Link to="/login" onClick={closeMobile} className="flex-1 text-center px-4 py-2.5 text-sm font-semibold border border-border rounded-xl">Login</Link>
+                  <Link to="/register" onClick={closeMobile} className="flex-1 text-center px-4 py-2.5 text-sm font-semibold bg-primary text-primary-foreground rounded-xl">Get Started</Link>
+                </>
+              )}
             </div>
           </div>
         </div>

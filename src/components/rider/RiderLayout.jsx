@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import RiderHeader from './RiderHeader';
 import BottomNav from './BottomNav';
+import SupportFAB from './SupportFAB';
 
 export default function RiderLayout() {
   const { user } = useAuth();
@@ -56,6 +57,7 @@ export default function RiderLayout() {
           <Outlet />
         </main>
         <BottomNav walletActive={walletActive} />
+        <SupportFAB />
       </div>
 
       {/* Right sidebar */}

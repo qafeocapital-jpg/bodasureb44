@@ -1,11 +1,13 @@
 // Service tiles grid with locked/soon/expandable logic
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { riderTileSections, tileColors } from '@/lib/riderTiles';
 import { getKycLevel } from '@/components/ui/KycLevelBadge';
 import { Lock, ChevronDown, ChevronRight } from 'lucide-react';
 import LockedTileSheet from '@/components/rider/LockedTileSheet';
 
 export default function HomeNavGrid({ user, walletActive, lockedTile, setLockedTile, servicesExpanded, setServicesExpanded }) {
+  const navigate = useNavigate();
+
   return (
     <>
       {/* Locked Tile Sheet */}
@@ -40,14 +42,23 @@ export default function HomeNavGrid({ user, walletActive, lockedTile, setLockedT
             const isWalletLocked = tile.requiresWallet && !walletActive;
             const isLocked = !isWalletLocked && tile.requiresTier2 && getKycLevel(user) < 2;
             const isAnyLocked = isWalletLocked || isLocked;
-            const TileElement = isSoon || isAnyLocked ? 'div' : Link;
+            const isChatAction = tile.action === 'open_chat';
+            const TileElement = isSoon || isAnyLocked || isChatAction ? 'div' : Link;
 
             const tileConfig = {
-              to: isSoon || isAnyLocked ? undefined : tile.path,
+              to: isSoon || isAnyLocked || isChatAction ? undefined : tile.path,
               onClick: isWalletLocked
                 ? () => setLockedTile({ ...tile, lockType: 'wallet' })
                 : isLocked
                 ? () => setLockedTile(tile)
+                : isChatAction
+                ? () => {
+                    if (window._support?.openChat) {
+                      window._support.openChat();
+                    } else {
+                      navigate('/app/support');
+                    }
+                  }
                 : undefined,
               className: 'flex flex-col items-center gap-1.5 cursor-pointer',
             };
