@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
+import ReamazeSSOProvider from './components/ReamazeSSOProvider';
 import { Navigate } from 'react-router-dom';
 import RiderLayout from './components/rider/RiderLayout';
 import StaffLayout from './components/staff/StaffLayout';
@@ -229,6 +230,7 @@ function App() {
 
   return (
     <AuthProvider>
+      <ReamazeSSOProvider />
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
