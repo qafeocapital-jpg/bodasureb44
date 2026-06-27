@@ -6,12 +6,16 @@ import { getOnboardingPhase } from '@/lib/onboarding';
 import { getTaskStatuses } from '@/lib/verification';
 
 export default function HomeStatusBanners({ user, bikes, kycDocs, groupMembers, latestAnnouncement, bannerDismissed, setBannerDismissed }) {
+  const phase = getOnboardingPhase(user, bikes, groupMembers);
+  
   return (
     <>
-      {/* Onboarding Progress Tiles */}
-      <div className="px-4 pt-5">
-        {user && <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} groupMembers={groupMembers} />}
-      </div>
+      {/* Onboarding Progress Tiles - hidden for fully verified riders (phase >= 5) */}
+      {phase < 5 && (
+        <div className="px-4 pt-5">
+          {user && <OnboardingTiles user={user} bikes={bikes} kycDocs={kycDocs} groupMembers={groupMembers} />}
+        </div>
+      )}
 
       {/* Verification Nudge Banner */}
       {user?.onboarding_complete && !user?.verification_complete && !bannerDismissed && (() => {
@@ -56,8 +60,8 @@ export default function HomeStatusBanners({ user, bikes, kycDocs, groupMembers, 
         </div>
       )}
 
-      {/* Notifications Banner */}
-      {getOnboardingPhase(user, bikes, groupMembers) < 5 && (
+      {/* Notifications Banner - hidden for fully verified riders (phase >= 5) */}
+      {phase < 5 && (
         <div className="px-4 pt-5">
           <div className="bg-warning/10 border border-warning/20 rounded-xl p-4">
             <div className="flex items-center gap-2">

@@ -18,7 +18,7 @@ export default function OnboardingTiles({ user, bikes, kycDocs, groupMembers }) 
     <div>
       <div className="flex items-center justify-between mb-3 px-1">
         <h2 className="text-sm font-heading font-bold text-foreground">Complete Your Setup</h2>
-        {phase >= 6 && <span className="text-xs font-medium text-success">All done!</span>}
+        {phase >= 5 && <span className="text-xs font-medium text-success">All done!</span>}
       </div>
       <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
         {ONBOARDING_PHASES.map((p, i) => {

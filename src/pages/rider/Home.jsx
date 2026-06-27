@@ -160,7 +160,7 @@ export default function Home() {
         wallet={wallet}
         startScreen={wizardStartScreen}
       />
-      {phase !== null && (
+      {phase !== null && phase < 5 && (
         <OnboardingFAB
           phase={phase}
           userId={user?.id}
