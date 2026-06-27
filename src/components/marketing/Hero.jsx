@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
-export default function Hero({ title, subtitle, primaryCta, secondaryCta, children }) {
+export default function Hero({ title, subtitle, primaryCta, secondaryCta, badge, children }) {
   const isHash = (to) => typeof to === 'string' && to.startsWith('#');
 
   const CtaButton = ({ cta, primary }) => {
@@ -28,7 +28,7 @@ export default function Hero({ title, subtitle, primaryCta, secondaryCta, childr
         <div className="max-w-3xl">
           <div className="inline-flex items-center gap-2 bg-background/10 border border-background/20 rounded-full px-3 py-1 mb-6">
             <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-            <span className="text-xs font-medium text-background/80">Kenya's BodaBoda Fintech Platform</span>
+            <span className="text-xs font-medium text-background/80">{badge || "Kenya's BodaBoda Fintech Platform"}</span>
           </div>
 
           <h1 className="font-heading font-extrabold text-4xl sm:text-5xl lg:text-6xl text-background leading-[1.1] tracking-tight">
