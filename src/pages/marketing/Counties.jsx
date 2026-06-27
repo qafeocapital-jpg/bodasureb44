@@ -3,7 +3,7 @@ import { ArrowRight, ArrowDown, Check, X, Eye, Download } from 'lucide-react';
 import Hero from '@/components/marketing/Hero';
 import StatStrip from '@/components/marketing/StatStrip';
 import CTASection from '@/components/marketing/CTASection';
-import DemoRequestForm from '@/components/marketing/DemoRequestForm';
+import ReamazeDemoForm from '@/components/marketing/ReamazeDemoForm';
 import CountyBriefModal from '@/components/marketing/CountyBriefModal';
 
 const BRIEF_URL = '/assets/BodaSure-County-Brief.pdf';
@@ -246,7 +246,7 @@ export default function Counties() {
         subtitle="Schedule a live demo with our team. We'll walk you through registration, compliance, and revenue collection — tailored to your county."
       >
         <div id="demo">
-          <DemoRequestForm />
+          <ReamazeDemoForm />
         </div>
       </CTASection>
 

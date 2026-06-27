@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { ArrowRight, Check } from 'lucide-react';
 import Hero from '@/components/marketing/Hero';
 import CTASection from '@/components/marketing/CTASection';
-import DemoRequestForm from '@/components/marketing/DemoRequestForm';
+import ReamazeDemoForm from '@/components/marketing/ReamazeDemoForm';
 
 const PILLARS = [
   { emoji: '🤝', title: 'Dignify', body: 'We treat every rider as a professional, a breadwinner, a neighbour — not a line item in a compliance spreadsheet. Dignity is the starting point, not an afterthought.' },
@@ -225,7 +225,7 @@ export default function About() {
           </a>
         </div>
         <div id="demo">
-          <DemoRequestForm />
+          <ReamazeDemoForm />
         </div>
       </CTASection>
     </>

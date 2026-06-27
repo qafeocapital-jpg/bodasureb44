@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowDown, Check, X } from 'lucide-react';
 import Hero from '@/components/marketing/Hero';
 import CTASection from '@/components/marketing/CTASection';
-import DemoRequestForm from '@/components/marketing/DemoRequestForm';
+import ReamazeDemoForm from '@/components/marketing/ReamazeDemoForm';
 
 const PAIN_CARDS = [
   { emoji: '📓', title: 'The book gets messy', body: 'A paper register rots in the rain, lives in one person\'s bag, and is never up to date. When the secretary leaves, the records leave with them.' },
@@ -266,7 +266,7 @@ export default function Saccos() {
           </a>
         </div>
         <div id="demo">
-          <DemoRequestForm />
+          <ReamazeDemoForm />
         </div>
       </CTASection>
     </>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowDown, Check } from 'lucide-react';
 import Hero from '@/components/marketing/Hero';
 import CTASection from '@/components/marketing/CTASection';
-import DemoRequestForm from '@/components/marketing/DemoRequestForm';
+import ReamazeDemoForm from '@/components/marketing/ReamazeDemoForm';
 
 const ROLES = [
   { emoji: '🏛️', title: 'County', body: 'Registers riders, issues digital permits, enforces compliance, and collects revenue — all in one dashboard.' },
@@ -202,7 +202,7 @@ export default function HowItWorks() {
           </Link>
         </div>
         <div id="demo">
-          <DemoRequestForm />
+          <ReamazeDemoForm />
         </div>
       </CTASection>
     </>
