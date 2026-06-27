@@ -85,25 +85,14 @@ export default function ComplianceChecklist({ user, vehicle, taskStatuses, walle
         <div className="space-y-2">
           <ChecklistRow
             label="ID Verification (Front & Back)"
-            status={taskStatusMap.id || 'not_started'}
-            subLabel={taskStatusMap.id === 'submitted' ? 'Awaiting review' : undefined}
+            status={taskStatusMap.identity || 'not_started'}
+            subLabel={taskStatusMap.identity === 'submitted' ? 'Awaiting review' : undefined}
             link="/app/profile"
           />
           <ChecklistRow
             label="Bike Photos (4 angles)"
             status={taskStatusMap.bike || 'not_started'}
             subLabel={taskStatusMap.bike === 'submitted' ? 'Awaiting review' : undefined}
-            link="/app/profile"
-          />
-          <ChecklistRow
-            label="Rider Selfie"
-            status={taskStatusMap.selfie || 'not_started'}
-            subLabel={taskStatusMap.selfie === 'submitted' ? 'Awaiting review' : undefined}
-            link="/app/profile"
-          />
-          <ChecklistRow
-            label="Phone Verification (OTP)"
-            status={taskStatusMap.phone || 'not_started'}
             link="/app/profile"
           />
           <ChecklistRow

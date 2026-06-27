@@ -35,8 +35,8 @@ export default function LipaCounty() {
       try {
         const w = await getOrCreateWallet(user.id);
         setWallet(w);
-        const owned = await base44.entities.Vehicle.filter({ owner_id: user.id, status: 'approved' });
-        const ridden = await base44.entities.Vehicle.filter({ rider_id: user.id, status: 'approved' });
+        const owned = await base44.entities.Vehicle.filter({ owner_id: user.id });
+        const ridden = await base44.entities.Vehicle.filter({ rider_id: user.id });
         const merged = [...owned, ...ridden.filter(r => !owned.find(o => o.id === r.id))];
         setBikes(merged);
 

@@ -167,6 +167,19 @@ export default function RiderVerify() {
               <div className="text-sm">
                 <p className="font-medium text-success">✓ Active</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Valid until {formatDate(permit.end_date)}</p>
+                {permit.permit_type && (
+                  <div className="mt-1.5">
+                    {permit.permit_type === 'provisional' ? (
+                      <span className="inline-flex items-center bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                        Provisional Permit
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center bg-success/10 text-success rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                        Full Permit
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm font-medium text-destructive">✗ No Active Permit</p>
