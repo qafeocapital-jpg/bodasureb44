@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Minus } from 'lucide-react';
 import CTASection from '@/components/marketing/CTASection';
@@ -79,19 +80,19 @@ export default function Saccos() {
       <section className="relative overflow-hidden bg-gradient-to-br from-foreground via-foreground to-primary/15 py-20 lg:py-28">
         <div className="absolute top-0 right-0 w-[420px] h-[420px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="!max-w-[16ch]">
+          <div>
             <span className="inline-block text-xs font-bold text-primary bg-primary/10 rounded-full px-4 py-1.5 mb-6 tracking-wider uppercase">For SACCOs, welfare &amp; self-help groups</span>
-            <h1 className="font-heading font-extrabold text-4xl sm:text-5xl lg:text-6xl text-background leading-[1.05] tracking-tight">
+            <h1 className="font-heading font-extrabold text-4xl sm:text-5xl lg:text-6xl text-background leading-[1.05] tracking-tight max-w-[16ch]">
               Run an organised group that actually <span className="text-primary">earns</span>.
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-background/70 leading-relaxed max-w-2xl">
               BodaSure gives boda boda SACCOs, welfare groups and self-help groups the digital tools to track members, collect contributions, and unlock new income — so your group runs clean, stays accountable, and grows strong.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <a href="#demo" className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
+              <Link to="/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
                 Register your group <ArrowRight className="w-4 h-4" />
-              </a>
-              <a href="#demo" className="inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-background/30 text-background rounded-xl font-semibold text-sm hover:bg-background/10 transition-colors">
+              </Link>
+              <a href="#demo" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-background/30 text-background rounded-xl font-semibold text-sm hover:bg-background/10 transition-colors">
                 Talk to us
               </a>
             </div>
@@ -177,7 +178,7 @@ export default function Saccos() {
           </h2>
           <div className="flex flex-col lg:flex-row gap-3 mt-12">
             {FLOW_STEPS.map((step, i) => (
-              <div key={i} className="contents">
+              <React.Fragment key={i}>
                 <div className="flex-1 bg-card border border-border rounded-2xl p-6 flex gap-4 items-start">
                   <div className="flex-none w-8 h-8 rounded-full bg-primary text-primary-foreground font-heading font-bold text-sm flex items-center justify-center shrink-0">
                     {step.num}
@@ -188,11 +189,11 @@ export default function Saccos() {
                   </div>
                 </div>
                 {i < FLOW_STEPS.length - 1 && (
-                  <div className="flex items-center justify-center">
-                    <ArrowRight className="w-5 h-5 text-primary rotate-90 lg:rotate-0" />
+                  <div className="hidden lg:flex items-center justify-center">
+                    <ArrowRight className="w-5 h-5 text-primary" />
                   </div>
                 )}
-              </div>
+              </React.Fragment>
             ))}
           </div>
         </div>
@@ -285,12 +286,12 @@ export default function Saccos() {
         subtitle="Register your SACCO or welfare group on BodaSure, or talk to us about how your group can start earning — not just collecting."
       >
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-8">
-          <a href="#demo" className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
+          <a href="#demo" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
             Register your group <ArrowRight className="w-4 h-4" />
           </a>
-          <Link to="/about" className="inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-foreground/20 text-foreground rounded-xl font-semibold text-sm hover:bg-foreground/5 transition-colors">
+          <a href="#demo" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-foreground/20 text-foreground rounded-xl font-semibold text-sm hover:bg-foreground/5 transition-colors">
             Talk to us
-          </Link>
+          </a>
         </div>
         <div id="demo" className="max-w-2xl mx-auto bg-card border border-border rounded-2xl p-8">
           <h3 className="font-heading font-bold text-xl mb-4 text-center">Register your group</h3>
