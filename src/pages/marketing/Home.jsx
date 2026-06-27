@@ -30,12 +30,12 @@ const FEATURES = [
 const DARK_STATS = [
   { value: '2.5M+', label: 'riders depend on the sector' },
   { value: 'KES 660B', label: 'generated annually · 4.4% of GDP' },
-  { value: '~10%', label: 'of revenue targets counties actually collect' },
+  { value: '~66%', label: 'average share of OSR targets counties actually collect' },
   { value: '47', label: 'counties mandated to digitise under ICRMS 2025' },
 ];
 
 const WHY_BODASURE = [
-  { emoji: '📱', title: 'Works on the phones riders have', description: 'USSD-ready, mobile-first, and M-Pesa-native. No rider is left out.' },
+  { emoji: '📱', title: 'Works on the phones riders have', description: 'Mobile-first and built for the phones riders already have. Works on any smartphone, wherever they are — no rider is left out.' },
   { emoji: '🏦', title: 'Money goes where it should', description: 'Payments settle through a CBK-licensed partner straight into county and SACCO accounts. No middlemen at the stage.' },
   { emoji: '🤝', title: 'Self-enforcement, not just enforcement', description: 'Riders and their officials hold each other accountable, with the county for support — not against the rider.' },
   { emoji: '📋', title: 'One trusted record', description: 'County, SACCO, owner, and rider all see the same verified data, reconciled to the shilling.' },
