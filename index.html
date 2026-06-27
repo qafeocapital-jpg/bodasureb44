@@ -25,8 +25,16 @@
       .reamaze-widget-launcher,
       .reamaze-widget-button,
       .rmz-launcher,
-      .rmz-widget-button {
+      .rmz-widget-button,
+      [class*='reamaze'][class*='launcher'],
+      [class*='reamaze'][class*='button'],
+      [id*='reamaze'][id*='launcher'],
+      [class*='rmz-'],
+      iframe[src*='reamaze.com'][title*='chat' i],
+      div[data-reamaze] {
         display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
     </style>
   </head>

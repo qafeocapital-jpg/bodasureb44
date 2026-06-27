@@ -139,6 +139,7 @@ export default function Home() {
         bikes={bikes}
         kycDocs={kycDocs}
         groupMembers={groupMembers}
+        wallet={wallet}
         latestAnnouncement={latestAnnouncement}
         bannerDismissed={bannerDismissed}
         setBannerDismissed={setBannerDismissed}
@@ -151,15 +152,17 @@ export default function Home() {
         servicesExpanded={servicesExpanded}
         setServicesExpanded={setServicesExpanded}
       />
-      <OnboardingWizardModal
-        open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
-        user={user}
-        bikes={bikes}
-        groupMembers={groupMembers}
-        wallet={wallet}
-        startScreen={wizardStartScreen}
-      />
+      {phase !== null && phase < 5 && (
+        <OnboardingWizardModal
+          open={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          user={user}
+          bikes={bikes}
+          groupMembers={groupMembers}
+          wallet={wallet}
+          startScreen={wizardStartScreen}
+        />
+      )}
       {phase !== null && phase < 5 && (
         <OnboardingFAB
           phase={phase}

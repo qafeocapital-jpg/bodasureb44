@@ -5,8 +5,8 @@ import OnboardingTiles from '@/components/rider/OnboardingTiles';
 import { getOnboardingPhase } from '@/lib/onboarding';
 import { getTaskStatuses } from '@/lib/verification';
 
-export default function HomeStatusBanners({ user, bikes, kycDocs, groupMembers, latestAnnouncement, bannerDismissed, setBannerDismissed }) {
-  const phase = getOnboardingPhase(user, bikes, groupMembers);
+export default function HomeStatusBanners({ user, bikes, kycDocs, groupMembers, wallet, latestAnnouncement, bannerDismissed, setBannerDismissed }) {
+  const phase = getOnboardingPhase(user, bikes, groupMembers, wallet);
   
   return (
     <>
