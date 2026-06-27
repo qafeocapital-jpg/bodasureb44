@@ -95,7 +95,7 @@ export const riderTileSections = [
       { label: 'Alerts', icon: Bell, color: 'amber', path: '/app/account', status: 'live' },
       { label: 'Security', icon: Lock, color: 'rose', path: '/app/account', status: 'live' },
       { label: 'Support', icon: Headphones, color: 'green', path: '/app/support', status: 'live', action: 'open_chat' },
-      { label: 'Help Center', icon: CircleHelp, color: 'blue', path: '/app/support', status: 'live' },
+      { label: 'Help Center', icon: CircleHelp, color: 'blue', action: 'open_chat', status: 'live' },
     ]
   },
 ];
