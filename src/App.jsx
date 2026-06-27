@@ -78,6 +78,7 @@ import MarketingHome from './pages/marketing/Home';
 import Counties from './pages/marketing/Counties';
 import Saccos from './pages/marketing/Saccos';
 import Riders from './pages/marketing/Riders';
+import HowItWorks from './pages/marketing/HowItWorks';
 import About from './pages/marketing/About';
 import Pricing from './pages/marketing/Pricing';
 import SecurityPage from './pages/marketing/Security';
@@ -247,6 +248,7 @@ function App() {
               <Route path="/counties" element={<Counties />} />
               <Route path="/saccos" element={<Saccos />} />
               <Route path="/riders" element={<Riders />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/about" element={<About />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/security" element={<SecurityPage />} />

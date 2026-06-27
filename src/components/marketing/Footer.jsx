@@ -30,6 +30,7 @@ export default function Footer() {
               <li><Link to="/counties" className="text-sm text-background/70 hover:text-primary transition-colors">Counties</Link></li>
               <li><Link to="/saccos" className="text-sm text-background/70 hover:text-primary transition-colors">SACCOs</Link></li>
               <li><Link to="/riders" className="text-sm text-background/70 hover:text-primary transition-colors">Riders</Link></li>
+              <li><Link to="/how-it-works" className="text-sm text-background/70 hover:text-primary transition-colors">How It Works</Link></li>
               <li><Link to="/pricing" className="text-sm text-background/70 hover:text-primary transition-colors">Pricing</Link></li>
             </ul>
           </div>
