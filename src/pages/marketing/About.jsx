@@ -11,7 +11,7 @@ const PILLARS = [
 ];
 
 const BELIEFS = [
-  { num: '01', title: 'Formalisation should reward riders, not punish them', body: 'If going digital only means more fees and more enforcement, it will fail. Riders have to gain — protection, credit, a path to ownership — or the system isn\'t worth building.' },
+  { num: '01', title: 'Formalisation should reward riders, not punish them', body: 'Formalisation rewards riders: it gives them protection, credit, and a path to ownership.' },
   { num: '02', title: 'Public revenue should reach public accounts', body: 'Every shilling a rider pays in fees should arrive where it belongs, transparently. No leakage, no middlemen at the stage, no "lost" collections.' },
   { num: '03', title: 'Technology should meet people where they are', body: 'That means the phones riders already own, in the languages they speak, working on any smartphone wherever they are. No one gets left out.' },
   { num: '04', title: 'A formal sector is a bankable sector', body: 'When earnings and identities are verified, riders become creditworthy — and a creditworthy rider can build real, lasting wealth.' },
@@ -46,14 +46,14 @@ const Eyebrow = ({ children }) => (
 );
 
 export default function About() {
-  useEffect(() => { document.title = "About BodaSure — Building the operating system for Kenya's boda boda economy"; }, []);
+  useEffect(() => { document.title = "About BodaSure — The operating system for Kenya's boda boda economy"; }, []);
 
   return (
     <>
       {/* Section 1 — Hero */}
       <Hero
         badge="About BodaSure"
-        title={<>We're building the operating system for Kenya's <em className="text-primary not-italic">boda boda</em> economy.</>}
+        title={<>BodaSure is the operating system for Kenya's <em className="text-primary not-italic">boda boda</em> economy.</>}
         subtitle="A sector that moves millions of Kenyans every day deserves more than cash, paper, and informality. We exist to dignify, protect, and empower the riders who keep the country moving."
         primaryCta={{ text: 'Request a Demo', to: '#demo' }}
         secondaryCta={{ text: 'Partner with us', to: 'mailto:help@bodasure.com' }}
@@ -68,7 +68,7 @@ export default function About() {
               We exist to dignify, protect, and empower the people who move Kenya.
             </h2>
             <p className="text-lg text-background/70 leading-relaxed">
-              The boda boda industry is the backbone of Kenyan mobility and one of its largest employers. Yet it has been left to run on cash, paper and trust — and that informality strips riders of <strong className="text-background">dignity</strong>, leaves them without <strong className="text-background">protection</strong>, and locks them out of the tools that would <strong className="text-background">empower</strong> them to build a better life. We formalise the sector to change that: fairly to riders, valuably to counties, and for the good of the country.
+              The boda boda industry is the backbone of Kenyan mobility and one of its largest employers. Yet it has been left to run on cash, paper and trust — and that informality strips riders of <strong className="text-background">dignity</strong>, leaves them without <strong className="text-background">protection</strong>, and locks them out of the tools that would <strong className="text-background">empower</strong> them to build a better life. BodaSure formalises the sector to change that: fairly to riders, valuably to counties, and for the good of the country.
             </p>
           </div>
           <div className="grid sm:grid-cols-3 gap-6 mt-12">
@@ -100,12 +100,12 @@ export default function About() {
           {/* Pull-quote */}
           <div className="border-l-4 border-primary bg-accent rounded-r-2xl p-6 lg:p-8 mb-8">
             <p className="font-heading font-bold text-xl lg:text-2xl leading-snug text-foreground">
-              "We realised the sector didn't need another payment app. It needed an operating system — one that does the hard work of registration, mapping, verification and compliance, with payments as just one part."
+              "The sector doesn't need another payment app. It needs an operating system — one that does the hard work of registration, mapping, verification and compliance, with payments as just one part. That's BodaSure."
             </p>
           </div>
 
           <p className="text-lg text-muted-foreground leading-relaxed">
-            That's what BodaSure is. We work hand in hand with county governments, SACCOs and riders to build tools that fit how the sector actually works — not how an outsider imagines it works. Built in Kenya, for Kenya, on the phones riders already carry.
+            That's what BodaSure is. BodaSure works hand in hand with county governments, SACCOs and riders, delivering tools that fit how the sector actually works — not how an outsider imagines it works. Built in Kenya, for Kenya, on the phones riders already carry.
           </p>
         </div>
       </section>
@@ -191,7 +191,7 @@ export default function About() {
                   Built by Mint Mobitech.
                 </h2>
                 <p className="text-lg text-background/70 leading-relaxed">
-                  BodaSure is a product of Mint Mobitech Ltd, a Kenyan technology company building digital infrastructure for the sectors that power everyday life. Headquartered in Nairobi, we work across the country with county governments, SACCOs and the rider communities at the heart of the boda boda economy.
+                  BodaSure is a product of Mint Mobitech Ltd, a Kenyan technology company that delivers digital infrastructure for the sectors that power everyday life. Headquartered in Nairobi, we work across the country with county governments, SACCOs and the rider communities at the heart of the boda boda economy.
                 </p>
               </div>
               <div className="bg-background/5 border-t lg:border-t-0 lg:border-l border-background/10 p-8 lg:p-12">
@@ -211,7 +211,7 @@ export default function About() {
 
       {/* Section 8 — Closing CTA */}
       <CTASection
-        title="Help us dignify, protect, and empower the people who move Kenya."
+        title="Dignify, protect, and empower the people who move Kenya — with BodaSure."
       >
         <div className="flex flex-col sm:flex-row justify-center gap-3 mb-8">
           <a href="#demo" className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
