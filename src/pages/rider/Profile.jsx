@@ -300,7 +300,7 @@ export default function Profile() {
           />
         )}
         {currentPhase >= 5 && (
-          <CompletionScreen onDone={() => navigate('/app')} verificationComplete={user?.verification_complete} />
+          <CompletionScreen onDone={() => navigate('/app')} verificationComplete={user?.verification_complete} user={user} />
         )}
       </div>
     </div>

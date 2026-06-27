@@ -30,13 +30,19 @@ const ACCOUNT_STATES = [
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-    // Admin-only function
-    if (user.role !== 'super_admin' && user.role !== 'bodasure_staff') {
-      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    
+    // FIX 1: Allow system calls (no user session) OR admin sessions, block regular users
+    const user = await base44.auth.me().catch(() => null);
+    let adminId = null;
+    
+    if (user) {
+      // If user session exists, must be admin
+      if (user.role !== 'super_admin' && user.role !== 'bodasure_staff') {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      adminId = user.id;
     }
+    // If no user session, allow (scheduled/system call)
 
     const { userId, event, metadata } = await req.json();
 
@@ -105,7 +111,7 @@ Deno.serve(async (req) => {
       old_values: { account_state: oldState },
       new_values: { account_state: targetState },
       description: `Transitioned from ${oldState} to ${targetState} via event ${event}`,
-      ip_address: 'system',
+      ip_address: adminId ? 'admin:' + adminId : 'system',
     });
 
     return Response.json({

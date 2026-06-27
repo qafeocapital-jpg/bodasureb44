@@ -346,7 +346,8 @@ Deno.serve(async (req) => {
     } else if (decision === 'reject') {
       userUpdate.kyc_status = 'rejected';
       userUpdate.verification_complete = false;
-      userUpdate.kyc_attempts = (userUpdate.kyc_attempts || 0) + 1;
+      // FIX 8: Increment from the fetched user object, not the fresh update object
+      userUpdate.kyc_attempts = (user.kyc_attempts || 0) + 1;
       // Don't set account_state here - transitionAccountState will handle it
     } else if (decision === 'review') {
       userUpdate.kyc_status = 'pending';

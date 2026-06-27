@@ -6,6 +6,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  */
 Deno.serve(async (req) => {
   try {
+    // FIX 2: Parse request body FIRST before any async DB calls
+    const requestBody = await req.json();
+    
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -13,7 +16,7 @@ Deno.serve(async (req) => {
     const sr = base44.asServiceRole;
 
     // 1. Validate BASIC_ACTIVE conditions
-    const eligibility = await sr.functions.invoke('checkBasicActiveEligibility', { userId: user.id });
+    const eligibility = await base44.functions.invoke('checkBasicActiveEligibility', { userId: user.id });
     if (!eligibility.eligible) {
       return Response.json({ 
         error: 'Not eligible for provisional permit', 
@@ -30,7 +33,7 @@ Deno.serve(async (req) => {
     const countyId = vehicle.county_id || user.county_id;
 
     // 3. Get billing cycle from request (rider chooses at payment time)
-    const { billing_cycle } = await req.json();
+    const { billing_cycle } = requestBody;
     if (!billing_cycle || !['weekly', 'monthly', 'quarterly', 'yearly'].includes(billing_cycle)) {
       return Response.json({ error: 'Invalid billing_cycle' }, { status: 400 });
     }
@@ -74,7 +77,7 @@ Deno.serve(async (req) => {
     });
 
     // 7. Transition account state to BASIC_ACTIVE
-    const transitionResult = await sr.functions.invoke('transitionAccountState', {
+    const transitionResult = await base44.functions.invoke('transitionAccountState', {
       userId: user.id,
       event: 'BASIC_ACTIVE_ACHIEVED',
       metadata: { 
@@ -86,7 +89,7 @@ Deno.serve(async (req) => {
 
     // 8. Send SMS notification
     try {
-      await sr.functions.invoke('sendSms', {
+      await base44.functions.invoke('sendSms', {
         to: user.phone,
         message: `Your BodaSure provisional permit is active. Complete verification within 14 days to keep it valid. Open the app to start.`,
       });

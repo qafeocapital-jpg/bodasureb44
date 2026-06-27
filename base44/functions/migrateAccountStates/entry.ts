@@ -23,8 +23,9 @@ Deno.serve(async (req) => {
 
     for (const u of allUsers) {
       try {
-        // Skip if already has account_state
-        if (u.account_state) {
+        // FIX 9: Skip only users whose account_state is NOT 'DRAFT'
+        // Re-evaluate all users currently at 'DRAFT'
+        if (u.account_state && u.account_state !== 'DRAFT') {
           continue;
         }
 

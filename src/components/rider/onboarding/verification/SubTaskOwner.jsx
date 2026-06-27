@@ -26,16 +26,12 @@ export default function SubTaskOwner({ user, vehicle, onDataChange, onBack }) {
     setSending(true);
     setError('');
     try {
-      // Update vehicle with owner details
-      await base44.entities.Vehicle.update(vehicle.id, {
-        owner_phone: normalized,
-        owner_name: ownerName.trim(),
-        owner_invite_sent_at: new Date().toISOString(),
+      // FIX 5: Call backend function that sends SMS via Africa's Talking
+      await base44.functions.invoke('sendOwnerInvite', {
+        vehicleId: vehicle.id,
+        ownerPhone: normalized,
+        ownerName: ownerName.trim(),
       });
-
-      // Owner verification is handled in-app: when the owner logs in with this phone,
-      // they'll see a "Verify My Bike" section on their Home dashboard.
-      // SMS gateway integration is deferred — the invite is recorded on the vehicle.
 
       await onDataChange();
     } catch (e) {
@@ -48,9 +44,13 @@ export default function SubTaskOwner({ user, vehicle, onDataChange, onBack }) {
     setSending(true);
     setError('');
     try {
-      await base44.entities.Vehicle.update(vehicle.id, {
-        owner_invite_sent_at: new Date().toISOString(),
+      // FIX 5: Call backend function to resend SMS
+      await base44.functions.invoke('sendOwnerInvite', {
+        vehicleId: vehicle.id,
+        ownerPhone: vehicle.owner_phone,
+        ownerName: vehicle.owner_name,
       });
+
       await onDataChange();
     } catch (e) {
       setError(e.message);

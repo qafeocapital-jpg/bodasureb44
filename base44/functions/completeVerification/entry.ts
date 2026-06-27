@@ -62,6 +62,26 @@ Deno.serve(async (req) => {
     }
     await sr.entities.User.update(user.id, updateData);
 
+    // FIX 4: Call transitionAccountState with KYC_ACCEPTED (idempotent if already VERIFIED)
+    try {
+      await base44.functions.invoke('transitionAccountState', {
+        userId: user.id,
+        event: 'KYC_ACCEPTED',
+        metadata: { source: 'completeVerification' },
+      });
+    } catch (stateError) {
+      console.error('[completeVerification] State transition failed:', stateError);
+      // Continue anyway - state might already be VERIFIED
+    }
+
+    // FIX 4: Convert provisional permit to full
+    try {
+      await base44.functions.invoke('convertProvisionalPermit', { userId: user.id });
+    } catch (permitError) {
+      console.error('[completeVerification] Permit conversion failed:', permitError);
+      // Continue anyway - convertProvisionalPermit is idempotent
+    }
+
     // Note: SasaPay personal onboarding is handled during WalletActivate (2-step progressive onboarding).
     // Verification completion only marks the user as verified — wallet activation happens separately.
     return Response.json({

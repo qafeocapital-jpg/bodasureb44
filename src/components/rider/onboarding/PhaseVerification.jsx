@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2, CreditCard, Bike, UserCheck } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronLeft, ArrowRight, CheckCircle2, XCircle, CreditCard, Bike, UserCheck } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import VerificationMiniStepper from '@/components/rider/onboarding/VerificationMiniStepper';
 import VerificationComplete from '@/components/rider/onboarding/VerificationComplete';
@@ -98,7 +98,7 @@ export default function PhaseVerification({ user, vehicle, wallet, onCompleted, 
     return (
       <div className="space-y-4">
         <div className="bg-destructive/5 border border-destructive/20 rounded-2xl p-6 text-center">
-          <CheckCircle2 className="w-12 h-12 mx-auto text-destructive mb-3" />
+          <XCircle className="w-12 h-12 mx-auto text-destructive mb-3" />
           <p className="text-sm font-semibold text-destructive mb-1">Identity Verification Failed</p>
           {kycAttemptsRemaining > 0 ? (
             <>

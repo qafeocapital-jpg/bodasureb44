@@ -37,8 +37,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 5. All checks passed — mark onboarding complete via service role
+    // FIX 3: Call transitionAccountState to advance to BASIC_ACTIVE
     const sr = base44.asServiceRole;
+    try {
+      await base44.functions.invoke('transitionAccountState', {
+        userId: user.id,
+        event: 'BASIC_ACTIVE_ACHIEVED',
+        metadata: { source: 'completeOnboarding' },
+      });
+    } catch (stateError) {
+      console.error('[completeOnboarding] State transition failed:', stateError);
+      // Continue anyway - state might already be BASIC_ACTIVE or higher
+    }
+
+    // Also write legacy booleans for backward compatibility
     await sr.entities.User.update(user.id, {
       onboarding_complete: true,
       profile_complete: true,
