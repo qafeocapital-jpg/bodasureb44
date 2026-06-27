@@ -3,7 +3,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, Minus } from 'lucide-react';
 import CTASection from '@/components/marketing/CTASection';
-import ReamazeDemoForm from '@/components/marketing/ReamazeDemoForm';
 
 const PAIN_CARDS = [
   { emoji: '📓', title: 'The book gets messy', body: 'Paper registers go out of date, get lost, or spark disputes no one can settle.' },
@@ -92,9 +91,6 @@ export default function Saccos() {
               <Link to="/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
                 Register your group <ArrowRight className="w-4 h-4" />
               </Link>
-              <a href="#demo" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-background/30 text-background rounded-xl font-semibold text-sm hover:bg-background/10 transition-colors">
-                Talk to us
-              </a>
             </div>
           </div>
         </div>
@@ -285,17 +281,13 @@ export default function Saccos() {
         title="Bring your group into the digital economy."
         subtitle="Register your SACCO or welfare group on BodaSure, or talk to us about how your group can start earning — not just collecting."
       >
-        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-8">
+        <div id="demo" className="flex flex-col sm:flex-row gap-3 justify-center">
           <a href="#demo" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
             Register your group <ArrowRight className="w-4 h-4" />
           </a>
           <a href="#demo" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 border border-foreground/20 text-foreground rounded-xl font-semibold text-sm hover:bg-foreground/5 transition-colors">
             Talk to us
           </a>
-        </div>
-        <div id="demo" className="max-w-2xl mx-auto bg-card border border-border rounded-2xl p-8">
-          <h3 className="font-heading font-bold text-xl mb-4 text-center">Register your group</h3>
-          <ReamazeDemoForm />
         </div>
       </CTASection>
     </>
