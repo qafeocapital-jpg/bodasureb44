@@ -60,7 +60,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-background/10 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-2">
-          <p className="text-xs text-background/50">© 2025 BodaSure Technologies Ltd. All rights reserved.</p>
+          <p className="text-xs text-background/50">© 2026 BodaSure by Mint Mobitech. All rights reserved.</p>
           <p className="text-xs text-background/50">Nairobi, Kenya</p>
         </div>
       </div>
