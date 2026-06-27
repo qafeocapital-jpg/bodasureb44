@@ -1,14 +1,14 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import BodaSureLoader from './components/BodaSureLoader';
 import ReamazeSSOProvider from './components/ReamazeSSOProvider';
-import { Navigate } from 'react-router-dom';
 import RiderLayout from './components/rider/RiderLayout';
 import StaffLayout from './components/staff/StaffLayout';
 import { countyNav, saccoNav, merchantNav, agentNav, adminNav, commsNav } from './lib/staffNav';
@@ -92,9 +92,15 @@ import AcceptableUse from './pages/marketing/AcceptableUse';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
+  const [minLoadDone, setMinLoadDone] = useState(false);
 
-  // Show loading spinner while checking app public settings or auth
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  useEffect(() => {
+    const timer = setTimeout(() => setMinLoadDone(true), 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Show branded loader while checking app public settings, auth, or minimum brand display window
+  if (isLoadingPublicSettings || isLoadingAuth || !minLoadDone) {
     return <BodaSureLoader size="fullscreen" />;
   }
 
