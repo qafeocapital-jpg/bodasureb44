@@ -8,7 +8,8 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const admin = await base44.auth.me();
     if (!admin?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (!['super_admin', 'bodasure_staff'].includes(admin.role)) return Response.json({ error: 'Forbidden: admin only' }, { status: 403 });
+    const isAuthorized = ['super_admin', 'bodasure_staff', 'county_admin'].includes(admin.role);
+    if (!isAuthorized) return Response.json({ error: 'Forbidden: admin only' }, { status: 403 });
 
     const { docId, userId, action, reason, provider = PROVIDER } = await req.json();
 
@@ -22,6 +23,17 @@ Deno.serve(async (req) => {
 
     if (action === 'reject' && (!reason || reason.trim().length < 10)) {
       return Response.json({ error: 'Rejection reason must be at least 10 characters' }, { status: 400 });
+    }
+
+    // County scope check: county_admin can only approve/reject docs for riders in their county
+    if (admin.role === 'county_admin') {
+      const targetUsers = await base44.asServiceRole.entities.User.filter({ id: userId });
+      const targetUser = targetUsers[0];
+      if (!targetUser) return Response.json({ error: 'Target rider not found' }, { status: 404 });
+      const adminCountyId = admin.scope_entity_id || admin.county_id;
+      if (!adminCountyId || targetUser.county_id !== adminCountyId) {
+        return Response.json({ error: 'Forbidden: county_admin can only review riders in their own county' }, { status: 403 });
+      }
     }
 
     // Route to provider implementation

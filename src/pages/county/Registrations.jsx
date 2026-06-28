@@ -33,6 +33,20 @@ export default function CountyRegistrations() {
 
   useEffect(() => { load(); }, [user]);
 
+  // Handle deep-link from global search: ?rider=<id> or ?vehicle=<id>
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const riderParam = urlParams.get('rider');
+    const vehicleParam = urlParams.get('vehicle');
+    if (riderParam) {
+      setSelectedRiderId(riderParam);
+      setTab('riders');
+    } else if (vehicleParam) {
+      setDetailVehicleId(vehicleParam);
+      setTab('vehicles');
+    }
+  }, []);
+
   async function load() {
     if (!user) return;
     setLoading(true);
@@ -355,7 +369,7 @@ export default function CountyRegistrations() {
       />
 
       {verifyRiderId && (
-        <VerificationDetailSheet riderId={verifyRiderId} onClose={() => setVerifyRiderId(null)} canApprove={false} />
+        <VerificationDetailSheet riderId={verifyRiderId} onClose={() => setVerifyRiderId(null)} canApprove />
       )}
     </div>
   );

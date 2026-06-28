@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Navigate, useLocation, Link } from 'react-router-dom';
-import { Menu, X, LogOut, Bell, Search, ChevronDown } from 'lucide-react';
+import { Menu, X, LogOut, Bell, ChevronDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { hasPortalAccess, getAccessiblePortals } from '@/lib/portals';
 import { useToast } from '@/components/ui/use-toast';
 import { countyNavGroups } from '@/lib/countyNav';
+import CountyGlobalSearch from '@/components/county/CountyGlobalSearch';
 
 export default function CountyLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -172,23 +173,16 @@ export default function CountyLayout() {
             <span className="font-semibold text-foreground">{currentNavItem?.label || 'Dashboard'}</span>
           </div>
           <div className="flex-1 flex justify-center">
-            <div className="relative w-full max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search riders, plates, permits..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-input bg-muted/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a1f]/30 focus:border-[#ff5a1f]/50"
-              />
-            </div>
+            <CountyGlobalSearch />
           </div>
-          <button className="relative p-2 rounded-lg hover:bg-accent transition-colors">
+          <Link to="/county/enforcement" className="relative p-2 rounded-lg hover:bg-accent transition-colors">
             <Bell className="w-5 h-5 text-muted-foreground" />
             {flagCount > 0 && (
               <span className="absolute top-1 right-1 bg-[#ff5a1f] text-white text-[9px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-0.5 leading-none">
                 {flagCount > 99 ? '99+' : flagCount}
               </span>
             )}
-          </button>
+          </Link>
           <div className="flex items-center gap-2 pl-2 border-l border-border">
             <div className="w-8 h-8 rounded-full bg-[#ff5a1f] flex items-center justify-center text-white text-xs font-bold">
               {(user?.full_name || user?.email || 'U')[0].toUpperCase()}
