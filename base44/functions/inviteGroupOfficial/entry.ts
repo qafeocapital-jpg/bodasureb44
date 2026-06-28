@@ -39,9 +39,26 @@ Deno.serve(async (req) => {
       status: 'active',
     });
     if (inviterOfficials.length === 0) {
-      // Also allow if user created the group (founding official check via official_name/phone)
-      // Be strict: only active officials can invite
-      return Response.json({ error: 'Only active group officials can invite others' }, { status: 403 });
+      // Fallback for admin-seeded groups with no GroupOfficial records:
+      // allow if the user's phone matches the group's official_phone
+      const userPhone = user.phone || '';
+      const groupPhone = group.official_phone || '';
+      const normalizePhone = (p) => p.replace(/\D/g, '');
+      const phonesMatch = userPhone && groupPhone && normalizePhone(userPhone) === normalizePhone(groupPhone);
+      if (!phonesMatch) {
+        return Response.json({ error: 'Only active group officials can invite others' }, { status: 403 });
+      }
+      // Auto-create the founding official record so future invites work normally
+      await sr.entities.GroupOfficial.create({
+        group_id: groupId,
+        user_id: user.id,
+        role: 'chairperson',
+        status: 'active',
+        kyc_complete: user.account_state === 'VERIFIED' || user.verification_complete === true,
+        invited_by_user_id: user.id,
+        confirmed_at: new Date().toISOString(),
+        invite_phone: groupPhone,
+      });
     }
 
     // Check for existing pending/active official with same phone for this group

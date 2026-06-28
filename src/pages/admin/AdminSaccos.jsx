@@ -182,6 +182,11 @@ export default function AdminSaccos() {
       for (const m of members) {
         await base44.entities.GroupMember.update(m.id, { group_id: primaryGroup.id });
       }
+      // Move officials from duplicate to primary
+      const officials = await base44.entities.GroupOfficial.filter({ group_id: dupGroup.id });
+      for (const o of officials) {
+        await base44.entities.GroupOfficial.update(o.id, { group_id: primaryGroup.id });
+      }
       // Deactivate duplicate
       await base44.functions.invoke('transitionGroupState', {
         groupId: dupGroup.id,

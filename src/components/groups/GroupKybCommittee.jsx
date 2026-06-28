@@ -54,8 +54,8 @@ export default function GroupKybCommittee({ group }) {
 
   const activeOfficials = officials.filter(o => o.status === 'active');
   const verifiedOfficials = activeOfficials.filter(o => o.kyc_complete);
-  const hasChair = activeOfficials.some(o => o.role === 'chairperson');
-  const quorumMet = hasChair && verifiedOfficials.length >= 2;
+  const chairVerified = activeOfficials.some(o => o.role === 'chairperson' && o.kyc_complete);
+  const quorumMet = chairVerified && verifiedOfficials.length >= 2;
 
   if (loading) {
     return <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
@@ -72,7 +72,7 @@ export default function GroupKybCommittee({ group }) {
           </p>
         </div>
         <p className={`text-xs ${quorumMet ? 'text-green-700' : 'text-amber-700'}`}>
-          Requires Chairperson + at least 1 other verified official. Currently: {verifiedOfficials.length} verified.
+          Requires verified Chairperson + at least 1 other verified official. Currently: {verifiedOfficials.length} verified.
         </p>
       </div>
 

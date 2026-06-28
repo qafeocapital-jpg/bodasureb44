@@ -97,15 +97,11 @@ export default function GroupKybBusiness({ group, onSubmitted }) {
       });
 
       // Transition to KYB_PENDING
-      try {
-        await base44.functions.invoke('transitionGroupState', {
-          groupId: group.id,
-          event: 'kyb_submitted',
-          metadata: { description: 'KYB business account details submitted for review' },
-        });
-      } catch (e) {
-        // State may already be set
-      }
+      await base44.functions.invoke('transitionGroupState', {
+        groupId: group.id,
+        event: 'kyb_submitted',
+        metadata: { description: 'KYB business account details submitted for review' },
+      });
 
       toast({ title: 'KYB Submitted', description: 'Your group is now pending review. We\'ll notify you when your business wallet is ready.' });
       onSubmitted();

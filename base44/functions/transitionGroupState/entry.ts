@@ -40,10 +40,6 @@ Deno.serve(async (req) => {
     let actorId = null;
 
     if (user) {
-      if (user.role !== 'super_admin' && user.role !== 'bodasure_staff') {
-        // Allow any logged-in user to trigger basic_created and kyb_submitted events
-        // (they are self-service rider actions), but restrict admin-level transitions
-      }
       actorId = user.id;
     }
 
@@ -51,6 +47,11 @@ Deno.serve(async (req) => {
 
     if (!groupId || !event) {
       return Response.json({ error: 'groupId and event are required' }, { status: 400 });
+    }
+    // Restrict admin-level events to admin roles (self-service events like group_basic_created/kyb_submitted are allowed for any user)
+    const ADMIN_EVENTS = ['group_verified', 'group_suspended', 'group_deactivated'];
+    if (user && ADMIN_EVENTS.includes(event) && user.role !== 'super_admin' && user.role !== 'bodasure_staff') {
+      return Response.json({ error: 'Admin privileges required for this action' }, { status: 403 });
     }
 
     const targetState = EVENT_MAP[event];

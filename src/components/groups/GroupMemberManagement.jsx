@@ -43,8 +43,9 @@ export default function GroupMemberManagement({ group }) {
         status: 'approved',
         joined_date: new Date().toISOString(),
       });
-      // Increment member count
-      await base44.entities.Group.update(group.id, { member_count: (group.member_count || 0) + 1 });
+      // Increment member count (fetch fresh to avoid stale count on batch approvals)
+      const freshGroup = await base44.entities.Group.get(group.id);
+      await base44.entities.Group.update(group.id, { member_count: (freshGroup.member_count || 0) + 1 });
       toast({ title: 'Member approved' });
       load();
     } catch (e) {

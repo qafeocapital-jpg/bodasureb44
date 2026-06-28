@@ -140,7 +140,7 @@ export default function GroupBasicForm({ onSuccess }) {
         status: 'active',
         source: 'self_registered',
         kyc_status: 'unverified',
-        group_state: 'BASIC_ACTIVE',
+        group_state: 'DRAFT',
         group_state_updated_at: new Date().toISOString(),
         coverage_type: form.coverage_type,
         coverage_sub_county_ids: form.coverage_type === 'sub_county' ? form.selectedSubCounties : [],
@@ -167,15 +167,11 @@ export default function GroupBasicForm({ onSuccess }) {
       });
 
       // Transition group state via backend function (audit + validation)
-      try {
-        await base44.functions.invoke('transitionGroupState', {
-          groupId: group.id,
-          event: 'group_basic_created',
-          metadata: { description: `Group created by ${user.full_name} as ${form.official_role}` },
-        });
-      } catch (e) {
-        // State already set directly; transition function just validates + audits
-      }
+      await base44.functions.invoke('transitionGroupState', {
+        groupId: group.id,
+        event: 'group_basic_created',
+        metadata: { description: `Group created by ${user.full_name} as ${form.official_role}` },
+      });
 
       // If duplicate, emit duplicate.flagged audit event
       if (isDuplicate) {

@@ -36,7 +36,7 @@ export default function GroupSearchClaim({ onClaim, onJoinRequest, onCreateNew }
     setLoading(true);
     setSearched(true);
     try {
-      const filter = countyId ? { county_id: countyId } : {};
+      const filter = countyId ? { county_id: countyId, status: 'active' } : { status: 'active' };
       const all = await base44.entities.Group.filter(filter, '-created_date', 50);
       const q = query.trim().toLowerCase();
       const matched = all.filter(g =>
