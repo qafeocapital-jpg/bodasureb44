@@ -105,5 +105,63 @@
   "required": [
     "plate_number",
     "county_id"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.rider_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "staff_type": {
+              "$ne": "none"
+            }
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.rider_id": "{{user.id}}"
+        },
+        {
+          "data.owner_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "staff_type": {
+              "$ne": "none"
+            }
+          }
+        },
+        {
+          "data.county_id": "{{user.county_id}}"
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.rider_id": "{{user.id}}"
+        },
+        {
+          "data.owner_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "staff_type": {
+              "$ne": "none"
+            }
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "super_admin"
+      }
+    }
+  }
 }

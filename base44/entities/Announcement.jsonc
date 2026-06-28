@@ -35,5 +35,148 @@
     "title",
     "body",
     "audience"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "user_condition": {
+            "staff_type": {
+              "$ne": "none"
+            }
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.audience": "all"
+        },
+        {
+          "$and": [
+            {
+              "data.audience": "riders"
+            },
+            {
+              "user_condition": {
+                "role": "rider"
+              }
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "data.audience": "county_staff"
+            },
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$in": [
+                    "county_admin",
+                    "county_finance",
+                    "county_enforcement",
+                    "sub_county_officer"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "data.audience": "sacco_staff"
+            },
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$in": [
+                    "sacco_admin",
+                    "sacco_treasurer",
+                    "stage_official"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "data.county_id": "{{user.county_id}}"
+            },
+            {
+              "data.county_id": {
+                "$ne": null
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.county_id": "{{user.county_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$in": [
+                    "county_admin",
+                    "sacco_admin"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.county_id": "{{user.county_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$in": [
+                    "county_admin",
+                    "sacco_admin"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
 }

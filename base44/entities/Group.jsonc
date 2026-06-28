@@ -241,5 +241,64 @@
     "name",
     "type",
     "county_id"
-  ]
+  ],
+  "rls": {
+    "create": {},
+    "read": {
+      "$or": [
+        {
+          "data.status": "active"
+        },
+        {
+          "user_condition": {
+            "staff_type": {
+              "$ne": "none"
+            }
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "id": "{{user.scope_entity_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": "sacco_admin"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "id": "{{user.scope_entity_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": "sacco_admin"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
 }

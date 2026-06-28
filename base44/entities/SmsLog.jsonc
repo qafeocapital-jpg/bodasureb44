@@ -56,5 +56,47 @@
     "message_body",
     "event_type",
     "status"
-  ]
+  ],
+  "rls": {
+    "create": {},
+    "read": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "staff_type": {
+              "$ne": "none"
+            }
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$in": [
+                    "county_admin",
+                    "county_finance",
+                    "county_enforcement",
+                    "sub_county_officer"
+                  ]
+                }
+              }
+            },
+            {
+              "data.recipient_phone": "{{user.phone}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {},
+    "delete": {
+      "user_condition": {
+        "role": "super_admin"
+      }
+    }
+  }
 }

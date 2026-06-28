@@ -47,5 +47,83 @@
     "rider_id",
     "product_id",
     "premium_cents"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.rider_id": "{{user.id}}"
+        },
+        {
+          "$and": [
+            {
+              "data.merchant_id": "{{user.scope_entity_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": "merchant_admin"
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.rider_id": "{{user.id}}"
+        },
+        {
+          "$and": [
+            {
+              "data.merchant_id": "{{user.scope_entity_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": "merchant_admin"
+              }
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "staff_type": {
+              "$ne": "none"
+            }
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.merchant_id": "{{user.scope_entity_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": "merchant_admin"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "super_admin"
+      }
+    }
+  }
 }

@@ -44,5 +44,49 @@
     "action_type",
     "target_type",
     "target_id"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "staff_type": {
+              "$in": [
+                "county_enforcement",
+                "super_admin",
+                "bodasure_staff"
+              ]
+            }
+          }
+        },
+        {
+          "data.officer_id": "{{user.id}}"
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "staff_type": {
+              "$ne": "none"
+            }
+          }
+        },
+        {
+          "data.officer_id": "{{user.id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "super_admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "super_admin"
+      }
+    }
+  }
 }

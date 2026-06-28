@@ -59,5 +59,111 @@
     "entity_type",
     "entity_id",
     "amount_cents"
-  ]
+  ],
+  "rls": {
+    "create": {},
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.entity_type": "county"
+            },
+            {
+              "data.entity_id": "{{user.scope_entity_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$in": [
+                    "county_admin",
+                    "county_finance"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "data.entity_type": "sacco"
+            },
+            {
+              "data.entity_id": "{{user.scope_entity_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$in": [
+                    "sacco_admin",
+                    "sacco_treasurer"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.entity_type": "county"
+            },
+            {
+              "data.entity_id": "{{user.scope_entity_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$in": [
+                    "county_admin",
+                    "county_finance"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "data.entity_type": "sacco"
+            },
+            {
+              "data.entity_id": "{{user.scope_entity_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$in": [
+                    "sacco_admin",
+                    "sacco_treasurer"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "super_admin"
+      }
+    }
+  }
 }

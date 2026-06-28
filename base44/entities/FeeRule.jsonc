@@ -43,5 +43,52 @@
   "required": [
     "name",
     "product_type"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "user_condition": {
+            "staff_type": "finance_admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "data.is_active": true
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "user_condition": {
+            "staff_type": "finance_admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "user_condition": {
+            "staff_type": "finance_admin"
+          }
+        }
+      ]
+    }
+  }
 }

@@ -71,5 +71,111 @@
     "audience_type",
     "status",
     "total_recipients"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "user_condition": {
+            "staff_type": "bodasure_staff"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.county_scope_id": "{{user.county_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": "county_admin"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "user_condition": {
+            "staff_type": "bodasure_staff"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.county_scope_id": "{{user.county_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": "county_admin"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "user_condition": {
+            "staff_type": "bodasure_staff"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.county_scope_id": "{{user.county_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": "county_admin"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        },
+        {
+          "user_condition": {
+            "staff_type": "bodasure_staff"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.county_scope_id": "{{user.county_id}}"
+            },
+            {
+              "user_condition": {
+                "staff_type": "county_admin"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
 }

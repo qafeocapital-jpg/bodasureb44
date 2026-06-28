@@ -32,5 +32,46 @@
     "merchant_id",
     "name",
     "premium_cents"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.merchant_id": "{{user.scope_entity_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "data.is_active": true
+    },
+    "update": {
+      "$or": [
+        {
+          "data.merchant_id": "{{user.scope_entity_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.merchant_id": "{{user.scope_entity_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "super_admin"
+          }
+        }
+      ]
+    }
+  }
 }

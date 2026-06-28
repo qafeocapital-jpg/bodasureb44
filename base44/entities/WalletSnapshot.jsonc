@@ -24,5 +24,43 @@
   },
   "required": [
     "wallet_id"
-  ]
+  ],
+  "rls": {
+    "create": {},
+    "read": {
+      "$or": [
+        {
+          "data.wallet_id": {
+            "$in": [
+              "{{user.id}}"
+            ]
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.wallet_id": {
+                "$in": [
+                  "{{user.scope_entity_id}}"
+                ]
+              }
+            },
+            {
+              "user_condition": {
+                "staff_type": {
+                  "$ne": "none"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {},
+    "delete": {
+      "user_condition": {
+        "role": "super_admin"
+      }
+    }
+  }
 }
