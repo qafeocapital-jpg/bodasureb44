@@ -64,6 +64,11 @@
     "permit_id": {
       "type": "string"
     },
+    "metadata": {
+      "type": "object",
+      "description": "Arbitrary context for the transaction (billing_cycle, county_id, fee_schedule_id, rider_id, etc.)",
+      "default": {}
+    },
     "failure_reason": {
       "type": "string"
     },
@@ -87,30 +92,18 @@
     "amount_cents"
   ],
   "rls": {
-    "create": {
-      "$or": [
-        {
-          "data.wallet_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "staff_type": {
-              "$ne": "none"
-            }
-          }
-        }
-      ]
-    },
+    "create": true,
     "read": {
       "$or": [
         {
           "data.wallet_id": "{{user.id}}"
         },
         {
+          "data.counterparty_wallet_id": "{{user.id}}"
+        },
+        {
           "user_condition": {
-            "staff_type": {
-              "$ne": "none"
-            }
+            "role": "super_admin"
           }
         }
       ]
@@ -122,9 +115,7 @@
         },
         {
           "user_condition": {
-            "staff_type": {
-              "$ne": "none"
-            }
+            "role": "super_admin"
           }
         }
       ]
