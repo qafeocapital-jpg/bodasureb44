@@ -57,6 +57,7 @@ export const adminNav = [
   { label: 'Announcements', path: '/admin/announcements', icon: Megaphone },
   { label: 'Communications', path: '/admin/comms', icon: MessageSquare, submenu: commsNav },
   { label: 'Reconciliation', path: '/admin/reconciliation', icon: Scale },
+  { label: 'Finance', path: '/admin/finance', icon: Banknote },
   { label: 'Reports', path: '/admin/reports', icon: FileBarChart },
   { label: 'Audit Log', path: '/admin/audit', icon: ScrollText },
   { label: 'Static Pages', path: '/admin/content/pages', icon: FileText },

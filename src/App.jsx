@@ -74,6 +74,7 @@ import AdminKyc from './pages/admin/Kyc';
 import AdminMoney from './pages/admin/Money';
 import AdminReports from './pages/admin/Reports';
 import AdminReconciliation from './pages/admin/Reconciliation';
+import Finance from './pages/admin/Finance';
 import AdminAuditLog from './pages/admin/AuditLog';
 import AdminAnnouncements from './pages/admin/Announcements';
 import AdminSaccos from './pages/admin/AdminSaccos';
@@ -234,6 +235,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/money" element={<AdminMoney />} />
         <Route path="/admin/reports" element={<AdminReports />} />
         <Route path="/admin/reconciliation" element={<AdminReconciliation />} />
+        <Route path="/admin/finance" element={<Finance />} />
         <Route path="/admin/audit" element={<AdminAuditLog />} />
         <Route path="/admin/announcements" element={<AdminAnnouncements />} />
         <Route path="/admin/comms" element={<Communications />} />
