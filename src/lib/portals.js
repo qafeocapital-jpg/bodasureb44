@@ -32,6 +32,17 @@ export function getAccessiblePortals(user, isOwner = false) {
   portals.push(PORTAL_ROUTES.rider);
   // Owner portal (if applicable)
   if (roles.has('owner')) portals.push(PORTAL_ROUTES.owner);
+
+  // Super admins see ALL portals in the switcher, regardless of explicit role assignments
+  if (roles.has('super_admin')) {
+    const allPortalKeys = ['county_admin', 'sacco_admin', 'merchant_admin', 'field_agent', 'stage_admin', 'super_admin'];
+    for (const k of allPortalKeys) {
+      const entry = PORTAL_ROUTES[k];
+      if (entry && !portals.some(p => p.path === entry.path)) portals.push(entry);
+    }
+    return portals;
+  }
+
   // Staff portals in priority order
   const staffOrder = ['sacco_admin', 'stage_admin', 'county_admin', 'merchant_admin', 'field_agent', 'super_admin'];
   for (const r of staffOrder) {
