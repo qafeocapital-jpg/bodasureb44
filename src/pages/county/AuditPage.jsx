@@ -35,13 +35,18 @@ export default function CountyAudit() {
     if (!user) return;
     setLoading(true);
     try {
-      const data = await base44.entities.AuditLog.filter({}, '-created_date', 200);
-      setLogs(data);
+      // Fetch county users to scope audit logs
+      const countyUsers = countyId
+        ? await base44.entities.User.filter({ county_id: countyId }, '-created_date', 200)
+        : await base44.entities.User.filter({ staff_type: 'none' }, '-created_date', 200);
+      const countyUserIds = new Set(countyUsers.map(u => u.id));
+      setRiderMap(Object.fromEntries(countyUsers.map(u => [u.id, u.full_name || u.email])));
 
-      // Resolve user names for county-scoped logs
-      const userIds = [...new Set(data.map(l => l.user_id).filter(Boolean))];
-      const users = await Promise.all(userIds.slice(0, 50).map(id => base44.entities.User.get(id).catch(() => null)));
-      setRiderMap(Object.fromEntries(users.filter(Boolean).map(u => [u.id, u.full_name || u.email])));
+      const data = await base44.entities.AuditLog.filter({}, '-created_date', 200);
+      const scoped = countyId
+        ? data.filter(l => !l.user_id || countyUserIds.has(l.user_id) || l.description?.includes(countyId))
+        : data;
+      setLogs(scoped);
     } catch (e) { console.error('Audit load error:', e); }
     setLoading(false);
   }

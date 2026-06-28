@@ -39,7 +39,7 @@ export default function CountyUsers() {
     if (!inviteForm.email) return;
     setInviting(true);
     try {
-      await base44.users.inviteUser(inviteForm.email, inviteForm.role);
+      await base44.auth.inviteUser(inviteForm.email, inviteForm.role);
       toast({ title: 'Invitation sent', description: `${inviteForm.email} has been invited as ${inviteForm.role}` });
       setShowInvite(false);
       setInviteForm({ email: '', role: 'enforcement_officer' });

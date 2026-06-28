@@ -428,8 +428,8 @@ export function CountySettings() {
     setLoading(true);
     try {
       if (countyId) {
-        const counties = await base44.entities.County.filter({ id: countyId });
-        if (counties.length > 0) setCounty(counties[0]);
+        const countyData = await base44.entities.County.get(countyId).catch(() => null);
+        if (countyData) setCounty(countyData);
       }
       const schedules = await base44.entities.FeeSchedule.filter(countyId ? { county_id: countyId, is_active: true } : { is_active: true });
       setFeeSchedules(schedules);
