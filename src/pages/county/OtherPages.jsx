@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { formatDate } from '@/lib/format';
-import { Users, Bike, Building2, Map, Search, Download, Loader2 } from 'lucide-react';
+import { formatDate, formatKESShort } from '@/lib/format';
+import { Users, Bike, Building2, Map, Search, Download, Loader2, BadgeCheck, Landmark, AlertCircle, FileBarChart, Settings } from 'lucide-react';
 import UserProfileDrawer from '@/components/admin/UserProfileDrawer';
 
 export function CountyPeople() {
@@ -11,6 +11,7 @@ export function CountyPeople() {
   const [activeTab, setActiveTab] = useState('riders');
   const [riders, setRiders] = useState([]);
   const [owners, setOwners] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [saccos, setSaccos] = useState([]);
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +37,7 @@ export function CountyPeople() {
 
       // Riders
       setRiders(riderUsers);
+      setVehicles(vehicles);
 
       // Owners (vehicles with is_owner_rider: false)
       const ownerIds = [...new Set(vehicles.filter(v => !v.is_owner_rider).map(v => v.owner_id).filter(Boolean))];
@@ -190,15 +192,12 @@ export function CountyPeople() {
                 </thead>
                 <tbody>
                   {ownersFiltered.map(o => {
-                    const bikesOwned = riders.reduce((count, r) => {
-                      const userBikes = riders.length > 0 ? 1 : 0; // Simplified for demo
-                      return count;
-                    }, 0);
+                    const bikesOwned = vehicles.filter(v => v.owner_id === o.id && !v.is_owner_rider).length;
                     return (
                       <tr key={o.id} onClick={() => handleUserClick(o)} className="border-t border-border hover:bg-accent/50 cursor-pointer">
                         <td className="px-4 py-3 font-medium text-[#ff5a1f]">{o.full_name}</td>
                         <td className="px-4 py-3 text-muted-foreground">{o.phone}</td>
-                        <td className="px-4 py-3 text-muted-foreground">—</td>
+                        <td className="px-4 py-3 text-muted-foreground">{bikesOwned}</td>
                       </tr>
                     );
                   })}
@@ -279,9 +278,227 @@ export function CountyPeople() {
 }
 
 export function CountyReports() {
-  return <div className="p-6 text-center text-muted-foreground">Reports page under construction</div>;
+  const { user } = useAuth();
+  const countyId = user?.scope_entity_id || user?.county_id;
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [data, setData] = useState({ riders: 0, verifiedRiders: 0, vehicles: 0, approvedBikes: 0, permits: 0, activePermits: 0, revenue: 0, penalties: 0, openPenalties: 0 });
+
+  useEffect(() => { load(); }, [user]);
+
+  async function load() {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const vehicleFilter = countyId ? { county_id: countyId } : {};
+      const userFilter = countyId ? { county_id: countyId, staff_type: 'none' } : { staff_type: 'none' };
+      const permitFilter = countyId ? { county_id: countyId } : {};
+      const penaltyFilter = countyId ? { county_id: countyId } : {};
+
+      const [riders, vehicles, permits, penalties] = await Promise.all([
+        base44.entities.User.filter(userFilter),
+        base44.entities.Vehicle.filter(vehicleFilter),
+        base44.entities.Permit.filter(permitFilter, '-created_date', 200),
+        base44.entities.Penalty.filter(penaltyFilter, '-created_date', 100),
+      ]);
+
+      const now = new Date();
+      const activePermits = permits.filter(p => p.status === 'active' && (!p.end_date || new Date(p.end_date) > now));
+
+      setData({
+        riders: riders.length,
+        verifiedRiders: riders.filter(r => r.account_state === 'VERIFIED').length,
+        vehicles: vehicles.length,
+        approvedBikes: vehicles.filter(v => v.status === 'approved').length,
+        permits: permits.length,
+        activePermits: activePermits.length,
+        revenue: activePermits.reduce((s, p) => s + (p.amount_paid_cents || 0), 0),
+        penalties: penalties.length,
+        openPenalties: penalties.filter(p => p.status === 'pending').length,
+      });
+    } catch (e) { console.error('Reports load error:', e); }
+    setLoading(false);
+  }
+
+  function exportCSV() {
+    setExporting(true);
+    const rows = [
+      ['Metric', 'Value'],
+      ['Total Riders', data.riders],
+      ['Verified Riders', data.verifiedRiders],
+      ['Total Vehicles', data.vehicles],
+      ['Approved Bikes', data.approvedBikes],
+      ['Total Permits', data.permits],
+      ['Active Permits', data.activePermits],
+      ['Revenue (KES)', (data.revenue / 100).toFixed(2)],
+      ['Total Penalties', data.penalties],
+      ['Open Penalties', data.openPenalties],
+      ['Report Date', formatDate(new Date().toISOString())],
+    ];
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `county-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setTimeout(() => setExporting(false), 500);
+  }
+
+  const reportCards = [
+    { label: 'Total Riders', value: data.riders, sub: `${data.verifiedRiders} verified`, icon: Users },
+    { label: 'Approved Bikes', value: data.approvedBikes, sub: `${data.vehicles} total registered`, icon: BadgeCheck },
+    { label: 'Active Permits', value: data.activePermits, sub: `${data.permits} total issued`, icon: BadgeCheck },
+    { label: 'Revenue (Active)', value: formatKESShort(data.revenue), sub: 'From active permits', icon: Landmark },
+    { label: 'Open Penalties', value: data.openPenalties, sub: `${data.penalties} total issued`, icon: AlertCircle },
+  ];
+
+  return (
+    <div className="p-6 animate-fade-in">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <FileBarChart className="w-6 h-6 text-[#ff5a1f]" />
+            <h1 className="text-2xl font-heading font-bold">Reports</h1>
+          </div>
+          <p className="text-sm text-muted-foreground">County-wide summary and exportable reports</p>
+        </div>
+        <button onClick={exportCSV} disabled={exporting || loading} className="flex items-center gap-1 bg-[#ff5a1f] text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          Export CSV
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground text-center py-10">Loading...</p>
+      ) : (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {reportCards.map(card => (
+              <div key={card.label} className="bg-card border border-border rounded-xl p-4">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-orange-50 text-[#ff5a1f] mb-3">
+                  <card.icon className="w-5 h-5" />
+                </div>
+                <p className="text-2xl font-heading font-bold">{card.value}</p>
+                <p className="text-xs text-muted-foreground">{card.label}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{card.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-5">
+            <h2 className="font-heading font-bold mb-3">Report Summary</h2>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between py-2 border-b border-border">
+                <span className="text-muted-foreground">Compliance Rate</span>
+                <span className="font-semibold">{data.approvedBikes > 0 ? Math.round((data.activePermits / data.approvedBikes) * 100) : 0}%</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-border">
+                <span className="text-muted-foreground">Verification Rate</span>
+                <span className="font-semibold">{data.riders > 0 ? Math.round((data.verifiedRiders / data.riders) * 100) : 0}%</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-border">
+                <span className="text-muted-foreground">Avg Revenue per Active Permit</span>
+                <span className="font-semibold">{data.activePermits > 0 ? formatKESShort(data.revenue / data.activePermits) : 'KES 0'}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-muted-foreground">Report Generated</span>
+                <span className="font-semibold">{formatDate(new Date().toISOString())}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function CountySettings() {
-  return <div className="p-6 text-center text-muted-foreground">Settings page under construction</div>;
+  const { user } = useAuth();
+  const countyId = user?.scope_entity_id || user?.county_id;
+  const [county, setCounty] = useState(null);
+  const [feeSchedules, setFeeSchedules] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => { load(); }, [user]);
+
+  async function load() {
+    if (!user) return;
+    setLoading(true);
+    try {
+      if (countyId) {
+        const counties = await base44.entities.County.filter({ id: countyId });
+        if (counties.length > 0) setCounty(counties[0]);
+      }
+      const schedules = await base44.entities.FeeSchedule.filter(countyId ? { county_id: countyId, is_active: true } : { is_active: true });
+      setFeeSchedules(schedules);
+    } catch (e) { console.error('Settings load error:', e); }
+    setLoading(false);
+  }
+
+  return (
+    <div className="p-6 animate-fade-in">
+      <div className="flex items-center gap-2 mb-1">
+        <Settings className="w-6 h-6 text-[#ff5a1f]" />
+        <h1 className="text-2xl font-heading font-bold">Settings</h1>
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">County configuration and fee schedules</p>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground text-center py-10">Loading...</p>
+      ) : (
+        <div className="space-y-5">
+          {county && (
+            <div className="bg-card border border-border rounded-xl p-5">
+              <h2 className="font-heading font-bold mb-3">County Profile</h2>
+              <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">County Name</p>
+                  <p className="font-semibold">{county.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Status</p>
+                  <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${county.status === 'live' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'}`}>{county.status || 'pending'}</span>
+                </div>
+                {county.code && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">County Code</p>
+                    <p className="font-semibold">{county.code}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-card border border-border rounded-xl p-5">
+            <h2 className="font-heading font-bold mb-3">Active Fee Schedules</h2>
+            {feeSchedules.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No fee schedules configured</p>
+            ) : (
+              <div className="space-y-2">
+                {feeSchedules.map(s => (
+                  <div key={s.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <div>
+                      <p className="text-sm font-semibold capitalize">{s.permit_type}</p>
+                      <p className="text-xs text-muted-foreground">Grace period: {s.grace_period_days || 7} days</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold">{formatKESShort(s.amount_cents)}</p>
+                      {s.penalty_amount_cents > 0 && <p className="text-xs text-red-600">Penalty: {formatKESShort(s.penalty_amount_cents)}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-5">
+            <h2 className="font-heading font-bold mb-3">Need Help?</h2>
+            <p className="text-sm text-muted-foreground">To update county profile, fee schedules, or add sub-counties and wards, contact BodaSure support.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

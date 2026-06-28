@@ -55,6 +55,7 @@ import CountySubCounties from './pages/county/SubCountiesPage';
 import CountyUsers from './pages/county/UsersPage';
 import CountyAudit from './pages/county/AuditPage';
 import { CountyPeople, CountyReports, CountySettings } from './pages/county/OtherPages';
+import CountyCommunications from './pages/county/Communications';
 import SaccoMembers from './pages/sacco/Members';
 import SaccoBikes from './pages/sacco/Bikes';
 import SaccoSettlements from './pages/sacco/Settlements';
@@ -186,7 +187,7 @@ const AuthenticatedApp = () => {
         <Route path="/county/subcounties" element={<CountySubCounties />} />
         <Route path="/county/users" element={<CountyUsers />} />
         <Route path="/county/audit" element={<CountyAudit />} />
-        <Route path="/county/comms" element={<Communications />} />
+        <Route path="/county/comms" element={<CountyCommunications />} />
         <Route path="/county/reports" element={<CountyReports />} />
         <Route path="/county/settings" element={<CountySettings />} />
       </Route>
