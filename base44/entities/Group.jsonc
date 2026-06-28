@@ -20,6 +20,74 @@
     "county_id": {
       "type": "string"
     },
+    "group_state": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "BASIC_ACTIVE",
+        "KYB_PENDING",
+        "KYB_REVIEW",
+        "VERIFIED",
+        "SUSPENDED",
+        "DEACTIVATED"
+      ],
+      "default": "DRAFT"
+    },
+    "group_state_updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "coverage_type": {
+      "type": "string",
+      "enum": [
+        "ward",
+        "sub_county",
+        "county"
+      ],
+      "default": "county"
+    },
+    "coverage_ward_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "coverage_sub_county_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "membership_size_band": {
+      "type": "string",
+      "enum": [
+        "<50",
+        "50-200",
+        "200-500",
+        "500+"
+      ],
+      "default": "<50"
+    },
+    "join_policy": {
+      "type": "string",
+      "enum": [
+        "auto_approve",
+        "official_approval"
+      ],
+      "default": "official_approval"
+    },
+    "duplicate_flagged": {
+      "type": "boolean",
+      "default": false
+    },
+    "duplicate_of_group_id": {
+      "type": "string"
+    },
+    "kyb_rejection_reason": {
+      "type": "string"
+    },
     "sasapay_account_number": {
       "type": "string"
     },

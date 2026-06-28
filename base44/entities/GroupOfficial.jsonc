@@ -1,0 +1,57 @@
+{
+  "name": "GroupOfficial",
+  "type": "object",
+  "properties": {
+    "group_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "chairperson",
+        "secretary",
+        "treasurer",
+        "committee_member"
+      ],
+      "default": "committee_member"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "pending",
+        "rejected"
+      ],
+      "default": "pending"
+    },
+    "invite_phone": {
+      "type": "string"
+    },
+    "invite_sent_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kyc_complete": {
+      "type": "boolean",
+      "default": false
+    },
+    "invited_by_user_id": {
+      "type": "string"
+    },
+    "confirmed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
+    }
+  },
+  "required": [
+    "group_id",
+    "role"
+  ]
+}

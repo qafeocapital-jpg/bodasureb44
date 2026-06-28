@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatDate, formatKES } from '@/lib/format';
-import { Building2, Plus, Pencil, Trash2, Loader2, X, Banknote, Users, Clock, Check, FileText, ChevronRight } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Loader2, X, Banknote, Users, Clock, Check, FileText, ChevronRight, AlertTriangle, Copy, GitMerge, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import SaccoPendingMembers from '@/components/admin/SaccoPendingMembers';
+import KybDocsPreview from '@/components/admin/KybDocsPreview';
 
 const KENYAN_BANKS = [
   'Kenya Commercial Bank (KCB)', 'Equity Bank', 'Cooperative Bank', 'Standard Chartered',
@@ -20,6 +21,7 @@ export default function AdminSaccos() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [acting, setActing] = useState(null);
   const [tab, setTab] = useState('saccos');
   const [reviewGroup, setReviewGroup] = useState(null);
   const [reviewing, setReviewing] = useState(false);
@@ -35,15 +37,39 @@ export default function AdminSaccos() {
 
   useEffect(() => { load(); }, []);
 
+  const [officialsMap, setOfficialsMap] = useState({});
+  const [disputes, setDisputes] = useState([]);
+  const [duplicates, setDuplicates] = useState([]);
+
   async function load() {
     setLoading(true);
     try {
-      const [saccos, cs] = await Promise.all([
-        base44.entities.Group.filter({ type: 'sacco' }, '-created_date', 100),
+      const [allGroups, cs] = await Promise.all([
+        base44.entities.Group.filter({}, '-created_date', 200),
         base44.entities.County.filter({}),
       ]);
-      setGroups(saccos);
+      setGroups(allGroups);
       setCounties(cs);
+
+      // Fetch officials for KYB groups
+      const kybGroupIds = allGroups
+        .filter(g => ['KYB_PENDING', 'KYB_REVIEW'].includes(g.group_state))
+        .map(g => g.id);
+      if (kybGroupIds.length > 0) {
+        const allOfficials = await Promise.all(
+          kybGroupIds.map(id => base44.entities.GroupOfficial.filter({ group_id: id }).catch(() => []))
+        );
+        const map = {};
+        kybGroupIds.forEach((id, i) => { map[id] = allOfficials[i]; });
+        setOfficialsMap(map);
+      }
+
+      // Fetch governance disputes
+      const disputeLogs = await base44.entities.AuditLog.filter({ action: 'governance_dispute' }, '-created_date', 50).catch(() => []);
+      setDisputes(disputeLogs);
+
+      // Duplicates
+      setDuplicates(allGroups.filter(g => g.duplicate_flagged));
     } catch (e) {}
     setLoading(false);
   }
@@ -51,15 +77,27 @@ export default function AdminSaccos() {
   async function approveSacco(group) {
     setReviewing(true);
     try {
-      // Activate the group
-      await base44.entities.Group.update(group.id, {
-        status: 'active',
-        kyc_status: 'verified',
-        sasapay_account_status: 'AWAITING_KYC_UPLOAD',
+      // Transition group state to VERIFIED via the state machine
+      await base44.functions.invoke('transitionGroupState', {
+        groupId: group.id,
+        event: 'group_verified',
+        metadata: { description: `KYB approved by admin` },
       });
 
       // Update the submitting user's roles
-      if (group.official_phone) {
+      const groupOfficials = officialsMap[group.id] || [];
+      const foundingOfficial = groupOfficials.find(o => o.status === 'active');
+      if (foundingOfficial?.user_id) {
+        const u = await base44.entities.User.get(foundingOfficial.user_id).catch(() => null);
+        if (u) {
+          const currentRoles = u.roles || ['rider'];
+          const newRoles = currentRoles.includes('sacco_admin') ? currentRoles : [...currentRoles, 'sacco_admin'];
+          await base44.entities.User.update(u.id, {
+            roles: newRoles,
+            scope_entity_id: group.id,
+          });
+        }
+      } else if (group.official_phone) {
         const users = await base44.entities.User.filter({ phone: group.official_phone });
         if (users.length > 0) {
           const u = users[0];
@@ -68,13 +106,11 @@ export default function AdminSaccos() {
           await base44.entities.User.update(u.id, {
             roles: newRoles,
             scope_entity_id: group.id,
-            pending_group_id: null,
-            group_rejection_reason: null,
           });
         }
       }
 
-      toast({ title: 'SACCO Approved', description: `${group.name} is now active. SasaPay KYC upload triggered.` });
+      toast({ title: 'Group Verified', description: `${group.name} is now verified. Business wallet provisioning will be triggered.` });
       setReviewGroup(null);
       load();
     } catch (e) {
@@ -86,22 +122,14 @@ export default function AdminSaccos() {
   async function rejectSacco(group, reason) {
     setReviewing(true);
     try {
-      await base44.entities.Group.update(group.id, {
-        status: 'inactive',
-        description: `REJECTED: ${reason}`,
+      // Transition back to BASIC_ACTIVE with rejection reason
+      await base44.functions.invoke('transitionGroupState', {
+        groupId: group.id,
+        event: 'kyb_rejected',
+        metadata: { description: `KYB rejected: ${reason}`, kyb_rejection_reason: reason },
       });
 
-      // Update the submitting user with rejection reason
-      if (group.official_phone) {
-        const users = await base44.entities.User.filter({ phone: group.official_phone });
-        if (users.length > 0) {
-          await base44.entities.User.update(users[0].id, {
-            group_rejection_reason: reason,
-          });
-        }
-      }
-
-      toast({ title: 'SACCO Rejected', description: `${group.name} has been rejected.` });
+      toast({ title: 'KYB Rejected', description: `${group.name} has been sent back to Basic. Reason recorded.` });
       setReviewGroup(null);
       setShowRejectInput(false);
       setRejectReason('');
@@ -110,6 +138,75 @@ export default function AdminSaccos() {
       toast({ title: 'Failed', description: e.message, variant: 'destructive' });
     }
     setReviewing(false);
+  }
+
+  async function resolveDispute(dispute, action) {
+    // action: 'assign_primary' | 'reject_challenger'
+    setActing(dispute.id);
+    try {
+      const metadata = dispute.new_values || {};
+      const groupId = dispute.entity_id;
+      if (action === 'assign_primary') {
+        // Accept the challenger as an active official
+        const challengerId = metadata.challenger_user_id;
+        if (challengerId && groupId) {
+          const pendingOfficials = await base44.entities.GroupOfficial.filter({ group_id: groupId, user_id: challengerId, status: 'pending' });
+          for (const o of pendingOfficials) {
+            await base44.entities.GroupOfficial.update(o.id, { status: 'active', confirmed_at: new Date().toISOString() });
+          }
+        }
+        toast({ title: 'Dispute resolved', description: 'Challenger assigned as additional official.' });
+      } else {
+        // Reject challenger
+        const challengerId = metadata.challenger_user_id;
+        if (challengerId && groupId) {
+          const pendingOfficials = await base44.entities.GroupOfficial.filter({ group_id: groupId, user_id: challengerId, status: 'pending' });
+          for (const o of pendingOfficials) {
+            await base44.entities.GroupOfficial.update(o.id, { status: 'rejected' });
+          }
+        }
+        toast({ title: 'Challenger rejected' });
+      }
+      load();
+    } catch (e) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
+    setActing(null);
+  }
+
+  async function mergeDuplicate(dupGroup, primaryGroup) {
+    setActing(dupGroup.id);
+    try {
+      // Move members from duplicate to primary
+      const members = await base44.entities.GroupMember.filter({ group_id: dupGroup.id });
+      for (const m of members) {
+        await base44.entities.GroupMember.update(m.id, { group_id: primaryGroup.id });
+      }
+      // Deactivate duplicate
+      await base44.functions.invoke('transitionGroupState', {
+        groupId: dupGroup.id,
+        event: 'group_deactivated',
+        metadata: { description: `Merged into ${primaryGroup.name}`, duplicate_of_group_id: primaryGroup.id },
+      });
+      await base44.entities.Group.update(dupGroup.id, { duplicate_of_group_id: primaryGroup.id });
+      toast({ title: 'Groups merged', description: `${dupGroup.name} merged into ${primaryGroup.name}.` });
+      load();
+    } catch (e) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
+    setActing(null);
+  }
+
+  async function keepBoth(dupGroup) {
+    setActing(dupGroup.id);
+    try {
+      await base44.entities.Group.update(dupGroup.id, { duplicate_flagged: false });
+      toast({ title: 'Flag cleared', description: `${dupGroup.name} will remain separate.` });
+      load();
+    } catch (e) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' });
+    }
+    setActing(null);
   }
 
   function openCreate() {
@@ -185,21 +282,35 @@ export default function AdminSaccos() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 flex-wrap">
         <button
           onClick={() => setTab('saccos')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'saccos' ? 'bg-orange-500 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
         >
-          <Building2 className="w-4 h-4" /> SACCOs
+          <Building2 className="w-4 h-4" /> All Groups
         </button>
         <button
           onClick={() => setTab('pending_approval')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'pending_approval' ? 'bg-orange-500 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
         >
-          <Clock className="w-4 h-4" /> Pending Approval
-          {groups.filter(g => g.status === 'pending' && g.source === 'self_registered').length > 0 && (
-            <span className="bg-white/20 rounded-full px-1.5 text-[10px] font-bold">{groups.filter(g => g.status === 'pending' && g.source === 'self_registered').length}</span>
+          <Clock className="w-4 h-4" /> KYB Review Queue
+          {groups.filter(g => ['KYB_PENDING', 'KYB_REVIEW'].includes(g.group_state)).length > 0 && (
+            <span className="bg-white/20 rounded-full px-1.5 text-[10px] font-bold">{groups.filter(g => ['KYB_PENDING', 'KYB_REVIEW'].includes(g.group_state)).length}</span>
           )}
+        </button>
+        <button
+          onClick={() => setTab('disputes')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'disputes' ? 'bg-orange-500 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
+        >
+          <ShieldAlert className="w-4 h-4" /> Disputes
+          {disputes.length > 0 && <span className="bg-white/20 rounded-full px-1.5 text-[10px] font-bold">{disputes.length}</span>}
+        </button>
+        <button
+          onClick={() => setTab('duplicates')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'duplicates' ? 'bg-orange-500 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
+        >
+          <Copy className="w-4 h-4" /> Duplicates
+          {duplicates.length > 0 && <span className="bg-white/20 rounded-full px-1.5 text-[10px] font-bold">{duplicates.length}</span>}
         </button>
         <button
           onClick={() => setTab('pending')}
@@ -217,16 +328,16 @@ export default function AdminSaccos() {
         ) : (
           <SaccoPendingMembers saccos={groups} counties={counties} />
         )
-      ) : loading ? (
+      ) : tab === 'saccos' && loading ? (
         <div className="flex items-center justify-center py-10">
           <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
         </div>
-      ) : groups.length === 0 ? (
+      ) : tab === 'saccos' && groups.length === 0 ? (
         <div className="bg-card border border-border rounded-xl p-8 text-center">
           <Building2 className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground">No SACCOs created yet</p>
+          <p className="text-sm text-muted-foreground">No groups created yet</p>
         </div>
-      ) : (
+      ) : tab === 'saccos' ? (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted">
@@ -235,6 +346,7 @@ export default function AdminSaccos() {
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">County</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Members</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">SasaPay Acct</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">State</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -249,6 +361,11 @@ export default function AdminSaccos() {
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{countyName(g.county_id)}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{g.member_count || 0}</td>
                   <td className="px-4 py-3 text-muted-foreground font-mono text-xs hidden lg:table-cell">{g.sasapay_account_number || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${(g.group_state || 'BASIC_ACTIVE') === 'VERIFIED' ? 'bg-blue-100 text-blue-700' : (g.group_state || 'BASIC_ACTIVE') === 'BASIC_ACTIVE' ? 'bg-green-100 text-green-700' : ['KYB_PENDING', 'KYB_REVIEW'].includes(g.group_state) ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
+                      {(g.group_state || 'BASIC_ACTIVE').replace('_', ' ')}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${g.status === 'active' ? 'bg-success/10 text-success' : g.status === 'pending' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground'}`}>{g.status}</span>
                   </td>
@@ -267,19 +384,19 @@ export default function AdminSaccos() {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
-      {/* Pending Approval Tab */}
+      {/* KYB Review Queue Tab */}
       {tab === 'pending_approval' && (
         <div>
           {loading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
             </div>
-          ) : groups.filter(g => g.status === 'pending' && g.source === 'self_registered').length === 0 ? (
+          ) : groups.filter(g => ['KYB_PENDING', 'KYB_REVIEW'].includes(g.group_state)).length === 0 ? (
             <div className="bg-card border border-border rounded-xl p-8 text-center">
               <Clock className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">No pending SACCO applications</p>
+              <p className="text-sm text-muted-foreground">No groups pending KYB review</p>
             </div>
           ) : (
             <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -288,23 +405,137 @@ export default function AdminSaccos() {
                   <tr>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Type</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Official</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">State</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Officials</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Submitted</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {groups.filter(g => g.status === 'pending' && g.source === 'self_registered').map(g => (
-                    <tr key={g.id} className="border-t border-border hover:bg-accent/50 cursor-pointer" onClick={() => setReviewGroup(g)}>
-                      <td className="px-4 py-3 font-medium">{g.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground capitalize hidden md:table-cell">{g.type}</td>
-                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{g.official_name || '—'}</td>
-                      <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{formatDate(g.created_date)}</td>
-                      <td className="px-4 py-3 text-right"><ChevronRight className="w-4 h-4 text-muted-foreground" /></td>
-                    </tr>
-                  ))}
+                  {groups.filter(g => ['KYB_PENDING', 'KYB_REVIEW'].includes(g.group_state)).map(g => {
+                    const officials = officialsMap[g.id] || [];
+                    return (
+                      <tr key={g.id} className="border-t border-border hover:bg-accent/50 cursor-pointer" onClick={() => setReviewGroup(g)}>
+                        <td className="px-4 py-3 font-medium">{g.name}</td>
+                        <td className="px-4 py-3 text-muted-foreground capitalize hidden md:table-cell">{g.type}</td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${g.group_state === 'KYB_REVIEW' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {g.group_state === 'KYB_REVIEW' ? 'In Review' : 'Pending'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                          {officials.length} official{officials.length !== 1 ? 's' : ''}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{formatDate(g.created_date)}</td>
+                        <td className="px-4 py-3 text-right"><ChevronRight className="w-4 h-4 text-muted-foreground" /></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Disputes Tab */}
+      {tab === 'disputes' && (
+        <div>
+          {disputes.length === 0 ? (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <ShieldAlert className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">No governance disputes</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {disputes.map(d => {
+                const groupId = d.entity_id;
+                const groupName = groups.find(g => g.id === groupId)?.name || 'Unknown Group';
+                return (
+                  <div key={d.id} className="bg-card border border-border rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-medium text-sm">{groupName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{d.description}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">{formatDate(d.created_date)}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => resolveDispute(d, 'assign_primary')}
+                        disabled={acting === d.id}
+                        className="flex items-center gap-1 bg-success text-white rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                      >
+                        {acting === d.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Assign as Official
+                      </button>
+                      <button
+                        onClick={() => resolveDispute(d, 'reject_challenger')}
+                        disabled={acting === d.id}
+                        className="flex items-center gap-1 bg-destructive/10 text-destructive border border-destructive/20 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                      >
+                        <X className="w-3 h-3" /> Reject Challenger
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Duplicates Tab */}
+      {tab === 'duplicates' && (
+        <div>
+          {duplicates.length === 0 ? (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <Copy className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">No duplicate-flagged groups</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {duplicates.map(dup => {
+                const countyGroups = groups.filter(g => g.county_id === dup.county_id && g.id !== dup.id);
+                return (
+                  <div key={dup.id} className="bg-card border border-border rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-medium text-sm">{dup.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 capitalize">{dup.type} · {countyName(dup.county_id)}</p>
+                        <p className="text-[10px] text-amber-600 mt-1">⚠ Flagged as potential duplicate</p>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <label className="text-xs font-medium text-muted-foreground">Merge into:</label>
+                      <select id={`merge-${dup.id}`} className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm">
+                        <option value="">Select primary group...</option>
+                        {countyGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => {
+                          const select = document.getElementById(`merge-${dup.id}`);
+                          const primaryId = select?.value;
+                          if (!primaryId) { toast({ title: 'Select a primary group first', variant: 'destructive' }); return; }
+                          mergeDuplicate(dup, groups.find(g => g.id === primaryId));
+                        }}
+                        disabled={acting === dup.id}
+                        className="flex items-center gap-1 bg-primary text-white rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                      >
+                        {acting === dup.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <GitMerge className="w-3 h-3" />} Merge
+                      </button>
+                      <button
+                        onClick={() => keepBoth(dup)}
+                        disabled={acting === dup.id}
+                        className="flex items-center gap-1 bg-muted text-muted-foreground border border-border rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                      >
+                        Keep Both
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -316,7 +547,7 @@ export default function AdminSaccos() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setReviewGroup(null)} />
           <div className="relative w-full max-w-[512px] bg-card rounded-t-3xl pb-8 animate-slide-up max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-card px-5 pt-5 pb-3 border-b border-border flex items-center justify-between">
-              <h3 className="font-heading font-bold text-lg">Review Application</h3>
+              <h3 className="font-heading font-bold text-lg">Review KYB Submission</h3>
               <button onClick={() => setReviewGroup(null)} className="p-1 rounded-lg hover:bg-accent"><X className="w-5 h-5" /></button>
             </div>
             <div className="px-5 py-4 space-y-4">
@@ -355,6 +586,32 @@ export default function AdminSaccos() {
                 </div>
               </div>
 
+              {/* Officials */}
+              {officialsMap[reviewGroup.id] && officialsMap[reviewGroup.id].length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Committee Officials</p>
+                  <div className="space-y-2">
+                    {officialsMap[reviewGroup.id].map(o => (
+                      <div key={o.id} className="bg-muted/50 rounded-xl p-3 text-sm flex items-center justify-between">
+                        <div>
+                          <p className="font-medium capitalize">{o.role.replace('_', ' ')}</p>
+                          <p className="text-xs text-muted-foreground">{o.invite_phone || 'No phone'} · {o.user_id ? 'Registered' : 'Not registered'}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {o.kyc_complete && <span className="text-[10px] text-green-700 bg-green-100 rounded-full px-2 py-0.5">KYC ✓</span>}
+                          <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${o.status === 'active' ? 'bg-green-100 text-green-700' : o.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{o.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* KYB Documents */}
+              {reviewGroup.id && (
+                <KybDocsPreview groupId={reviewGroup.id} />
+              )}
+
               {/* Directors */}
               {reviewGroup.directors && reviewGroup.directors.length > 0 && (
                 <div>
@@ -392,7 +649,7 @@ export default function AdminSaccos() {
                   <>
                     <button onClick={() => setShowRejectInput(true)} disabled={reviewing} className="flex-1 border border-destructive/20 text-destructive bg-destructive/5 rounded-xl py-3 text-sm font-semibold disabled:opacity-50">Reject</button>
                     <button onClick={() => approveSacco(reviewGroup)} disabled={reviewing} className="flex-1 flex items-center justify-center gap-1 bg-success text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50">
-                      {reviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" /> Approve SACCO</>}
+                      {reviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" /> Verify Group</>}
                     </button>
                   </>
                 )}
