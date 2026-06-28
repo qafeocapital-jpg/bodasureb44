@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDateTime } from '@/lib/format';
 import { getOrCreateWallet, initiateStkPush } from '@/lib/payments';
-import { ChevronLeft, HandCoins, Loader2, CheckCircle2, XCircle, Receipt } from 'lucide-react';
+import { ChevronLeft, HandCoins, Loader2, XCircle, Receipt } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 import PhoneInput from '@/components/ui/PhoneInput';
 import UnlockSheet from '@/components/rider/UnlockSheet';
@@ -12,6 +12,8 @@ import TierLimitGateSheet from '@/components/rider/TierLimitGateSheet';
 import { checkServiceAccess } from '@/lib/serviceAccess';
 import { lookupFee, checkTransactionLimits } from '@/lib/feeEngine';
 import { isValidKenyanPhone, formatPhoneDisplay } from '@/lib/phone';
+import { usePaymentPolling } from '@/hooks/usePaymentPolling';
+import PaymentPendingSheet from '@/components/rider/PaymentPendingSheet';
 
 export default function Lipisha() {
   const navigate = useNavigate();
@@ -27,6 +29,40 @@ export default function Lipisha() {
   const [feePreview, setFeePreview] = useState(null);
   const [limitInfo, setLimitInfo] = useState(null);
   const [tierGateInfo, setTierGateInfo] = useState(null);
+  const [pendingTxn, setPendingTxn] = useState(null);
+  const [showPending, setShowPending] = useState(false);
+
+  const polling = usePaymentPolling({
+    transactionId: pendingTxn?.transactionId || null,
+    reference: pendingTxn?.reference || null,
+    watchPermit: false,
+  });
+
+  // Start polling once pendingTxn is committed (ensures the hook sees the real transactionId)
+  useEffect(() => {
+    if (pendingTxn?.transactionId) {
+      polling.start();
+    }
+  }, [pendingTxn?.transactionId]);
+
+  // On terminal polling state, refresh balance + transaction history + limits
+  useEffect(() => {
+    if (polling.status === 'completed' || polling.status === 'timeout') {
+      (async () => {
+        if (!wallet) return;
+        try {
+          const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: wallet.id });
+          if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);
+          const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipisha' }, '-created_date', 10);
+          setHistory(txns);
+          try {
+            const limits = await checkTransactionLimits(wallet.id, 'lipisha', 0);
+            setLimitInfo(limits);
+          } catch (e) {}
+        } catch (e) {}
+      })();
+    }
+  }, [polling.status]);
 
   useEffect(() => {
     async function load() {
@@ -75,21 +111,22 @@ export default function Lipisha() {
         description: `Fare collection from ${phone}`,
         transactionType: 'lipisha',
       });
-      if (res.mode === 'live' && res.status === 'pending') {
-        setResult({ success: true, pending: true, amount: cents, phone, reference: res.reference, message: res.message });
+      if (res.mode === 'live' && res.status === 'pending' && res.transactionId) {
+        // Open the live pending sheet — polling kicks off via the pendingTxn effect
+        setPendingTxn({ transactionId: res.transactionId, reference: res.reference, amount: cents, phone });
+        setShowPending(true);
       } else {
+        // Mock / instant completion
         setBalance(prev => prev + cents);
-        setResult({ success: true, amount: cents, phone, reference: res.reference });
+        const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipisha' }, '-created_date', 10);
+        setHistory(txns);
+        try {
+          const limits = await checkTransactionLimits(wallet.id, 'lipisha', 0);
+          setLimitInfo(limits);
+        } catch (e) {}
       }
       setPhone('');
       setAmount('');
-      const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipisha' }, '-created_date', 10);
-      setHistory(txns);
-      // Refresh limit info after successful transaction
-      try {
-        const limits = await checkTransactionLimits(wallet.id, 'lipisha', 0);
-        setLimitInfo(limits);
-      } catch (e) {}
     } catch (e) {
       setResult({ success: false, message: e.message || 'Could not collect fare. Please try again.' });
     }
@@ -118,28 +155,6 @@ export default function Lipisha() {
         <HandCoins className="w-5 h-5 text-primary flex-shrink-0" />
         <p className="text-sm text-muted-foreground">Send an M-Pesa STK push to your customer's phone. They enter their PIN and the fare lands in your wallet.</p>
       </div>
-
-      {result?.success && result.pending && (
-        <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 mb-5 flex items-center gap-3">
-          <Loader2 className="w-6 h-6 text-warning flex-shrink-0 animate-spin" />
-          <div>
-            <p className="text-sm font-bold text-warning">STK Push Sent!</p>
-            <p className="text-xs text-muted-foreground">{formatKES(result.amount)} from {formatPhoneDisplay(result.phone)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Ref: {result.reference} · {result.message}</p>
-          </div>
-        </div>
-      )}
-
-      {result?.success && !result.pending && (
-        <div className="bg-success/10 border border-success/20 rounded-xl p-4 mb-5 flex items-center gap-3">
-          <CheckCircle2 className="w-6 h-6 text-success flex-shrink-0" />
-          <div>
-            <p className="text-sm font-bold text-success">Fare Collected!</p>
-            <p className="text-xs text-muted-foreground">{formatKES(result.amount)} from {formatPhoneDisplay(result.phone)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Ref: {result.reference} · No fees applied</p>
-          </div>
-        </div>
-      )}
 
       {result && !result.success && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 mb-5 flex items-center gap-3">
@@ -193,13 +208,15 @@ export default function Lipisha() {
         </button>
       </div>
 
-      {loading && (
-        <div className="mt-4 bg-warning/10 border border-warning/20 rounded-xl p-4 text-center">
-          <Loader2 className="w-6 h-6 text-warning mx-auto mb-2 animate-spin" />
-          <p className="text-sm font-medium text-warning">Check your customer's phone</p>
-          <p className="text-xs text-muted-foreground">Waiting for M-Pesa confirmation...</p>
-        </div>
-      )}
+      <PaymentPendingSheet
+        open={showPending}
+        onClose={() => { setShowPending(false); setPendingTxn(null); }}
+        reference={pendingTxn?.reference}
+        status={polling.status}
+        attempts={polling.attempts}
+        message="Check your customer's phone for the M-Pesa prompt."
+        onRetry={() => polling.start()}
+      />
 
       <TierLimitGateSheet
         open={!!tierGateInfo}
