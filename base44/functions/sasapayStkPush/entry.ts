@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     // Convert cents to shillings
     const amountStr = (amountCents / 100).toFixed(2);
     const reference = accountRef || `BS${Date.now()}`;
-    const callbackUrl = `${getBaseUrl()}/functions/invoke/sasapayWebhook`;
+    const callbackUrl = `${getBaseUrl()}/functions/sasapayWebhook`;
 
     const c2bPayload = {
       MerchantCode: merchantCode,

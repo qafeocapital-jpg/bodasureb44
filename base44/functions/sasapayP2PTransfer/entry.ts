@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
 
     const token = await getSasaPayToken();
     const amountStr = (amountCents / 100).toFixed(2);
-    const callbackUrl = `${getBaseUrl()}/functions/invoke/sasapayWebhook`;
+    const callbackUrl = `${getBaseUrl()}/functions/sasapayWebhook`;
 
     const sendPayload = {
       MerchantCode: merchantCode,

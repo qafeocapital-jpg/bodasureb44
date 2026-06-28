@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     // Live mode: query SasaPay API for the transaction status
     try {
       const token = await getSasaPayToken();
-      const callbackUrl = `${getBaseUrl()}/functions/invoke/sasapayWebhook`;
+      const callbackUrl = `${getBaseUrl()}/functions/sasapayWebhook`;
 
       const queryPayload = {
         MerchantCode: merchantCode,

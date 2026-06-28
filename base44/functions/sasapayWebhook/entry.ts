@@ -41,7 +41,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Signature verification
     const signature = req.headers.get('x-sasapay-signature') || '';
     const clientId = Deno.env.get('SASAPAY_CLIENT_ID');
     const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
@@ -51,6 +50,22 @@ Deno.serve(async (req) => {
     if (!merchantCode) return Response.json({ error: 'SASAPAY_MERCHANT_CODE not configured' }, { status: 500 });
 
     const isSandbox = environment === 'sandbox';
+
+    // Log EVERY incoming request before any validation, so we can confirm
+    // whether SasaPay callbacks are arriving at all.
+    try {
+      await sr.entities.PaymentEvent.create({
+        transaction_id: body.CheckoutRequestID || body.CheckoutId || '',
+        event_type: 'sasapay_webhook_raw',
+        reference: body.CheckoutRequestID || body.BillRefNumber || body.MerchantRequestID || '',
+        payload: { ...body, _headers: { signature: !!signature, 'content-type': contentType } },
+        processed: false,
+      });
+    } catch (e) {
+      console.error('[sasapayWebhook] Failed to log raw request:', e.message);
+    }
+
+    // Signature verification
     if (signature) {
       // SasaPay C2B callback uses different field names than other callback types.
       // C2B sends BillRefNumber (not AccountNumber) and CheckoutRequestID/MerchantRequestID
@@ -78,7 +93,11 @@ Deno.serve(async (req) => {
 
       if (!constantTimeCompare(signature, computedSignature)) {
         console.error('[sasapayWebhook] Signature verification failed');
-        return Response.json({ error: 'Invalid signature' }, { status: 401 });
+        if (!isSandbox) {
+          return Response.json({ error: 'Invalid signature' }, { status: 401 });
+        }
+        // Sandbox: log but continue processing — allows testing while HMAC format is being verified
+        console.warn('[sasapayWebhook] Sandbox: allowing callback through despite signature mismatch');
       }
     } else if (!isSandbox) {
       return Response.json({ error: 'Missing X-SasaPay-Signature header' }, { status: 401 });
