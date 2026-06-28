@@ -32,11 +32,13 @@ export function checkServiceAccess(service, { user, wallet, bikes, countyLive })
       actionLink: '/app/compliance',
     },
     lipa_county: {
-      unlocked: hasBike,
-      title: 'Register Your Bike First',
-      message: 'You need a registered and approved bike before paying county fees.',
-      actionLabel: 'Register Bike',
-      actionLink: '/app/bikes/register',
+      unlocked: hasBike && (user?.account_state === 'BASIC_ACTIVE' || user?.account_state === 'VERIFIED' || user?.account_state === 'KYC_PENDING' || user?.account_state === 'KYC_REVIEW'),
+      title: user?.account_state === 'DRAFT' ? 'Complete Your Setup' : 'Register Your Bike First',
+      message: user?.account_state === 'DRAFT'
+        ? 'Activate your BodaSure wallet to pay for your licence.'
+        : 'You need a registered and approved bike before paying county fees.',
+      actionLabel: user?.account_state === 'DRAFT' ? 'Activate Wallet' : 'Register Bike',
+      actionLink: user?.account_state === 'DRAFT' ? '/app/wallet/activate' : '/app/bikes/register',
     },
     lipa_county_live: {
       unlocked: countyLive === true,

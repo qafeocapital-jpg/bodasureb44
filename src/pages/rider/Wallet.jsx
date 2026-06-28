@@ -9,7 +9,9 @@ import { checkTransactionLimits } from '@/lib/feeEngine';
 import { normalizePhone } from '@/lib/phone';
 import PhoneInput from '@/components/ui/PhoneInput';
 import PinEntrySheet from '@/components/rider/PinEntrySheet';
+import PaymentPendingSheet from '@/components/rider/PaymentPendingSheet';
 import TransactionDetailSheet from '@/components/rider/TransactionDetailSheet';
+import { usePaymentPolling } from '@/hooks/usePaymentPolling';
 import { ArrowDownToLine, ArrowUpFromLine, Send, AlertCircle, History } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -31,6 +33,26 @@ export default function Wallet() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [selectedTx, setSelectedTx] = useState(null);
+  const [pendingTxn, setPendingTxn] = useState(null);
+  const [showPending, setShowPending] = useState(false);
+
+  const polling = usePaymentPolling({
+    transactionId: pendingTxn?.transactionId || null,
+    reference: pendingTxn?.reference || null,
+    watchPermit: false,
+  });
+
+  // When polling completes, refresh balance + transactions
+  useEffect(() => {
+    if (polling.status === 'completed' || polling.status === 'timeout') {
+      (async () => {
+        const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: wallet.id });
+        if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);
+        const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id }, '-created_date', 20);
+        setTransactions(txns);
+      })();
+    }
+  }, [polling.status]);
 
   useEffect(() => {
     async function loadData() {
@@ -94,6 +116,8 @@ export default function Wallet() {
 
     try {
       const phoneForSend = activeTab === 'send' ? normalizePhone(recipient) : null;
+      // For withdraw: send to the user's own phone
+      const phoneForWithdraw = activeTab === 'withdraw' ? user.phone : null;
 
       let res;
       if (activeTab === 'deposit') {
@@ -108,15 +132,37 @@ export default function Wallet() {
           description: 'M-Pesa top up',
           transactionType: 'deposit',
         });
+
+        // If live mode (pending), start polling
+        if (res.status === 'pending' && res.transactionId) {
+          setPendingTxn({ transactionId: res.transactionId, reference: res.reference });
+          setShowPending(true);
+          polling.start();
+          setLoading(false);
+          return;
+        }
       } else {
-        // Send / withdraw = internal wallet operation
+        // Send / withdraw = SasaPay P2P / B2C
         res = await processWalletPayment({
           walletId: wallet.id,
           type: activeTab,
           amountCents: cents,
-          counterpartyPhone: phoneForSend,
+          counterpartyPhone: phoneForSend || phoneForWithdraw,
           description: activeTab === 'withdraw' ? 'Withdraw to M-Pesa' : `Send to ${recipient}`,
         });
+
+        // If live mode (pending), start polling
+        if (res.status === 'pending' && res.transactionId) {
+          // Debit was applied immediately by the backend — refresh balance
+          const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: wallet.id });
+          if (snaps.length > 0) setBalance(snaps[0].balance_cents || 0);
+
+          setPendingTxn({ transactionId: res.transactionId, reference: res.reference });
+          setShowPending(true);
+          polling.start();
+          setLoading(false);
+          return;
+        }
       }
       // Re-fetch balance from server for accuracy
       const snaps = await base44.entities.WalletSnapshot.filter({ wallet_id: wallet.id });
@@ -265,6 +311,16 @@ export default function Wallet() {
         onClose={() => setShowPin(false)}
         onConfirm={handlePinConfirm}
         title={activeTab === 'withdraw' ? 'Enter PIN to Withdraw' : 'Enter PIN to Send'}
+      />
+
+      <PaymentPendingSheet
+        open={showPending}
+        onClose={() => { setShowPending(false); setPendingTxn(null); }}
+        reference={pendingTxn?.reference}
+        status={polling.status}
+        attempts={polling.attempts}
+        message={activeTab === 'deposit' ? 'Check your phone for the M-Pesa prompt and enter your PIN to confirm.' : 'Your transfer is being processed. We\'ll confirm when it\'s done.'}
+        onRetry={() => { polling.stop(); polling.start(); }}
       />
 
       <TransactionDetailSheet

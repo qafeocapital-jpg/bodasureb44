@@ -8,6 +8,8 @@ import { verifyPin } from '@/lib/pin';
 import { checkServiceAccess } from '@/lib/serviceAccess';
 import { auditLog } from '@/lib/audit';
 import UnlockSheet from '@/components/rider/UnlockSheet';
+import PaymentPendingSheet from '@/components/rider/PaymentPendingSheet';
+import { usePaymentPolling } from '@/hooks/usePaymentPolling';
 import { ChevronLeft, UserCheck, Loader2, CheckCircle2, XCircle, Receipt } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -26,6 +28,24 @@ export default function LipaOwner() {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [accessInfo, setAccessInfo] = useState(null);
+  const [pendingTxn, setPendingTxn] = useState(null);
+  const [showPending, setShowPending] = useState(false);
+
+  const polling = usePaymentPolling({
+    transactionId: pendingTxn?.transactionId || null,
+    reference: pendingTxn?.reference || null,
+    watchPermit: false,
+  });
+
+  // When polling completes, refresh history
+  useEffect(() => {
+    if (polling.status === 'completed' || polling.status === 'timeout') {
+      (async () => {
+        const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipa_owner' }, '-created_date', 10);
+        setHistory(txns);
+      })();
+    }
+  }, [polling.status]);
 
   useEffect(() => {
     async function load() {
@@ -68,50 +88,47 @@ export default function LipaOwner() {
     setLoading(true);
     const cents = Math.round(parseFloat(amount) * 100);
     try {
-      // Find or create owner wallet
-      let ownerWallet = null;
-      if (selectedBikeObj?.owner_id) {
-        const ownerWallets = await base44.entities.Wallet.filter({ user_id: selectedBikeObj.owner_id, entity_type: 'personal' });
-        if (ownerWallets.length > 0) ownerWallet = ownerWallets[0];
+      // Get owner's phone for B2C disbursement
+      const ownerId = selectedBikeObj?.owner_id;
+      let ownerPhone = selectedBikeObj?.owner_phone;
+      if (!ownerPhone && ownerId && owners[ownerId]?.phone) {
+        ownerPhone = owners[ownerId].phone;
+      }
+      if (!ownerPhone) {
+        throw new Error('Owner phone number not available. Ask the owner to verify their account.');
       }
 
       const res = await processWalletPayment({
         walletId: wallet.id,
         type: 'lipa_owner',
         amountCents: cents,
-        counterpartyWalletId: ownerWallet?.id,
+        counterpartyPhone: ownerPhone,
         description: `Payment to owner for ${selectedBikeObj.plate_number}`,
         productType: 'lipa_owner',
         vehicleId: selectedBike,
+        metadata: {
+          owner_id: ownerId,
+          vehicle_id: selectedBike,
+          rider_id: user.id,
+        },
       });
 
-      setResult({ success: true, amount: cents, reference: res.reference, owner: selectedBikeObj?.owner_id });
       setAmount('');
       setPin('');
       setSelectedBike('');
       setShowPin(false);
 
-      // Notify the owner of the payment via email
-      const ownerId = selectedBikeObj?.owner_id;
-      if (ownerId) {
-        try {
-          const ownerUser = owners[ownerId];
-          // Send email notification if owner has an email
-          if (ownerUser?.email) {
-            await base44.integrations.Core.SendEmail({
-              to: ownerUser.email,
-              subject: 'BodaSure — Owner Payment Received',
-              body: `Hello ${ownerUser.full_name || 'Owner'},<br><br>You have received ${formatKES(cents)} from ${user.full_name || 'a rider'} for bike <strong>${selectedBikeObj.plate_number}</strong>.<br><br>Reference: ${res.reference}<br><br>Thank you for using BodaSure.`,
-            });
-          }
-        } catch (e) {}
+      // If pending (live SasaPay), start polling
+      if (res.status === 'pending' && res.transactionId) {
+        setPendingTxn({ transactionId: res.transactionId, reference: res.reference, amountCents: cents });
+        setShowPending(true);
+        polling.start();
+      } else {
+        setResult({ success: true, amount: cents, reference: res.reference, owner: ownerId });
       }
 
-      // Audit log the payment
-      await auditLog({ userId: user.id, action: 'lipa_owner_payment', entityType: 'Transaction', entityId: res.transaction?.id, description: `Paid owner ${formatKES(cents)} for bike ${selectedBikeObj.plate_number}. Ref: ${res.reference}` });
-
-      const txns = await base44.entities.Transaction.filter({ wallet_id: wallet.id, type: 'lipa_owner' }, '-created_date', 10);
-      setHistory(txns);
+      // Audit log the payment initiation
+      await auditLog({ userId: user.id, action: 'lipa_owner_payment_initiated', entityType: 'Transaction', entityId: res.transactionId, description: `Initiated owner payment of ${formatKES(cents)} for bike ${selectedBikeObj.plate_number}. Ref: ${res.reference}` });
     } catch (e) {
       setResult({ success: false, message: e.message || 'Could not complete payment. Try again.' });
     }
@@ -252,6 +269,23 @@ export default function LipaOwner() {
         actionLink={accessInfo?.actionLink}
         onAction={() => { if (accessInfo?.actionLink) navigate(accessInfo.actionLink); }}
       />
+
+      <PaymentPendingSheet
+        open={showPending}
+        onClose={() => { setShowPending(false); setPendingTxn(null); }}
+        reference={pendingTxn?.reference}
+        status={polling.status}
+        attempts={polling.attempts}
+        message="Your payment to the owner is being processed via SasaPay. We'll confirm when it's complete."
+        onRetry={() => { polling.stop(); polling.start(); }}
+      />
+
+      {polling.status === 'completed' && pendingTxn && !result?.success && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-success/10 border border-success/20 rounded-xl px-4 py-3 flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-success" />
+          <p className="text-sm font-semibold text-success">Payment Sent! {formatKES(pendingTxn.amountCents)} · Ref: {pendingTxn.reference}</p>
+        </div>
+      )}
 
       {/* History */}
       {history.length > 0 && (

@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatKES, formatDate } from '@/lib/format';
-import { processWalletPayment, getOrCreateWallet, processFeeSplit } from '@/lib/payments';
+import { initiateStkPush, processWalletPayment, getOrCreateWallet } from '@/lib/payments';
 import { verifyPin } from '@/lib/pin';
 import { checkServiceAccess } from '@/lib/serviceAccess';
 import UnlockSheet from '@/components/rider/UnlockSheet';
 import PinEntrySheet from '@/components/rider/PinEntrySheet';
+import PaymentPendingSheet from '@/components/rider/PaymentPendingSheet';
+import { usePaymentPolling } from '@/hooks/usePaymentPolling';
 import { ChevronLeft, BadgeCheck, Loader2, CheckCircle2, XCircle, AlertCircle, Receipt, MapPin } from 'lucide-react';
 import PageSkeleton from '@/components/rider/PageSkeleton';
 
@@ -23,11 +25,44 @@ export default function LipaCounty() {
   const [countyName, setCountyName] = useState('');
   const [selectedBike, setSelectedBike] = useState('');
   const [selectedCycle, setSelectedCycle] = useState('');
-  const [payMethod, setPayMethod] = useState('wallet');
+  const [payMethod, setPayMethod] = useState('mpesa');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [showPin, setShowPin] = useState(false);
+  const [showUnlock, setShowUnlock] = useState(false);
+  const [pendingTxn, setPendingTxn] = useState(null);
+  const [showPending, setShowPending] = useState(false);
+
+  const polling = usePaymentPolling({
+    transactionId: pendingTxn?.transactionId || null,
+    reference: pendingTxn?.reference || null,
+    watchPermit: true,
+    vehicleId: selectedBike || null,
+    riderId: user?.id || null,
+  });
+
+  // When polling completes, refresh permits
+  useEffect(() => {
+    if (polling.status === 'completed' && polling.permitId) {
+      (async () => {
+        const perms = await base44.entities.Permit.filter({ rider_id: user.id }, '-created_date', 10);
+        setPermits(perms);
+        setResult({
+          success: true,
+          amount: pendingTxn?.amountCents || 0,
+          reference: pendingTxn?.reference,
+          cycle: selectedCycle,
+          permitType: user?.account_state === 'VERIFIED' ? 'full' : 'provisional',
+        });
+        setSelectedBike('');
+        setSelectedCycle('');
+      })();
+    }
+    if (polling.status === 'failed' || polling.status === 'timeout') {
+      setResult({ success: false, message: polling.error || 'Payment could not be confirmed. Check your M-Pesa SMS.' });
+    }
+  }, [polling.status]);
 
   useEffect(() => {
     async function load() {
@@ -49,7 +84,6 @@ export default function LipaCounty() {
           setFeeSchedules(schedules);
           const perms = await base44.entities.Permit.filter({ rider_id: user.id }, '-created_date', 10);
           setPermits(perms);
-          // Check county LIVE status
           const counties = await base44.entities.County.filter({ id: bike.county_id });
           if (counties.length > 0) {
             setCountyLive(counties[0].status === 'live');
@@ -91,7 +125,49 @@ export default function LipaCounty() {
 
   function handlePay() {
     if (!selectedBike || !selectedSchedule) return;
-    setShowPin(true);
+
+    // Gate: check account_state
+    const access = checkServiceAccess('lipa_county', { user, wallet, bikes });
+    if (!access.unlocked) {
+      setShowUnlock(true);
+      return;
+    }
+
+    if (payMethod === 'wallet') {
+      setShowPin(true);
+    } else {
+      // M-Pesa STK push — no PIN needed (M-Pesa PIN is entered on the phone)
+      handlePayMpesa();
+    }
+  }
+
+  async function handlePayMpesa() {
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await initiateStkPush({
+        walletId: wallet.id,
+        phone: user.phone,
+        amountCents: selectedSchedule.amount_cents,
+        description: `${selectedCycle} permit for ${selectedBikeObj.plate_number}`,
+        transactionType: 'lipa_county',
+      });
+
+      if (res.status === 'pending' && res.transactionId) {
+        setPendingTxn({
+          transactionId: res.transactionId,
+          reference: res.reference,
+          amountCents: selectedSchedule.amount_cents,
+        });
+        setShowPending(true);
+        polling.start();
+      } else {
+        setResult({ success: false, message: 'Payment request failed. Please try again.' });
+      }
+    } catch (e) {
+      setResult({ success: false, message: e.message || 'Payment failed. Please try again.' });
+    }
+    setLoading(false);
   }
 
   async function handlePinConfirm(pin) {
@@ -109,55 +185,26 @@ export default function LipaCounty() {
         description: `${selectedCycle} permit for ${selectedBikeObj.plate_number}`,
         productType: 'lipa_county',
         vehicleId: selectedBike,
+        metadata: {
+          billing_cycle: selectedCycle,
+          vehicle_id: selectedBike,
+          county_id: selectedBikeObj.county_id,
+          fee_schedule_id: selectedSchedule.id,
+          rider_id: user.id,
+        },
       });
 
-      const now = new Date();
-      const durations = { weekly: 7, monthly: 30, quarterly: 90, yearly: 365 };
-      const end = new Date(now);
-      end.setDate(end.getDate() + (durations[selectedCycle] || 30));
-
-      // Determine permit type: provisional for BASIC_ACTIVE riders, full for VERIFIED
-      const permitType = user?.account_state === 'BASIC_ACTIVE' ? 'provisional' : 'full';
-
-      const permit = await base44.entities.Permit.create({
-        vehicle_id: selectedBike,
-        rider_id: user?.id,
-        county_id: selectedBikeObj.county_id,
-        billing_cycle: selectedCycle,
-        start_date: now.toISOString(),
-        end_date: end.toISOString(),
-        status: 'active',
-        amount_paid_cents: selectedSchedule.amount_cents,
-        transaction_id: res.transaction.id,
-        fee_schedule_id: selectedSchedule.id,
-        qr_code_data: `BODASURE-${selectedBike}-${Date.now()}`,
-        permit_type: permitType,
-      });
-
-      // Process fee split — moves money to county, SACCO, and platform wallets
-      if (feeRule) {
-        // Find rider's SACCO via their GroupMember record (not just any SACCO in the county)
-        let saccoGroupId = null;
-        const memberships = await base44.entities.GroupMember.filter({ user_id: user.id, status: 'approved' });
-        if (memberships.length > 0) {
-          const memberGroupIds = memberships.map(m => m.group_id);
-          // Batch fetch all rider's groups in one call, then find the active SACCO
-          const allGroups = await base44.entities.Group.filter({ status: 'active' });
-          const saccoGroup = allGroups.find(g => memberGroupIds.includes(g.id) && g.type === 'sacco');
-          if (saccoGroup) saccoGroupId = saccoGroup.id;
-        }
-
-        await processFeeSplit(res.transaction.id, selectedSchedule.amount_cents, feeRule, {
-          countyId: selectedBikeObj.county_id,
-          saccoGroupId,
+      if (res.status === 'pending' && res.transactionId) {
+        setPendingTxn({
+          transactionId: res.transactionId,
+          reference: res.reference,
+          amountCents: selectedSchedule.amount_cents,
         });
+        setShowPending(true);
+        polling.start();
+      } else {
+        setResult({ success: false, message: 'Payment failed. Please try again.' });
       }
-
-      setResult({ success: true, amount: selectedSchedule.amount_cents, reference: res.reference, cycle: selectedCycle, permitType: permit.permit_type });
-      const perms = await base44.entities.Permit.filter({ rider_id: user?.id }, '-created_date', 10);
-      setPermits(perms);
-      setSelectedBike('');
-      setSelectedCycle('');
     } catch (e) {
       setResult({ success: false, message: e.message || 'Payment failed. Please try again.' });
     }
@@ -187,7 +234,6 @@ export default function LipaCounty() {
           </button>
         </div>
       ) : !countyLive ? (
-        /* County not LIVE */
         <div className="bg-accent rounded-2xl p-8 text-center">
           <div className="w-14 h-14 rounded-full bg-warning/10 flex items-center justify-center mx-auto mb-3">
             <MapPin className="w-7 h-7 text-warning" />
@@ -278,12 +324,13 @@ export default function LipaCounty() {
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Pay From</label>
                 <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button onClick={() => setPayMethod('mpesa')} className={`p-3 rounded-xl border-2 text-center transition-colors ${payMethod === 'mpesa' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+                    <p className="text-sm font-semibold">M-Pesa</p>
+                    <p className="text-[9px] text-muted-foreground">STK Push</p>
+                  </button>
                   <button onClick={() => setPayMethod('wallet')} className={`p-3 rounded-xl border-2 text-center transition-colors ${payMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-border'}`}>
                     <p className="text-sm font-semibold">Wallet</p>
-                  </button>
-                  <button onClick={() => setPayMethod('mpesa')} className={`p-3 rounded-xl border-2 text-center transition-colors ${payMethod === 'mpesa' ? 'border-primary bg-primary/5' : 'border-border'} relative`}>
-                    <p className="text-sm font-semibold">M-Pesa</p>
-                    <span className="text-[9px] text-muted-foreground">Coming soon</span>
+                    <p className="text-[9px] text-muted-foreground">SasaPay</p>
                   </button>
                 </div>
               </div>
@@ -291,7 +338,7 @@ export default function LipaCounty() {
 
             <button
               onClick={handlePay}
-              disabled={loading || !selectedBike || !selectedSchedule || payMethod === 'mpesa'}
+              disabled={loading || !selectedBike || !selectedSchedule}
               className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold text-sm disabled:opacity-50"
             >
               {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</> : <><BadgeCheck className="w-5 h-5" /> Pay {selectedSchedule ? formatKES(selectedSchedule.amount_cents) : ''}</>}
@@ -330,11 +377,32 @@ export default function LipaCounty() {
         </>
       )}
 
+      <UnlockSheet
+        open={showUnlock}
+        onClose={() => setShowUnlock(false)}
+        title={access.title}
+        message={access.message}
+        actionLabel={access.actionLabel}
+        actionLink={access.actionLink}
+      />
+
       <PinEntrySheet
         open={showPin}
         onClose={() => setShowPin(false)}
         onConfirm={handlePinConfirm}
         title="Enter PIN to Pay"
+      />
+
+      <PaymentPendingSheet
+        open={showPending}
+        onClose={() => { setShowPending(false); setPendingTxn(null); }}
+        reference={pendingTxn?.reference}
+        status={polling.status}
+        attempts={polling.attempts}
+        message={payMethod === 'mpesa'
+          ? 'Check your phone for the M-Pesa prompt and enter your PIN to confirm.'
+          : 'Your wallet payment is being processed. We\'ll confirm when your permit is ready.'}
+        onRetry={() => { polling.stop(); polling.start(); }}
       />
     </div>
   );

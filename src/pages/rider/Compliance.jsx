@@ -17,6 +17,7 @@ import ComplianceChecklist from '@/components/compliance/ComplianceChecklist';
 import ComplianceTabToggle from '@/components/compliance/ComplianceTabToggle';
 import CompliancePenaltyList from '@/components/compliance/CompliancePenaltyList';
 import OfficerModeOverlay from '@/components/compliance/OfficerModeOverlay';
+import PermitCard from '@/components/rider/PermitCard';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { Shield } from 'lucide-react';
 
@@ -112,26 +113,44 @@ export default function Compliance() {
         amountCents: cents,
         description: `Penalty payment: ${payingPenalty.reason}`,
         productType: 'penalty',
-        feeRule: null,
-        feeSplitParams: null,
+        metadata: {
+          penalty_id: payingPenalty.id,
+          rider_id: user.id,
+          county_id: payingPenalty.county_id,
+        },
       });
 
       if (!res) throw new Error('Payment processing failed.');
 
-      const transactionId = res.transaction?.id || res.id;
-      await base44.entities.Penalty.update(payingPenalty.id, {
-        status: 'paid',
-        transaction_id: transactionId,
-        paid_at: new Date().toISOString(),
-      });
+      // The webhook will mark the penalty as paid when the transaction completes.
+      // For pending SasaPay transactions, show a "processing" message.
+      if (res.status === 'pending') {
+        toast({
+          title: 'Payment processing',
+          description: 'Your penalty payment is being processed. We\'ll confirm when it\'s complete.',
+        });
+      } else {
+        // Mock mode — immediate completion
+        const transactionId = res.transaction?.id || res.id;
+        await base44.entities.Penalty.update(payingPenalty.id, {
+          status: 'paid',
+          transaction_id: transactionId,
+          paid_at: new Date().toISOString(),
+        });
 
-      await auditLog({
-        userId: user.id,
-        action: 'penalty_paid',
-        entityType: 'Penalty',
-        entityId: payingPenalty.id,
-        description: `Penalty paid: ${formatKES(cents)}`,
-      });
+        await auditLog({
+          userId: user.id,
+          action: 'penalty_paid',
+          entityType: 'Penalty',
+          entityId: payingPenalty.id,
+          description: `Penalty paid: ${formatKES(cents)}`,
+        });
+
+        toast({
+          title: 'Penalty paid successfully',
+          description: formatKES(cents) + ' deducted from your wallet',
+        });
+      }
 
       const newBal = await getWalletBalance(wallet.id);
       setBalance(newBal);
@@ -142,11 +161,6 @@ export default function Compliance() {
         20
       );
       setPenalties(pendingPenalties);
-
-      toast({
-        title: 'Penalty paid successfully',
-        description: formatKES(cents) + ' deducted from your wallet',
-      });
 
       setPayingPenalty(null);
     } catch (e) {
@@ -204,6 +218,11 @@ export default function Compliance() {
         {activeTab === 'status' && (
           <div className="space-y-5">
             <ComplianceTierHero tier={complianceTier} score={complianceScore} />
+            <PermitCard
+              permit={permits[0] || null}
+              vehicle={vehicle}
+              onPayLicense={() => navigate('/app/lipa-county')}
+            />
             <RiderIdentitySummary user={user} vehicle={vehicle} kycDocs={kycDocs} group={group} />
             <CompliancePenaltyList penalties={penalties} wallet={wallet} onPay={setPayingPenalty} />
           </div>

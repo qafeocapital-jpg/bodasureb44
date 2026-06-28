@@ -154,7 +154,7 @@ const AuthenticatedApp = () => {
         <Route path="/app/account" element={<Account />} />
         <Route path="/app/profile" element={<Profile />} />
 
-        <Route path="/app/wallet/activate" element={<Navigate to="/app/profile" replace />} />
+        <Route path="/app/wallet/activate" element={<WalletActivate />} />
         <Route path="/app/bikes/register" element={<BikeRegister />} />
         <Route path="/app/fleet" element={<MyFleet />} />
         <Route path="/app/groups/register-sacco" element={<SaccoRegister />} />
