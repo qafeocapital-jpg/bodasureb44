@@ -52,16 +52,21 @@ Deno.serve(async (req) => {
 
     const isSandbox = environment === 'sandbox';
     if (signature) {
+      // SasaPay C2B callback uses different field names than other callback types.
+      // C2B sends BillRefNumber (not AccountNumber) and CheckoutRequestID/MerchantRequestID
+      // (not PaymentReference). We must match the exact field names SasaPay signed with.
       const transactionCode = body.TransactionCode || '';
-      const accountNumber = body.AccountNumber || body.account_number || '';
-      const paymentReference = body.PaymentReference || body.MerchantReference || '';
+      const accountNumber = body.AccountNumber || body.account_number || body.BillRefNumber || '';
+      const paymentReference = body.PaymentReference || body.MerchantReference || body.CheckoutRequestID || body.MerchantRequestID || '';
       const amount = body.TransAmount || body.Amount;
 
-      if (!transactionCode || !accountNumber || !paymentReference || amount === undefined) {
-        console.warn('[sasapayWebhook] Missing required fields for signature verification');
+      if (!transactionCode || !paymentReference || amount === undefined) {
+        console.warn('[sasapayWebhook] Missing required fields for signature verification', { transactionCode, accountNumber, paymentReference, amount });
         return Response.json({ error: 'Missing required fields for verification' }, { status: 400 });
       }
 
+      // SasaPay sends TransAmount with up to 6 decimal places (e.g. "43.000000").
+      // Format to 2 decimal places to match what SasaPay signed.
       const formattedAmount = (parseFloat(amount) || 0).toFixed(2);
       const message = `${transactionCode}-${merchantCode}-${accountNumber}-${paymentReference}-${formattedAmount}`;
       const encoder = new TextEncoder();
@@ -114,7 +119,8 @@ Deno.serve(async (req) => {
     const isSuccess = resultCodeStr === '0' || body.Paid === true;
     const newStatus = isSuccess ? 'completed' : resultCodeStr && resultCodeStr !== '0' ? 'failed' : 'pending';
 
-    // Amount validation
+    // Amount validation — SasaPay sends TransAmount with up to 6 decimal places
+    // (e.g. "43.000000"). Parse robustly to integer cents to avoid float precision drift.
     const paidAmount = body.TransAmount || body.PaidAmount || body.RequestedAmount;
     if (!paidAmount || !txn.amount_cents) {
       await sr.entities.PaymentEvent.create({
@@ -127,8 +133,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing or invalid amount' }, { status: 400 });
     }
 
-    const paidCents = Math.round(parseFloat(paidAmount) * 100);
-    if (paidCents !== txn.amount_cents) {
+    const paidCents = amountToCents(paidAmount);
+    if (paidCents === null || paidCents !== txn.amount_cents) {
       await sr.entities.PaymentEvent.create({
         transaction_id: txn.id,
         event_type: 'sasapay_webhook',
@@ -559,6 +565,21 @@ async function sendSmsDirect(phone, message) {
 // ─── Helpers ─────────────────────────────────────────────────────────────
 function formatKes(cents) {
   return `KES ${(cents / 100).toFixed(2)}`;
+}
+
+// Parse a SasaPay amount string (e.g. "43.000000") to integer cents without float drift.
+function amountToCents(amountStr) {
+  if (amountStr === undefined || amountStr === null || amountStr === '') return null;
+  const s = String(amountStr).trim();
+  if (!/^\d+(\.\d+)?$/.test(s)) {
+    // Fallback for unusual formats
+    const num = parseFloat(s);
+    if (isNaN(num)) return null;
+    return Math.round(num * 100);
+  }
+  const [whole, frac = ''] = s.split('.');
+  const padded = (frac + '00').slice(0, 2);
+  return parseInt(whole, 10) * 100 + parseInt(padded, 10);
 }
 
 function constantTimeCompare(a, b) {
