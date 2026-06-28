@@ -1,0 +1,54 @@
+---
+description: Non-negotiable fintech security when touching wallets, payments, auth, or webhooks
+alwaysApply: false
+globs:
+  - "**/*wallet*"
+  - "**/*payment*"
+  - "**/*auth*"
+  - "**/*webhook*"
+  - "base44/functions/**"
+  - "src/lib/payments.js"
+  - "src/lib/mockPayments.js"
+  - "src/lib/pin.js"
+  - ".env*"
+---
+
+# BodaSure Fintech Critical Guardrails
+
+## Credentials
+
+- Never read, write, or paste `.env` contents into chat or commits.
+- Ensure `.cursorignore` blocks credential files from indexing.
+
+## SasaPay Webhooks
+
+- Enforce HMAC-SHA512 signature verification with **constant-time** comparison.
+- Find transactions by `checkout_request_id` only — never trust client-supplied wallet IDs from webhook payload alone.
+- Callback URL: `{BASE44_APP_URL}/functions/sasapayWebhook` with no secrets in query strings.
+
+## Ledger Integrity
+
+- No direct wallet balance edits from profile or UI.
+- All money movement must go through `Transaction` + `TransactionLeg` double-entry legs.
+
+## Identity Lock-In
+
+- After Phase 0 OTP confirm, `full_name` and `middle_name` are frozen on the User record.
+- Only service-role backend writes may update locked identity fields — not frontend `updateMe()`.
+
+## Duplicate Blocking
+
+- Hard-block duplicate phone and national ID at onboarding — no recovery or relink path.
+
+## IDAnalyzer Callback
+
+- Process idempotently keyed on `transactionId` + decision status.
+- Validate `IDANALYZER_WEBHOOK_SECRET` on every callback.
+
+## Testing Stability
+
+- Keep `mockPayments.js` operational during testing phases — do not remove without PM approval.
+
+## Before Editing
+
+- Read relevant sections of `src/FEATURE_CONTRACTS.md` and `src/DECISIONS.md` for any payment, wallet, auth, or webhook change.
