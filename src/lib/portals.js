@@ -1,5 +1,5 @@
 export const PORTAL_ROUTES = {
-  county_admin: { path: '/county/dashboard', name: 'County Portal', accent: 'emerald', color: 'bg-emerald-500' },
+  county_admin: { path: '/county/dashboard', name: 'County Portal', accent: 'orange', color: 'bg-orange-500' },
   sacco_admin: { path: '/sacco/dashboard', name: 'SACCO Portal', accent: 'blue', color: 'bg-blue-500' },
   merchant_admin: { path: '/merchant/dashboard', name: 'Merchant Portal', accent: 'emerald', color: 'bg-emerald-500' },
   field_agent: { path: '/agent/dashboard', name: 'Field Agent Portal', accent: 'orange', color: 'bg-orange-500' },

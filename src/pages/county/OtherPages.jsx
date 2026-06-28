@@ -136,7 +136,7 @@ export function CountyPeople() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 font-semibold text-sm border-b-2 -mb-[1px] whitespace-nowrap ${
-                activeTab === tab.id ? 'text-emerald-600 border-emerald-600' : 'text-muted-foreground border-transparent'
+                activeTab === tab.id ? 'text-[#ff5a1f] border-[#ff5a1f]' : 'text-muted-foreground border-transparent'
               }`}
             >
               <Icon className="w-4 h-4" /> {tab.label} ({tab.count})
@@ -165,7 +165,7 @@ export function CountyPeople() {
                 <tbody>
                   {ridersFiltered.map(r => (
                     <tr key={r.id} onClick={() => handleUserClick(r)} className="border-t border-border hover:bg-accent/50 cursor-pointer">
-                      <td className="px-4 py-3 font-medium text-emerald-600">{r.full_name}</td>
+                      <td className="px-4 py-3 font-medium text-[#ff5a1f]">{r.full_name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{r.phone}</td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell text-xs">{r.national_id || '—'}</td>
                       <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">{formatDate(r.created_date)}</td>
@@ -196,7 +196,7 @@ export function CountyPeople() {
                     }, 0);
                     return (
                       <tr key={o.id} onClick={() => handleUserClick(o)} className="border-t border-border hover:bg-accent/50 cursor-pointer">
-                        <td className="px-4 py-3 font-medium text-emerald-600">{o.full_name}</td>
+                        <td className="px-4 py-3 font-medium text-[#ff5a1f]">{o.full_name}</td>
                         <td className="px-4 py-3 text-muted-foreground">{o.phone}</td>
                         <td className="px-4 py-3 text-muted-foreground">—</td>
                       </tr>
@@ -215,7 +215,7 @@ export function CountyPeople() {
                 <div key={sacco.id} className="bg-card border border-border rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h3 className="font-bold text-emerald-600">{sacco.name}</h3>
+                      <h3 className="font-bold text-[#ff5a1f]">{sacco.name}</h3>
                       <p className="text-xs text-muted-foreground">{sacco.member_count} members</p>
                     </div>
                     <span className={`text-xs font-semibold px-2 py-1 rounded ${sacco.status === 'active' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
@@ -244,7 +244,7 @@ export function CountyPeople() {
                 <div key={stage.id} className="bg-card border border-border rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h3 className="font-bold text-emerald-600">{stage.name}</h3>
+                      <h3 className="font-bold text-[#ff5a1f]">{stage.name}</h3>
                       <p className="text-xs text-muted-foreground">{stage.member_count} members</p>
                     </div>
                     <span className={`text-xs font-semibold px-2 py-1 rounded ${stage.application_status === 'approved' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>

@@ -165,7 +165,7 @@ export default function CountyRegistrations() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${tab === t.id ? 'bg-emerald-600 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${tab === t.id ? 'bg-[#ff5a1f] text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}
           >
             <t.icon className="w-4 h-4" /> {t.label}
             <span className={`text-xs rounded-full px-1.5 py-0.5 ${tab === t.id ? 'bg-white/20' : 'bg-accent'}`}>{t.count}</span>
@@ -201,7 +201,7 @@ export default function CountyRegistrations() {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{formatDate(r.created_date)}</td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => setSelectedRiderId(r.id)} className="text-xs text-emerald-600 font-semibold hover:underline">View</button>
+                    <button onClick={() => setSelectedRiderId(r.id)} className="text-xs text-[#ff5a1f] font-semibold hover:underline">View</button>
                   </td>
                 </tr>
               ))}
@@ -255,7 +255,7 @@ export default function CountyRegistrations() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setDetailVehicleId(b.id)} className="bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg px-4 py-2 text-xs font-semibold hover:bg-emerald-100">View</button>
+                    <button onClick={() => setDetailVehicleId(b.id)} className="bg-orange-50 text-[#ff5a1f] border border-orange-200 rounded-lg px-4 py-2 text-xs font-semibold hover:bg-orange-100">View</button>
                     <button onClick={() => approveBike(b.id)} className="bg-success text-success-foreground rounded-lg px-4 py-2 text-xs font-semibold hover:bg-success/90">Approve</button>
                     <button onClick={() => rejectBike(b.id)} className="bg-destructive/10 text-destructive border border-destructive/20 rounded-lg px-4 py-2 text-xs font-semibold hover:bg-destructive/20">Reject</button>
                   </div>
@@ -315,7 +315,7 @@ export default function CountyRegistrations() {
             </div>
           )}
           <div className="flex justify-end mb-3">
-            <button onClick={() => { setEditingStage(null); setShowStageModal(true); }} className="flex items-center gap-1 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-semibold">
+            <button onClick={() => { setEditingStage(null); setShowStageModal(true); }} className="flex items-center gap-1 bg-[#ff5a1f] text-white rounded-lg px-4 py-2 text-sm font-semibold">
               <Plus className="w-4 h-4" /> Add Stage
             </button>
           </div>
@@ -324,7 +324,7 @@ export default function CountyRegistrations() {
               <div key={s.id} className="bg-card border border-border rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-emerald-600" />
+                    <MapPin className="w-4 h-4 text-[#ff5a1f]" />
                     <p className="font-heading font-bold text-sm">{s.name}</p>
                   </div>
                   <button onClick={() => { setEditingStage(s); setShowStageModal(true); }} className="text-muted-foreground hover:text-foreground p-1">
@@ -341,7 +341,7 @@ export default function CountyRegistrations() {
       )}
 
       {detailVehicleId && (
-        <BikeDetailSheet vehicleId={detailVehicleId} onClose={() => setDetailVehicleId(null)} isStaff accent="emerald" />
+        <BikeDetailSheet vehicleId={detailVehicleId} onClose={() => setDetailVehicleId(null)} isStaff accent="orange" />
       )}
 
       <RiderDetailSheet riderId={selectedRiderId} onClose={() => setSelectedRiderId(null)} />

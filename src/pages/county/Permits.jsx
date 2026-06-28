@@ -4,24 +4,24 @@ import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { formatKES, formatDate } from '@/lib/format';
 import { auditLog } from '@/lib/audit';
-import { BadgeCheck, BarChart3, Plus, TrendingUp, Calendar, Pencil } from 'lucide-react';
+import { BadgeCheck, BarChart3, Plus, TrendingUp, Calendar, X, Loader2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function CountyPermits() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const countyId = user?.scope_entity_id || user?.county_id;
   const [tab, setTab] = useState('register');
   const [permits, setPermits] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [riders, setRiders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddSchedule, setShowAddSchedule] = useState(false);
   const [newSchedule, setNewSchedule] = useState({ permit_type: 'weekly', amount_cents: '', penalty_amount_cents: '', grace_period_days: '7' });
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [issueForm, setIssueForm] = useState({ vehicle_id: '', billing_cycle: 'weekly', start_date: new Date().toISOString().split('T')[0] });
   const [issuing, setIssuing] = useState(false);
-
-  const countyId = user?.scope_entity_id || user?.county_id;
 
   useEffect(() => { load(); }, [user]);
 
@@ -32,12 +32,13 @@ export default function CountyPermits() {
       const permitFilter = countyId ? { county_id: countyId } : {};
       const vehicleFilter = countyId ? { county_id: countyId, status: 'approved' } : { status: 'approved' };
       const scheduleFilter = countyId ? { county_id: countyId, is_active: true } : { is_active: true };
-      const [p, s, v] = await Promise.all([
-        base44.entities.Permit.filter(permitFilter, '-created_date', 50),
+      const [p, s, v, r] = await Promise.all([
+        base44.entities.Permit.filter(permitFilter, '-created_date', 100),
         base44.entities.FeeSchedule.filter(scheduleFilter),
         base44.entities.Vehicle.filter(vehicleFilter),
+        base44.entities.User.filter(countyId ? { county_id: countyId, staff_type: 'none' } : { staff_type: 'none' }),
       ]);
-      setPermits(p); setSchedules(s); setVehicles(v);
+      setPermits(p); setSchedules(s); setVehicles(v); setRiders(r);
     } catch (e) {}
     setLoading(false);
   }
@@ -65,19 +66,17 @@ export default function CountyPermits() {
     if (!issueForm.vehicle_id || !issueForm.billing_cycle) return;
     const vehicle = vehicles.find(v => v.id === issueForm.vehicle_id);
     if (!vehicle) return;
-
     const startDate = new Date(issueForm.start_date || new Date());
     const cycleDays = { weekly: 7, monthly: 30, quarterly: 90, yearly: 365 };
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + (cycleDays[issueForm.billing_cycle] || 30));
-
     setIssuing(true);
     try {
       const u = await base44.auth.me();
       const ts = Date.now().toString();
       const permit = await base44.entities.Permit.create({
         vehicle_id: issueForm.vehicle_id,
-        rider_id: vehicle.rider_id || vehicle.owner_id,
+        rider_id: vehicle.rider_id || vehicle.owner_id || '',
         county_id: countyId || vehicle.county_id || 'general',
         billing_cycle: issueForm.billing_cycle,
         start_date: startDate.toISOString(),
@@ -97,6 +96,7 @@ export default function CountyPermits() {
     setIssuing(false);
   }
 
+  const riderMap = new Map(riders.map(r => [r.id, r]));
   const analytics = ['weekly', 'monthly', 'quarterly', 'yearly'].map(cycle => ({
     name: cycle,
     count: permits.filter(p => p.billing_cycle === cycle).length,
@@ -113,9 +113,10 @@ export default function CountyPermits() {
       <h1 className="text-2xl font-heading font-bold mb-1">Permits</h1>
       <p className="text-sm text-muted-foreground mb-5">Manage permits and fee schedules</p>
 
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 flex-wrap">
         {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-emerald-600 text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}>
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-[#ff5a1f] text-white' : 'bg-card border border-border text-muted-foreground hover:bg-accent'}`}>
             <t.icon className="w-4 h-4" /> {t.label}
           </button>
         ))}
@@ -126,7 +127,7 @@ export default function CountyPermits() {
       ) : tab === 'register' ? (
         <div>
           <div className="flex justify-end mb-3">
-            <button onClick={() => setShowIssueModal(true)} className="flex items-center gap-1 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-semibold">
+            <button onClick={() => setShowIssueModal(true)} className="flex items-center gap-1 bg-[#ff5a1f] text-white rounded-lg px-4 py-2 text-sm font-semibold">
               <Calendar className="w-4 h-4" /> Issue Manually
             </button>
           </div>
@@ -150,7 +151,7 @@ export default function CountyPermits() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${p.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>{p.status}</span>
-                        <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${p.permit_type === 'provisional' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                        <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${p.permit_type === 'provisional' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`}>
                           {p.permit_type === 'provisional' ? 'Provisional' : 'Full'}
                         </span>
                       </div>
@@ -174,14 +175,14 @@ export default function CountyPermits() {
               <XAxis dataKey="name" className="text-xs" />
               <YAxis className="text-xs" />
               <Tooltip />
-              <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill="#ff5a1f" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       ) : (
         <div>
           <div className="flex justify-end mb-3">
-            <button onClick={() => setShowAddSchedule(true)} className="flex items-center gap-1 bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-semibold">
+            <button onClick={() => setShowAddSchedule(true)} className="flex items-center gap-1 bg-[#ff5a1f] text-white rounded-lg px-4 py-2 text-sm font-semibold">
               <Plus className="w-4 h-4" /> Add Schedule
             </button>
           </div>
@@ -189,7 +190,7 @@ export default function CountyPermits() {
             {schedules.map(s => (
               <div key={s.id} className="bg-card border border-border rounded-xl p-4">
                 <p className="font-heading font-bold capitalize">{s.permit_type}</p>
-                <p className="text-2xl font-bold text-emerald-600 mt-1">{formatKES(s.amount_cents)}</p>
+                <p className="text-2xl font-bold text-[#ff5a1f] mt-1">{formatKES(s.amount_cents)}</p>
                 <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
                   <p>Penalty: {formatKES(s.penalty_amount_cents || 0)}</p>
                   <p>Grace: {s.grace_period_days} days</p>
@@ -203,7 +204,10 @@ export default function CountyPermits() {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-black/40" onClick={() => setShowAddSchedule(false)} />
               <div className="relative bg-card rounded-2xl p-6 w-full max-w-md">
-                <h3 className="font-heading font-bold text-lg mb-4">Add Fee Schedule</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-heading font-bold text-lg">Add Fee Schedule</h3>
+                  <button onClick={() => setShowAddSchedule(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
+                </div>
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Permit Type</label>
@@ -228,7 +232,7 @@ export default function CountyPermits() {
                   </div>
                   <div className="flex gap-2 pt-2">
                     <button onClick={() => setShowAddSchedule(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold">Cancel</button>
-                    <button onClick={addSchedule} className="flex-1 bg-emerald-600 text-white rounded-xl py-2.5 text-sm font-semibold">Save</button>
+                    <button onClick={addSchedule} className="flex-1 bg-[#ff5a1f] text-white rounded-xl py-2.5 text-sm font-semibold">Save</button>
                   </div>
                 </div>
               </div>
@@ -237,20 +241,20 @@ export default function CountyPermits() {
         </div>
       )}
 
-      {/* Issue Permit Manually Modal */}
       {showIssueModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowIssueModal(false)} />
           <div className="relative bg-card rounded-2xl p-6 w-full max-w-md">
-            <h3 className="font-heading font-bold text-lg mb-4">Issue Permit Manually</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-heading font-bold text-lg">Issue Permit Manually</h3>
+              <button onClick={() => setShowIssueModal(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
+            </div>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Vehicle</label>
                 <select value={issueForm.vehicle_id} onChange={e => setIssueForm(f => ({ ...f, vehicle_id: e.target.value }))} className="w-full mt-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm">
                   <option value="">Select approved vehicle</option>
-                  {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>{v.plate_number} — {v.make} {v.model}</option>
-                  ))}
+                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.plate_number} — {v.make} {v.model}</option>)}
                 </select>
               </div>
               <div>
@@ -268,8 +272,8 @@ export default function CountyPermits() {
               </div>
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setShowIssueModal(false)} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold">Cancel</button>
-                <button onClick={issuePermit} disabled={!issueForm.vehicle_id || issuing} className="flex-1 bg-emerald-600 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50">
-                  {issuing ? 'Issuing...' : 'Issue Permit'}
+                <button onClick={issuePermit} disabled={!issueForm.vehicle_id || issuing} className="flex-1 bg-[#ff5a1f] text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50">
+                  {issuing ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Issue Permit'}
                 </button>
               </div>
             </div>

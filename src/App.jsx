@@ -11,7 +11,8 @@ import BodaSureLoader from './components/BodaSureLoader';
 import ReamazeSSOProvider from './components/ReamazeSSOProvider';
 import RiderLayout from './components/rider/RiderLayout';
 import StaffLayout from './components/staff/StaffLayout';
-import { countyNav, saccoNav, merchantNav, agentNav, adminNav, commsNav } from './lib/staffNav';
+import { saccoNav, merchantNav, agentNav, adminNav, commsNav } from './lib/staffNav';
+import CountyLayout from './components/county/CountyLayout';
 import Home from './pages/rider/Home';
 import Wallet from './pages/rider/Wallet';
 import Bikes from './pages/rider/Bikes';
@@ -43,6 +44,16 @@ import CountyRegistrations from './pages/county/Registrations';
 import CountyPermits from './pages/county/Permits';
 import CountyEnforcement from './pages/county/Enforcement';
 import CountyRevenue from './pages/county/Revenue';
+import CountyCompliance from './pages/county/Compliance';
+import CountyMap from './pages/county/MapPage';
+import CountyOwners from './pages/county/OwnersPage';
+import CountyOnboarding from './pages/county/OnboardingPage';
+import CountySettlements from './pages/county/SettlementsPage';
+import CountyStages from './pages/county/StagesPage';
+import CountySaccos from './pages/county/SaccosPage';
+import CountySubCounties from './pages/county/SubCountiesPage';
+import CountyUsers from './pages/county/UsersPage';
+import CountyAudit from './pages/county/AuditPage';
 import { CountyPeople, CountyReports, CountySettings } from './pages/county/OtherPages';
 import SaccoMembers from './pages/sacco/Members';
 import SaccoBikes from './pages/sacco/Bikes';
@@ -157,14 +168,24 @@ const AuthenticatedApp = () => {
         <Route path="/app/support" element={<Support />} />
       </Route>
 
-      {/* County Portal (emerald) */}
-      <Route element={<StaffLayout accent="emerald" portalName="County" navItems={countyNav} requiredRole="county_admin" />}>
+      {/* County Portal (BodaSure orange, dark sidebar) */}
+      <Route element={<CountyLayout />}>
         <Route path="/county/dashboard" element={<CountyDashboard />} />
+        <Route path="/county/map" element={<CountyMap />} />
         <Route path="/county/registrations" element={<CountyRegistrations />} />
+        <Route path="/county/owners" element={<CountyOwners />} />
+        <Route path="/county/onboarding" element={<CountyOnboarding />} />
+        <Route path="/county/people" element={<CountyPeople />} />
         <Route path="/county/permits" element={<CountyPermits />} />
+        <Route path="/county/compliance" element={<CountyCompliance />} />
         <Route path="/county/enforcement" element={<CountyEnforcement />} />
         <Route path="/county/revenue" element={<CountyRevenue />} />
-        <Route path="/county/people" element={<CountyPeople />} />
+        <Route path="/county/settlements" element={<CountySettlements />} />
+        <Route path="/county/stages" element={<CountyStages />} />
+        <Route path="/county/saccos" element={<CountySaccos />} />
+        <Route path="/county/subcounties" element={<CountySubCounties />} />
+        <Route path="/county/users" element={<CountyUsers />} />
+        <Route path="/county/audit" element={<CountyAudit />} />
         <Route path="/county/comms" element={<Communications />} />
         <Route path="/county/reports" element={<CountyReports />} />
         <Route path="/county/settings" element={<CountySettings />} />
