@@ -1,0 +1,47 @@
+---
+description: High-speed BodaSure development, PM communication, multi-agent discipline, and delivery quality gates
+alwaysApply: true
+---
+
+# BodaSure Fast-Track Development Rules
+
+## 1. How to Communicate with the PM
+
+- I am a non-technical Product Manager. Never give me long engineering lectures or code jargon. Just tell me what features you are building or fixing in plain business English.
+- **NEVER** use shortcuts, code omissions, or placeholders like `// TODO` or `// rest of code stays the same`. Give me 100% complete, fully written file blocks so I can click "Apply" and test immediately.
+- The user is an entrepreneur and non-technical Product Manager. Never write abstract engineering lectures or use heavy framework jargon. Explain all structural changes, feature flows, and bugs in clean business terms.
+- You are **STRICTLY FORBIDDEN** from using omissions, shortcuts, or placeholders like `// TODO: implement later`, or `// ... rest of code stays the same`. You must always output the entire functional file block cleanly so it can be applied with a single click.
+
+## 2. Speed and Simplicity (No Over-Engineering)
+
+- Build the smallest change that solves the task; no speculative abstractions or wrapper layers.
+- Do not refactor unrelated files in the same task.
+- Prioritize working code over perfect architecture.
+- Design for 1M+ users with **simple patterns first** (indexed queries, batch fetches) — not premature microservices.
+
+## 3. Portal and Device Layout
+
+- **Mobile-first:** Rider App (`/app`), Owner flows, Field Agent (`/agent`) — large touch targets, low data use, no horizontal scroll.
+- **Desktop-first but responsive:** SACCO (`/sacco`), Super Admin (`/admin`) — shadcn tables, metric cards, split-pane analytics.
+- Keep cross-portal data in sync (Base44 realtime today; Supabase realtime after migration).
+
+## 4. Delivery Quality Gates (Fast, Not Bureaucratic)
+
+- Run `npm run build` before marking any task done; fix TypeScript/lint errors first.
+- **Two-strike rule:** after 2 failed fix attempts, stop and give a plain-English bottleneck report with 2 options — do not loop.
+- **Smart planning (not slow planning):**
+  - Normal UI/copy/features → 3-bullet summary, then implement immediately.
+  - Payments, auth, KYC, webhooks, entity schemas, security → short written plan listing files touched and blast radius, then implement.
+
+## 5. Multi-Agent Cloud Discipline
+
+- One agent = one git branch (`cursorcloud/<task>-7c82`).
+- Never edit files another active agent owns; check open PRs/branches first.
+- Before merging: run build; note which QA checklist section applies.
+- At task start: read `AGENTS.md` + scan `.cursor/rules/` (only 3 files after consolidation).
+
+## 6. Do Not Break Existing Features
+
+- Before changing a function or flow, check if it is listed in `src/FEATURE_CONTRACTS.md`.
+- Before changing locked behavior, check `src/DECISIONS.md` Active entries.
+- If a change affects onboarding, payments, KYC, or SMS → run the matching section in `src/QA_CHECKLISTS.md`.
