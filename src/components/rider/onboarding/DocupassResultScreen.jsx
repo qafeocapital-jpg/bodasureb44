@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
-import { CheckCircle, Clock, AlertTriangle, ArrowRight, LifeBuoy, RefreshCw, FileUser } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import { CheckCircle, Clock, AlertTriangle, ArrowRight, LifeBuoy, RefreshCw, FileUser, Loader2, ShieldCheck } from 'lucide-react';
 
 /**
  * Full-screen DocuPass result screen.
@@ -19,19 +20,98 @@ export default function DocupassResultScreen({
   onRefresh,
 }) {
   const navigate = useNavigate();
-  
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
 
   // Polling handled by SubTaskIdentity; this component removed to avoid duplicate polling
   // See issue #L3 fix: only SubTaskIdentity manages the polling loop
 
   // Fire confetti on accepted
   useEffect(() => {
-    if (decision === 'accept') {
+    if (decision === 'accept' || decision === 'pending_confirmation') {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       setTimeout(() => confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } }), 200);
       setTimeout(() => confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } }), 400);
     }
   }, [decision]);
+
+  async function handleConfirmDetails() {
+    setConfirming(true);
+    setConfirmError('');
+    try {
+      const res = await base44.functions.invoke('confirmKycDetails', {});
+      if (res.data?.success) {
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+        if (onRefresh) await onRefresh();
+        onGoToDashboard();
+      } else {
+        setConfirmError(res.data?.error || 'Failed to confirm. Please try again.');
+      }
+    } catch (e) {
+      setConfirmError(e.response?.data?.error || e.message || 'Failed to confirm. Please try again.');
+    }
+    setConfirming(false);
+  }
+
+  // --- PENDING CONFIRMATION: Confirm Your Details screen ---
+  if (decision === 'pending_confirmation') {
+    const selfieDoc = kycDocs.find(d => d.document_type === 'selfie' && d.provider_reference);
+    const selfieUrl = user?.avatar_url || selfieDoc?.file_url;
+
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6 animate-fade-in overflow-y-auto">
+        <div className="w-full max-w-sm flex flex-col items-center">
+          {/* Selfie photo from IDAnalyzer */}
+          {selfieUrl ? (
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-success/20 mb-4 shadow-lg">
+              <img src={selfieUrl} alt="Verified selfie" className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-success/10 flex items-center justify-center mb-4">
+              <ShieldCheck className="w-12 h-12 text-success" />
+            </div>
+          )}
+
+          <h1 className="text-2xl font-heading font-bold text-center mb-2">Confirm Your Details</h1>
+          <p className="text-sm text-muted-foreground text-center mb-6">
+            We extracted these details from your ID. Please confirm they're correct.
+          </p>
+
+          {/* Details card */}
+          <div className="w-full bg-card border border-border rounded-xl divide-y divide-border overflow-hidden mb-6">
+            <DetailRow label="Full Name" value={user?.id_extracted_name || user?.full_name} />
+            <DetailRow label="National ID" value={user?.national_id} mono />
+            <DetailRow label="Date of Birth" value={user?.id_extracted_dob || user?.date_of_birth} />
+          </div>
+
+          {confirmError && (
+            <div className="w-full bg-destructive/5 border border-destructive/20 rounded-xl p-3 mb-4 text-center">
+              <p className="text-sm text-destructive">{confirmError}</p>
+            </div>
+          )}
+
+          {/* Primary CTA — green confirm button */}
+          <button
+            onClick={handleConfirmDetails}
+            disabled={confirming}
+            className="w-full flex items-center justify-center gap-2 bg-success text-success-foreground rounded-xl py-3.5 font-semibold text-sm disabled:opacity-50"
+          >
+            {confirming
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Confirming…</>
+              : <><CheckCircle className="w-4 h-4" /> Confirm — These are my details</>}
+          </button>
+
+          {/* Secondary — contact support */}
+          <button
+            onClick={onContactSupport}
+            className="w-full mt-3 text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
+          >
+            Something looks wrong? Contact support
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (decision === 'accept') {
     return (
@@ -169,4 +249,13 @@ export default function DocupassResultScreen({
   }
 
   return null;
+}
+
+function DetailRow({ label, value, mono }) {
+  return (
+    <div className="flex justify-between items-center px-4 py-3">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={`text-sm font-medium ${mono ? 'font-mono' : ''}`}>{value || '—'}</span>
+    </div>
+  );
 }

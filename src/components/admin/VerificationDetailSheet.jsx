@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Check, XCircle, Loader2, Phone, CreditCard, Bike, UserCircle, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { X, Check, XCircle, Loader2, Phone, CreditCard, Bike, UserCircle, ShieldCheck, AlertTriangle, RefreshCw } from 'lucide-react';
 import PdfReportCard from '@/components/admin/flags/PdfReportCard';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { getTaskStatuses, TASK_STATUS_CONFIG, VERIFICATION_TASKS } from '@/lib/verification';
@@ -27,6 +27,7 @@ export default function VerificationDetailSheet({ riderId, onClose, canApprove =
   const [rejectingDoc, setRejectingDoc] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
+  const [replaying, setReplaying] = useState(false);
 
   useEffect(() => { load(); }, [riderId]);
 
@@ -78,6 +79,32 @@ export default function VerificationDetailSheet({ riderId, onClose, canApprove =
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
     setRejecting(false);
+  }
+
+  async function handleReplayWebhook() {
+    if (!rider?.docupass_session_reference) {
+      toast({ title: 'No session reference', description: 'This user has no DocuPass session reference stored.', variant: 'destructive' });
+      return;
+    }
+    setReplaying(true);
+    try {
+      const res = await base44.functions.invoke('replayDocupassWebhook', {
+        transactionId: rider.docupass_session_reference,
+        userId: riderId,
+      });
+      if (res.data?.success) {
+        toast({
+          title: 'Webhook replayed',
+          description: `Decision: ${res.data.decision}. ${res.data.note || ''}`,
+        });
+        load();
+      } else {
+        toast({ title: 'Replay failed', description: res.data?.error || 'Unknown error', variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Replay failed', description: e.response?.data?.error || e.message, variant: 'destructive' });
+    }
+    setReplaying(false);
   }
 
   if (loading) {
@@ -147,13 +174,24 @@ export default function VerificationDetailSheet({ riderId, onClose, canApprove =
                   <ShieldCheck className="w-3.5 h-3.5 text-primary" />
                   IDAnalyzer Verification
                 </p>
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                  rider.docupass_decision === 'accept' ? 'bg-success/10 text-success'
-                  : rider.docupass_decision === 'reject' ? 'bg-destructive/10 text-destructive'
-                  : 'bg-warning/10 text-warning'
-                }`}>
-                  {rider.docupass_decision}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-muted-foreground">kyc_status:</span>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    rider.kyc_status === 'verified' ? 'bg-success/10 text-success'
+                    : rider.kyc_status === 'pending_confirmation' ? 'bg-blue-50 text-blue-600'
+                    : rider.kyc_status === 'rejected' ? 'bg-destructive/10 text-destructive'
+                    : 'bg-warning/10 text-warning'
+                  }`}>
+                    {rider.kyc_status || 'unverified'}
+                  </span>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    rider.docupass_decision === 'accept' ? 'bg-success/10 text-success'
+                    : rider.docupass_decision === 'reject' ? 'bg-destructive/10 text-destructive'
+                    : 'bg-warning/10 text-warning'
+                  }`}>
+                    {rider.docupass_decision}
+                  </span>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                 {rider.id_extracted_name && (
@@ -216,6 +254,33 @@ export default function VerificationDetailSheet({ riderId, onClose, canApprove =
                       ({rider.id_face_identical ? 'Identical' : 'Not Identical'})
                     </span>
                   )}
+                </div>
+              )}
+
+              {/* Mismatch reason (if any) */}
+              {rider.kyc_mismatch_reason && (
+                <div className="pt-1 border-t border-primary/10">
+                  <p className="text-[9px] text-muted-foreground uppercase mb-0.5">Mismatch Reason</p>
+                  <p className="text-[10px] text-destructive">{rider.kyc_mismatch_reason}</p>
+                </div>
+              )}
+
+              {/* Session reference + Replay button */}
+              {rider.docupass_session_reference && (
+                <div className="pt-1 border-t border-primary/10 space-y-2">
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase">Session Reference</p>
+                    <p className="text-[10px] font-mono text-muted-foreground break-all">{rider.docupass_session_reference}</p>
+                  </div>
+                  <button
+                    onClick={handleReplayWebhook}
+                    disabled={replaying}
+                    className="w-full flex items-center justify-center gap-1.5 bg-primary/10 text-primary rounded-lg py-2 text-[11px] font-semibold disabled:opacity-50"
+                  >
+                    {replaying
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Replaying…</>
+                      : <><RefreshCw className="w-3.5 h-3.5" /> Replay Webhook</>}
+                  </button>
                 </div>
               )}
             </div>

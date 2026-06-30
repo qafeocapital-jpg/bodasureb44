@@ -1,31 +1,38 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * IDAnalyzer DocuPass webhook handler (v2).
+ * IDAnalyzer DocuPass webhook handler (v3).
  *
- * Authentication: Fetch transaction directly from IDAnalyzer API (bypasses HMAC verification,
- * which fails due to Base44 modifying request body bytes in transit).
+ * Authentication: Fetch transaction directly from IDAnalyzer API (bypasses HMAC
+ * verification, which fails due to Base44 modifying request body bytes in transit).
  *
- * Atomic flow on every docupass_conclusive event:
- *   1. Extract transactionId from incoming payload
- *   2. Filter events — only process docupass_conclusive (skip fetch for other events)
- *   3. Call GET https://api2.idanalyzer.com/transaction/{transactionId} with X-API-KEY
- *   4. If 404/error, silently discard (not a genuine webhook)
- *   5. Use re-fetched response as authoritative payload
- *   6. Extract ALL ID fields (per Data Fields doc) with confidence scores
- *   7. Extract face confidence from scores.faceCompare (NOT data.face)
- *   8. Store PDF audit report URL directly from outputFile (no download/upload)
- *   9. Upsert KycDocuments + hydrate User with full extracted identity
- *   10. Auto-set kyc_status, verification_complete, wallet tier on accept
- *   11. SMS notification to rider
- *   12. AuditLog entries
+ * Flow on every docupass_conclusive event:
+ *   1. DEAD-LETTER LOG: store raw payload to PaymentEvent immediately (before processing)
+ *   2. Extract transactionId, filter non-conclusive events
+ *   3. GET https://api2.idanalyzer.com/transaction/{transactionId} with X-API-KEY
+ *   4. IDEMPOTENCY: skip if already processed with same decision
+ *   5. Extract ALL ID fields with confidence scores
+ *   6. Upsert KycDocuments
+ *   7. Hydrate User:
+ *      - accept  → overwrite profile (full_name, national_id, dob, avatar_url),
+ *                 set kyc_status='pending_confirmation' (NOT verified yet)
+ *      - reject  → kyc_status='rejected', increment kyc_attempts
+ *      - review  → kyc_status='pending', account_state='KYC_REVIEW'
+ *   8. SMS notification (reject only; accept SMS sent from confirmKycDetails)
+ *   9. AuditLog
+ *  10. Mark PaymentEvent as processed, return 200
+ *
+ * MISMATCH REJECT LOGIC REMOVED — on accept, we always overwrite the profile
+ * with OCR data. The user confirms their details via a confirmation screen
+ * before verification is finalized (confirmKycDetails function).
  */
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
+  const sr = base44.asServiceRole;
 
   const rawBody = await req.text();
 
-  // --- Parse incoming payload (event filtering only) ---
+  // --- Parse incoming payload ---
   let incomingPayload;
   try {
     incomingPayload = JSON.parse(rawBody);
@@ -33,54 +40,78 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // --- 1. Event filtering — early return for non-conclusive events ---
   const eventType = incomingPayload.event;
-  console.log('[idAnalyzerCallback] Received event=' + eventType + ', transactionId=' + (incomingPayload.transactionId || 'unknown'));
-  
+  const txIdRaw = incomingPayload.transactionId || incomingPayload.id || '';
+  console.log('[idAnalyzerCallback] Received event=' + eventType + ', transactionId=' + txIdRaw);
+
+  // --- 1. DEAD-LETTER LOG: store raw payload immediately (before any processing) ---
+  let logEntry = null;
+  try {
+    logEntry = await sr.entities.PaymentEvent.create({
+      event_type: 'idanalyzer_webhook',
+      reference: txIdRaw,
+      payload: incomingPayload,
+      processed: false,
+    });
+  } catch (e) {
+    console.warn('[idAnalyzerCallback] Dead-letter log failed:', e.message);
+  }
+
+  // Helper to mark the log entry as processed
+  async function markProcessed() {
+    if (!logEntry) return;
+    try {
+      await sr.entities.PaymentEvent.update(logEntry.id, {
+        processed: true,
+        processed_at: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.warn('[idAnalyzerCallback] Mark processed failed:', e.message);
+    }
+  }
+
+  // --- 2. Event filtering — early return for non-conclusive events ---
   if (eventType && eventType !== 'docupass_conclusive') {
+    await markProcessed();
     return Response.json({ success: true, message: `Ignored event: ${eventType}` });
   }
 
-  // --- 2. Extract transactionId from incoming payload ---
-  const transactionId = incomingPayload.transactionId || incomingPayload.id;
+  // --- 3. Extract transactionId ---
+  const transactionId = txIdRaw;
   if (!transactionId) {
+    await markProcessed();
     return Response.json({ success: true, message: 'No transactionId in payload' });
   }
 
-  // --- 3. Fetch authoritative transaction from IDAnalyzer API ---
+  // --- 4. Fetch authoritative transaction from IDAnalyzer API ---
   const apiKey = Deno.env.get('IDANALYZER_API_KEY');
   if (!apiKey) {
     console.error('[idAnalyzerCallback] IDANALYZER_API_KEY not configured');
+    await markProcessed();
     return Response.json({ error: 'API key not configured' }, { status: 500 });
   }
 
   let payload;
   try {
-    console.log('[idAnalyzerCallback] Re-fetching transaction from IDAnalyzer API: ' + transactionId);
+    console.log('[idAnalyzerCallback] Re-fetching transaction: ' + transactionId);
     const res = await fetch(`https://api2.idanalyzer.com/transaction/${transactionId}`, {
       method: 'GET',
-      headers: {
-        'X-API-KEY': apiKey,
-        'Accept': 'application/json',
-      },
+      headers: { 'X-API-KEY': apiKey, 'Accept': 'application/json' },
     });
 
     if (res.status === 404) {
-      console.warn('[idAnalyzerCallback] Transaction not found (404). Silently discarding.');
-      return Response.json({ success: true, message: 'Transaction not found — not a genuine webhook' });
+      console.warn('[idAnalyzerCallback] Transaction not found (404). Discarding.');
+      await markProcessed();
+      return Response.json({ success: true, message: 'Transaction not found' });
     }
-
     if (res.status === 429) {
-     console.warn('[idAnalyzerCallback] Rate limited (429). Returning 503 for retry.');
-     return Response.json({ error: 'IDAnalyzer rate limited — retrying' }, { status: 503 });
+      console.warn('[idAnalyzerCallback] Rate limited (429). Returning 503.');
+      return Response.json({ error: 'IDAnalyzer rate limited' }, { status: 503 });
     }
-
-    // Return 500 for IDAnalyzer 5xx so they retry per their schedule
     if (res.status >= 500) {
-      console.error(`[idAnalyzerCallback] IDAnalyzer API error ${res.status}. Returning 500 for retry.`);
+      console.error(`[idAnalyzerCallback] IDAnalyzer API ${res.status}. Returning 500.`);
       return Response.json({ error: `IDAnalyzer API ${res.status}` }, { status: 500 });
     }
-
     if (!res.ok) {
       const errData = await res.text();
       console.error(`[idAnalyzerCallback] IDAnalyzer API error ${res.status}: ${errData}`);
@@ -88,45 +119,72 @@ Deno.serve(async (req) => {
     }
 
     payload = await res.json();
-    console.log('[idAnalyzerCallback] Successfully re-fetched transaction, decision=' + payload.decision);
+    console.log('[idAnalyzerCallback] Fetched. decision=' + payload.decision);
   } catch (e) {
-    console.error('[idAnalyzerCallback] Failed to fetch transaction:', e.message);
+    console.error('[idAnalyzerCallback] Fetch failed:', e.message);
     return Response.json({ error: 'Fetch exception: ' + e.message }, { status: 500 });
   }
 
-  // --- Continue with extracted transactionId and decision ---
   const decision = payload.decision;
   const customData = incomingPayload.customData || payload.customData;
 
-  if (!transactionId || !decision) {
-    return Response.json({ error: 'Missing required fields: transactionId, decision' }, { status: 400 });
+  if (!decision) {
+    await markProcessed();
+    return Response.json({ error: 'Missing decision' }, { status: 400 });
   }
 
   const statusMap = { accept: 'approved', review: 'pending', reject: 'rejected' };
   const docStatus = statusMap[decision] || 'pending';
 
-  // --- Identify user from customData (what we passed to DocuPass create) ---
+  // --- Identify user ---
   let userId = customData;
   if (!userId && payload.reference) userId = payload.reference;
-
   if (!userId) {
-   console.error(`[idAnalyzerCallback] No userId found for transactionId=${transactionId}`);
-   return Response.json({ success: true, message: 'No user reference in payload' });
+    console.error('[idAnalyzerCallback] No userId for transactionId=' + transactionId);
+    await markProcessed();
+    return Response.json({ success: true, message: 'No user reference' });
   }
 
-  // H5 fix: Validate userId is a real user before hydration (prevents identity theft)
+  // Validate user exists
   try {
-   const userExists = await base44.asServiceRole.entities.User.get(userId);
-   if (!userExists) {
-     console.error(`[idAnalyzerCallback] Invalid userId (not found): ${userId}`);
-     return Response.json({ error: 'User not found' }, { status: 400 });
-   }
+    const userExists = await sr.entities.User.get(userId);
+    if (!userExists) {
+      console.error('[idAnalyzerCallback] Invalid userId: ' + userId);
+      await markProcessed();
+      return Response.json({ error: 'User not found' }, { status: 400 });
+    }
   } catch (e) {
-   console.error(`[idAnalyzerCallback] Failed to validate userId: ${e.message}`);
-   return Response.json({ error: 'User validation failed' }, { status: 500 });
+    console.error('[idAnalyzerCallback] User validation failed: ' + e.message);
+    return Response.json({ error: 'User validation failed' }, { status: 500 });
   }
 
-  // --- 3. Extract ALL data fields with confidence (per Data Fields doc) ---
+  // --- 5. IDEMPOTENCY CHECK (enhanced) ---
+  // (a) If user already has this decision AND kyc_status is terminal, skip
+  try {
+    const existingUser = await sr.entities.User.get(userId);
+    if (existingUser?.docupass_decision === decision &&
+        ['verified', 'pending_confirmation'].includes(existingUser?.kyc_status)) {
+      console.log('[idAnalyzerCallback] Idempotent skip — already processed with same decision');
+      await markProcessed();
+      return Response.json({ success: true, message: 'Already processed (idempotent)' });
+    }
+  } catch (e) {
+    console.warn('[idAnalyzerCallback] User idempotency check failed:', e.message);
+  }
+
+  // (b) KycDocument idempotency by provider_reference
+  try {
+    const existing = await sr.entities.KycDocument.filter({ provider_reference: transactionId });
+    if (existing.length > 0 && existing[0].status === docStatus) {
+      console.log('[idAnalyzerCallback] Idempotent skip — KycDocument already processed');
+      await markProcessed();
+      return Response.json({ success: true, message: 'Already processed (idempotent)' });
+    }
+  } catch (e) {
+    console.warn('[idAnalyzerCallback] KycDocument idempotency check failed:', e.message);
+  }
+
+  // --- 6. Extract ALL data fields ---
   const data = payload.data || {};
   const outputImage = payload.outputImage || {};
   const warnings = payload.warning || [];
@@ -135,64 +193,48 @@ Deno.serve(async (req) => {
   const backUrl = outputImage.back || '';
   const faceUrl = outputImage.face || '';
 
-  // Correct IDAnalyzer v2 field names per https://developer.idanalyzer.com/help/data-fields
   const fieldDefs = [
-    // Names
     'fullName', 'firstName', 'middleName', 'lastName',
     'firstNameLocal', 'middleNameLocal', 'lastNameLocal', 'fullNameLocal',
-    // Dates
     'dob', 'dob_day', 'dob_month', 'dob_year',
     'expiry', 'expiry_day', 'expiry_month', 'expiry_year',
     'issued', 'issued_day', 'issued_month', 'issued_year',
     'daysToExpiry', 'daysFromIssue',
-    // Personal Information
     'age', 'sex', 'height', 'weight', 'hairColor', 'eyeColor',
     'address1', 'address2', 'postcode', 'placeOfBirth', 'religion',
-    // Document Information
     'documentNumber', 'personalNumber', 'documentSide', 'documentType', 'documentName',
     'internalId', 'issueAuthority',
     'stateFull', 'stateShort',
     'vehicleClass', 'restrictions', 'endorsement',
-    // Country & Nationality (correct v2 names)
     'countryFull', 'countryIso2', 'countryIso3',
     'nationalityFull', 'nationalityIso2', 'nationalityIso3',
-    // Other Data
     'optionalData', 'optionalData2', 'optionalData3', 'optionalData4',
   ];
 
   const fields = {};
   for (const key of fieldDefs) {
     const extracted = extractField(data[key]);
-    if (extracted) {
-      fields[key] = extracted;
-    }
+    if (extracted) fields[key] = extracted;
   }
 
-  // Capture extra fields not in our list (forward compatibility)
   const extraFields = {};
   for (const key of Object.keys(data)) {
     if (!fieldDefs.includes(key) && key !== 'face' && key !== 'authentication' && key !== 'aml') {
       const extracted = extractField(data[key]);
-      if (extracted && extracted.value != null) {
-        extraFields[key] = extracted;
-      }
+      if (extracted && extracted.value != null) extraFields[key] = extracted;
     }
   }
 
-  // Helper: get just the value from a field (avoids storing redundant `values` object)
   function fieldValue(key) {
-    const f = fields[key];
-    return f?.value ?? null;
+    return fields[key]?.value ?? null;
   }
 
-  // --- 4. Face match confidence from scores.faceCompare (NOT data.face) ---
+  // Face match confidence
   const scores = payload.scores || {};
   const faceConfidence = scores.faceCompare != null ? scores.faceCompare : null;
-
-  // Face identical: derive from threshold (>= 0.7 = identical match)
   const faceIsIdentical = faceConfidence != null ? faceConfidence >= 0.7 : null;
 
-  // --- Document authentication score (only anti-forgery warnings, not all high-severity) ---
+  // Document authentication score
   const ANTI_FORGERY_CODES = new Set([
     'IMAGE_FORGERY', 'FAKE_ID', 'FEATURE_VERIFICATION_FAILED',
     'ARTIFICIAL_IMAGE', 'RECAPTURED_DOCUMENT', 'SCREEN_DETECTED',
@@ -201,12 +243,11 @@ Deno.serve(async (req) => {
   const antiForgeryWarnings = warnings.filter(w => ANTI_FORGERY_CODES.has(w.code));
   const authScore = antiForgeryWarnings.length === 0 ? 1.0 : 0.0;
 
-  // --- OCR quality: ratio of expected fields successfully extracted ---
   const totalFieldDefs = fieldDefs.length;
   const extractedCount = Object.keys(fields).length;
   const matchRate = totalFieldDefs > 0 ? Math.round((extractedCount / totalFieldDefs) * 100) / 100 : null;
 
-  // --- PDF audit report URL from outputFile (no download needed) ---
+  // PDF audit report URL
   const outputFile = payload.outputFile || [];
   const auditReport = outputFile.find(f =>
     (f.name && f.name.toLowerCase().includes('audit')) ||
@@ -215,7 +256,6 @@ Deno.serve(async (req) => {
   );
   const auditReportUrl = auditReport?.fileUrl || null;
 
-  // Build extracted data JSON (strip bounding boxes + redundant values to reduce storage)
   const extractedData = {
     fields,
     extraFields,
@@ -236,21 +276,8 @@ Deno.serve(async (req) => {
     ? (warnings[0]?.description || 'Verification rejected by IDAnalyzer')
     : null;
 
-  // --- Idempotency check (BEFORE any DB writes) ---
-  try {
-    const existing = await base44.asServiceRole.entities.KycDocument.filter({
-      provider_reference: transactionId,
-    });
-    // If decision matches, we've already processed this transaction
-    if (existing.length > 0 && existing[0].status === docStatus) {
-      return Response.json({ success: true, message: 'Already processed (idempotent)' });
-    }
-  } catch (e) {
-    console.warn('[idAnalyzerCallback] Idempotency check failed:', e.message);
-  }
-
-  // --- 5. Upsert KycDocuments ---
-  const existingDocs = await base44.asServiceRole.entities.KycDocument.filter({ user_id: userId });
+  // --- 7. Upsert KycDocuments ---
+  const existingDocs = await sr.entities.KycDocument.filter({ user_id: userId });
   const docTypes = [
     { type: 'id_front', url: frontUrl },
     { type: 'id_back', url: backUrl },
@@ -258,25 +285,21 @@ Deno.serve(async (req) => {
   ];
 
   const upsertData = {
-    status: effectiveDocStatus,
+    status: docStatus,
     provider_name: 'idanalyzer_docupass',
     provider_reference: transactionId,
   };
-  if (effectiveDocStatus === 'approved') upsertData.reviewed_at = new Date().toISOString();
+  if (docStatus === 'approved') upsertData.reviewed_at = new Date().toISOString();
   if (rejectionReason) upsertData.rejection_reason = rejectionReason;
-  // GAP 1: For mismatch_reject, set rejection_reason
-  if (isMismatchReject) upsertData.rejection_reason = mismatchReason;
 
-  // Wrap KycDocument upsert in try-catch; return 500 on error so IDAnalyzer retries
   try {
     await Promise.all(docTypes.map(async ({ type, url }) => {
       const existing = existingDocs.find(d => d.document_type === type);
-      // FIX: fallback file_url to '' (empty string) not null — KycDocument.file_url is required string
       const recordData = { ...upsertData, file_url: url || existing?.file_url || '' };
       if (existing) {
-        await base44.asServiceRole.entities.KycDocument.update(existing.id, recordData);
+        await sr.entities.KycDocument.update(existing.id, recordData);
       } else {
-        await base44.asServiceRole.entities.KycDocument.create({
+        await sr.entities.KycDocument.create({
           user_id: userId,
           document_type: type,
           ...recordData,
@@ -288,76 +311,28 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'KycDocument upsert failed: ' + e.message }, { status: 500 });
   }
 
-  // Log warning if all 3 outputImage URLs are empty — indicates IDAnalyzer profile needs 'Return Output Image' enabled
   if (!frontUrl && !backUrl && !faceUrl) {
-    console.warn('[idAnalyzerCallback] All outputImage URLs are empty — verify IDAnalyzer KYC Profile has "Return Output Image" enabled in settings');
+    console.warn('[idAnalyzerCallback] All outputImage URLs empty — verify IDAnalyzer profile has "Return Output Image" enabled');
   }
 
-  // --- 6. GAP 1: Fetch user profile BEFORE any accept-path writes for cross-check ---
-  let existingNationalId = null;
+  // --- 8. Hydrate User ---
+  // Fetch user profile (for kyc_attempts increment on reject)
   let userProfile = null;
   try {
-    userProfile = await base44.asServiceRole.entities.User.get(userId);
-    existingNationalId = userProfile?.national_id || null;
+    userProfile = await sr.entities.User.get(userId);
   } catch (e) {
-    console.error('[idAnalyzerCallback] Failed to fetch user profile:', e.message);
+    console.error('[idAnalyzerCallback] Failed to fetch user:', e.message);
     return Response.json({ error: 'User profile fetch failed' }, { status: 500 });
   }
 
-  // --- GAP 1: Name & ID Number Hard Block (cross-check OCR vs profile) ---
-  const ocrFullName = fieldValue('fullName') || '';
-  const ocrDocumentNumber = fieldValue('documentNumber') || '';
-  const profileFullName = userProfile?.full_name || '';
-  const profileNationalId = userProfile?.national_id || '';
-
-  // Normalize both strings for comparison (case-insensitive, trimmed, collapse spaces)
-  const normalizeStr = (str) => String(str || '').toLowerCase().trim().replace(/\s+/g, ' ');
-  const ocrFullNameNorm = normalizeStr(ocrFullName);
-  const profileFullNameNorm = normalizeStr(profileFullName);
-  const ocrDocNumNorm = normalizeStr(ocrDocumentNumber);
-  const profileNationalIdNorm = normalizeStr(profileNationalId);
-
-  // Check for mismatches
-  const fullNameMismatch = ocrFullNameNorm && profileFullNameNorm && ocrFullNameNorm !== profileFullNameNorm;
-  const documentNumberMismatch = ocrDocNumNorm && profileNationalIdNorm && ocrDocNumNorm !== profileNationalIdNorm;
-
-  // Build mismatch reason if any field doesn't match
-  let mismatchReason = null;
-  if (fullNameMismatch || documentNumberMismatch) {
-    const reasons = [];
-    if (fullNameMismatch) {
-      reasons.push(`Full name on your profile: ${profileFullName || 'Not set'} / Full name on your ID: ${ocrFullName || 'Not extracted'}`);
-    }
-    if (documentNumberMismatch) {
-      reasons.push(`National ID on your profile: ${profileNationalId || 'Not set'} / National ID on your ID: ${ocrDocumentNumber || 'Not extracted'}`);
-    }
-    mismatchReason = reasons.join(' | ');
-  }
-
-  // --- GAP 1: If mismatch detected, override accept to mismatch_reject ---
-  let effectiveDecision = decision;
-  let isMismatchReject = false;
-  if (decision === 'accept' && (fullNameMismatch || documentNumberMismatch)) {
-    effectiveDecision = 'mismatch_reject';
-    isMismatchReject = true;
-    console.log('[idAnalyzerCallback] MISMATCH DETECTED - overriding accept to mismatch_reject:', mismatchReason);
-  }
-
-  // GAP 1 FIX: For mismatch_reject, override docStatus to 'rejected' (not 'approved')
-  const effectiveDocStatus = isMismatchReject ? 'rejected' : docStatus;
-
-  // --- 7. Hydrate User with essential fields + auto-set verification status ---
-  // This is SYNCHRONOUS (before returning 200) because the frontend polls for these fields.
-  // Wrap in try-catch; return 500 on error so IDAnalyzer retries.
   try {
     const userUpdate = {
       docupass_decision: decision,
       id_extracted_data: JSON.stringify(extractedData),
-      // Always mark report as fetched (we looked — URL either exists or doesn't)
       docupass_report_fetched: true,
     };
 
-    // Store key fields individually for querying/display
+    // Store confidence / metadata fields
     if (faceConfidence != null) userUpdate.id_face_confidence = faceConfidence;
     if (faceIsIdentical != null) userUpdate.id_face_identical = faceIsIdentical;
     if (authScore != null) userUpdate.id_authentication_score = authScore;
@@ -370,55 +345,52 @@ Deno.serve(async (req) => {
     if (fieldValue('nationalityFull')) userUpdate.id_nationality = fieldValue('nationalityFull');
     if (fieldValue('expiry')) userUpdate.id_expiry_date = normalizeDate(fieldValue('expiry'));
     if (fieldValue('issued')) userUpdate.id_issued_date = normalizeDate(fieldValue('issued'));
+    if (auditReportUrl) userUpdate.docupass_report_url = auditReportUrl;
 
-    // Store audit report URL directly (no PDF download — optimizes DB for millions of users)
-    if (auditReportUrl) {
-      userUpdate.docupass_report_url = auditReportUrl;
-    }
-
-    // Auto-set verification status based on decision
-    if (effectiveDecision === 'accept') {
-      userUpdate.kyc_status = 'verified';
-      userUpdate.verification_complete = true;
+    // --- ACCEPT: overwrite profile, set pending_confirmation ---
+    if (decision === 'accept') {
+      userUpdate.kyc_status = 'pending_confirmation';
+      userUpdate.verification_complete = false;
       userUpdate.phone_verified = true;
-      userUpdate.docupass_verified_at = new Date().toISOString();
-      userUpdate.wallet_tier = 2;
-      userUpdate.kyc_just_approved = true;
-      // GAP 2: Remove direct account_state write - transitionAccountState will handle it
-      // userUpdate.account_state = 'VERIFIED';
-      // userUpdate.account_state_updated_at = new Date().toISOString();
 
-      if (fieldValue('fullName')) userUpdate.id_extracted_name = fieldValue('fullName');
+      // Always overwrite full_name with OCR result
+      if (fieldValue('fullName')) {
+        userUpdate.full_name = fieldValue('fullName');
+        userUpdate.id_extracted_name = fieldValue('fullName');
+      }
+      // Always overwrite date_of_birth
       if (fieldValue('dob')) {
         userUpdate.id_extracted_dob = normalizeDate(fieldValue('dob'));
         userUpdate.date_of_birth = normalizeDate(fieldValue('dob'));
       }
-      if (fieldValue('documentNumber') && !existingNationalId) {
+      // Always overwrite national_id
+      if (fieldValue('documentNumber')) {
         userUpdate.national_id = fieldValue('documentNumber');
       }
-    } else if (effectiveDecision === 'mismatch_reject') {
-      // GAP 1: Mismatch reject - set kyc_status='rejected', store mismatch_reason, DON'T increment attempts
+      // Selfie → profile photo (overwrite avatar_url)
+      if (faceUrl) {
+        userUpdate.avatar_url = faceUrl;
+      }
+      // NOTE: Do NOT set wallet_tier, verification_complete, transitionAccountState,
+      // convertProvisionalPermit, or upgradeWallet here — that happens in confirmKycDetails
+    }
+    // --- REJECT: kyc_status='rejected', increment attempts ---
+    else if (decision === 'reject') {
       userUpdate.kyc_status = 'rejected';
       userUpdate.verification_complete = false;
-      userUpdate.kyc_mismatch_reason = mismatchReason;
-      userUpdate.docupass_decision = 'mismatch_reject';
-      // Don't increment kyc_attempts - mismatch is a profile data problem, not document quality
-    } else if (decision === 'reject') {
-      userUpdate.kyc_status = 'rejected';
-      userUpdate.verification_complete = false;
-      // FIX 8: Increment from the fetched user object, not the fresh update object
       userUpdate.kyc_attempts = (userProfile.kyc_attempts || 0) + 1;
-      // Don't set account_state here - transitionAccountState will handle it
-    } else if (decision === 'review') {
+    }
+    // --- REVIEW: kyc_status='pending', account_state='KYC_REVIEW' ---
+    else if (decision === 'review') {
       userUpdate.kyc_status = 'pending';
       userUpdate.verification_complete = false;
       userUpdate.account_state = 'KYC_REVIEW';
       userUpdate.account_state_updated_at = new Date().toISOString();
     }
 
-    await base44.asServiceRole.entities.User.update(userId, userUpdate);
+    await sr.entities.User.update(userId, userUpdate);
 
-    // Transition account state for reject decisions
+    // Reject → transitionAccountState(KYC_REJECTED)
     if (decision === 'reject') {
       try {
         await base44.functions.invoke('transitionAccountState', {
@@ -427,45 +399,11 @@ Deno.serve(async (req) => {
           metadata: { transactionId, rejectionReason },
         });
       } catch (stateError) {
-        console.error('[idAnalyzerCallback] State transition failed:', stateError);
+        console.error('[idAnalyzerCallback] State transition (reject) failed:', stateError.message);
       }
     }
 
-    // Wallet tier upgrade & AuditLog (SYNCHRONOUS before returning 200)
-    // C1 fix: Return 500 on tier upgrade failure to trigger IDAnalyzer retry
-    if (effectiveDecision === 'accept') {
-      // Convert provisional permit to full
-      try {
-        await base44.functions.invoke('convertProvisionalPermit', { userId });
-      } catch (permitError) {
-        console.error('[idAnalyzerCallback] Permit conversion failed:', permitError);
-      }
-
-      const tierUpgradeResult = await upgradeWalletTier(base44, userId);
-      if (tierUpgradeResult?.success === false) {
-        console.error('[idAnalyzerCallback] Wallet tier upgrade FAILED during KYC approval');
-        await base44.asServiceRole.entities.AuditLog.create({
-          user_id: userId,
-          action: 'wallet_tier_upgrade_failed',
-          description: `Wallet tier upgrade failed during KYC approval: ${tierUpgradeResult?.error || 'unknown error'}`,
-        });
-        // Return 500 to trigger IDAnalyzer retry
-        return Response.json({ error: 'Wallet tier upgrade failed' }, { status: 500 });
-      }
-
-      // GAP 2: Route accept through transitionAccountState instead of direct account_state write
-      try {
-        await base44.functions.invoke('transitionAccountState', {
-          userId,
-          event: 'KYC_ACCEPTED',
-          metadata: { transactionId, faceConfidence, auditReportUrl },
-        });
-      } catch (stateError) {
-        console.error('[idAnalyzerCallback] State transition failed:', stateError);
-        // Don't fail the webhook - state transition is best-effort here since kyc_status is already set
-      }
-    }
-    await base44.asServiceRole.entities.AuditLog.create({
+    await sr.entities.AuditLog.create({
       user_id: userId,
       action: 'idanalyzer_docupass_completed',
       entity_type: 'KycDocument',
@@ -473,49 +411,23 @@ Deno.serve(async (req) => {
       new_values: { decision, transactionId, faceConfidence, auditReportUrl },
     });
   } catch (e) {
-    console.error('[idAnalyzerCallback] User hydration or audit failed:', e.message);
+    console.error('[idAnalyzerCallback] User hydration failed:', e.message);
     return Response.json({ error: 'Hydration failed: ' + e.message }, { status: 500 });
   }
 
-  // --- SMS notification (fire-and-forget, acceptable to lose) ---
-  sendKycSms(base44, userId, decision).catch(() => {});
+  // --- SMS notification (reject only; accept SMS sent from confirmKycDetails) ---
+  if (decision === 'reject') {
+    sendKycSms(base44, userId, decision).catch(() => {});
+  }
 
-  // --- Return 200 immediately ---
-  // Per IDAnalyzer docs: "Your endpoint must return HTTP 200 within 10 seconds."
+  await markProcessed();
   return Response.json({ success: true, status: docStatus, decision });
 });
-
-// ---------------------------------------------------------------------------
-// Wallet tier upgrade (fire-and-forget, called after returning 200)
-// ---------------------------------------------------------------------------
-
-async function upgradeWalletTier(base44, userId) {
-  try {
-    const wallets = await base44.asServiceRole.entities.Wallet.filter({
-      user_id: userId, entity_type: 'personal',
-    });
-    if (wallets.length > 0) {
-      await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
-        tier: 2, status: 'active',
-      });
-      return { success: true };
-    }
-    return { success: false, error: 'No personal wallet found' };
-  } catch (e) {
-    console.warn('[idAnalyzerCallback] Wallet upgrade failed:', e.message);
-    return { success: false, error: e.message };
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Extract a field value and its confidence from IDAnalyzer v2 payload.
- * Per Data Fields doc: each key holds an ARRAY of {value, confidence, source, index, inputBox, outputBox}.
- * We strip inputBox/outputBox to reduce storage.
- */
 function extractField(field) {
   if (field == null) return null;
   if (typeof field === 'string') return { value: field, confidence: null };
@@ -537,24 +449,18 @@ function extractField(field) {
 
 function normalizeDate(dateStr) {
   if (!dateStr) return null;
-  // L10 fix: Validate ISO 8601 date format and ranges
   const cleaned = String(dateStr).replace(/\//g, '-');
-  
-  // Try YYYY-MM-DD format
   if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) {
     const result = cleaned.substring(0, 10);
     if (isValidDate(result)) return result;
     return null;
   }
-  
-  // Try DD-MM-YYYY → YYYY-MM-DD
   const parts = cleaned.split('-');
   if (parts.length === 3 && parts[2].length === 4) {
     const result = `${parts[2]}-${parts[1]}-${parts[0]}`;
     if (isValidDate(result)) return result;
     return null;
   }
-  
   return null;
 }
 
@@ -563,47 +469,31 @@ function isValidDate(dateStr) {
   if (!year || !month || !day) return false;
   if (month < 1 || month > 12) return false;
   if (day < 1 || day > 31) return false;
-  // Further validate based on month
   const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  if (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) {
-    daysInMonth[1] = 29;
-  }
+  if (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) daysInMonth[1] = 29;
   if (day > daysInMonth[month - 1]) return false;
-  // Sanity check: not in future, not before 1900
   const now = new Date();
   if (year > now.getFullYear() || year < 1900) return false;
   return true;
 }
 
-
-
-
-
-// ---------------------------------------------------------------------------
-// SMS notification (fire-and-forget)
-// ---------------------------------------------------------------------------
-
 async function sendKycSms(base44, userId, decision) {
   try {
     const user = await base44.asServiceRole.entities.User.get(userId);
     if (!user?.phone) return;
-
-    const templateKey = decision === 'accept' ? 'kyc_approved' : decision === 'reject' ? 'kyc_rejected' : null;
+    const templateKey = decision === 'reject' ? 'kyc_rejected' : null;
     if (!templateKey) return;
-
     const templates = await base44.asServiceRole.entities.SmsTemplate.filter({
       template_key: templateKey, is_active: true,
     });
     if (templates.length === 0) return;
-
     let body = templates[0].body;
     body = body.replace('{name}', user.id_extracted_name || user.full_name || 'Rider');
-
     await base44.functions.invoke('sendSms', {
       phone: user.phone, message: body, templateKey,
       eventType: templateKey, metadata: { decision, userId },
     });
   } catch (error) {
-    console.error(`[idAnalyzerCallback] SMS send failed: ${error.message}`);
+    console.error('[idAnalyzerCallback] SMS send failed: ' + error.message);
   }
 }

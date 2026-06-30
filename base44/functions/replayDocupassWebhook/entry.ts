@@ -3,11 +3,15 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 /**
  * Admin recovery tool: fetches a completed IDAnalyzer DocuPass transaction
  * by transactionId from the IDAnalyzer vault and processes it through the
- * same pipeline as idAnalyzerCallback (field extraction, KycDocument upsert,
- * User hydration, wallet tier upgrade, SasaPay KYC push, SMS, AuditLog).
+ * same pipeline as idAnalyzerCallback v3 (field extraction, KycDocument upsert,
+ * User hydration with pending_confirmation on accept).
  *
  * Bypasses signature verification (admin-initiated).
  * Force-overwrites existing KycDocuments (intentional recovery).
+ *
+ * On accept: sets kyc_status='pending_confirmation' and overwrites profile
+ * fields. The user must then confirm their details via confirmKycDetails.
+ * Does NOT push to SasaPay or upgrade wallet — that happens on user confirmation.
  *
  * Requires: super_admin or bodasure_staff role.
  * Requires: IDANALYZER_API_KEY secret.
@@ -53,10 +57,11 @@ Deno.serve(async (req) => {
 });
 
 // ---------------------------------------------------------------------------
-// Processing pipeline (mirrors idAnalyzerCallback, force-overwrites)
+// Processing pipeline (mirrors idAnalyzerCallback v3)
 // ---------------------------------------------------------------------------
 
 async function processTransaction(base44, payload, userId, adminUserId) {
+  const sr = base44.asServiceRole;
   const transactionId = payload.transactionId || payload.id || 'unknown';
   const decision = payload.decision;
 
@@ -136,27 +141,19 @@ async function processTransaction(base44, payload, userId, adminUserId) {
   const auditReportUrl = auditReport?.fileUrl || null;
 
   const extractedData = {
-    fields,
-    extraFields,
+    fields, extraFields,
     face: { confidence: faceConfidence, isIdentical: faceIsIdentical },
     authentication: { score: authScore, antiForgeryOnly: true },
-    warnings: warnings.map(w => ({
-      code: w.code,
-      description: w.description,
-      severity: w.severity,
-      decision: w.decision,
-    })),
-    transactionId,
-    decision,
-    auditReportUrl,
+    warnings: warnings.map(w => ({ code: w.code, description: w.description, severity: w.severity, decision: w.decision })),
+    transactionId, decision, auditReportUrl,
   };
 
   const rejectionReason = decision === 'reject'
     ? (warnings[0]?.description || 'Verification rejected by IDAnalyzer')
     : null;
 
-  // --- Upsert KycDocuments (force-overwrite, skip idempotency) ---
-  const existingDocs = await base44.asServiceRole.entities.KycDocument.filter({ user_id: userId });
+  // --- Upsert KycDocuments (force-overwrite) ---
+  const existingDocs = await sr.entities.KycDocument.filter({ user_id: userId });
   const docTypes = [
     { type: 'id_front', url: frontUrl },
     { type: 'id_back', url: backUrl },
@@ -175,20 +172,16 @@ async function processTransaction(base44, payload, userId, adminUserId) {
     const existing = existingDocs.find(d => d.document_type === type);
     const recordData = { ...upsertData, file_url: url || (existing?.file_url || '') };
     if (existing) {
-      await base44.asServiceRole.entities.KycDocument.update(existing.id, recordData);
+      await sr.entities.KycDocument.update(existing.id, recordData);
     } else {
-      await base44.asServiceRole.entities.KycDocument.create({
-        user_id: userId, document_type: type, ...recordData,
-      });
+      await sr.entities.KycDocument.create({ user_id: userId, document_type: type, ...recordData });
     }
   }));
 
   // --- Hydrate User ---
-  let existingNationalId = null;
   let userUpdate = {};
   try {
-    const targetUser = await base44.asServiceRole.entities.User.get(userId);
-    existingNationalId = targetUser?.national_id || null;
+    const targetUser = await sr.entities.User.get(userId);
     userUpdate = {
       docupass_decision: decision,
       id_extracted_data: JSON.stringify(extractedData),
@@ -210,74 +203,58 @@ async function processTransaction(base44, payload, userId, adminUserId) {
     if (auditReportUrl) userUpdate.docupass_report_url = auditReportUrl;
 
     if (decision === 'accept') {
-      userUpdate.kyc_status = 'verified';
-      userUpdate.verification_complete = true;
+      // Set pending_confirmation and overwrite profile fields
+      userUpdate.kyc_status = 'pending_confirmation';
+      userUpdate.verification_complete = false;
       userUpdate.phone_verified = true;
-      userUpdate.docupass_verified_at = new Date().toISOString();
-      userUpdate.wallet_tier = 2;
-      userUpdate.kyc_just_approved = true;
 
-      if (fieldValue('fullName')) userUpdate.id_extracted_name = fieldValue('fullName');
+      if (fieldValue('fullName')) {
+        userUpdate.full_name = fieldValue('fullName');
+        userUpdate.id_extracted_name = fieldValue('fullName');
+      }
       if (fieldValue('dob')) {
         userUpdate.id_extracted_dob = normalizeDate(fieldValue('dob'));
         userUpdate.date_of_birth = normalizeDate(fieldValue('dob'));
       }
-      if (fieldValue('documentNumber') && !existingNationalId) {
+      if (fieldValue('documentNumber')) {
         userUpdate.national_id = fieldValue('documentNumber');
       }
+      if (faceUrl) userUpdate.avatar_url = faceUrl;
     } else if (decision === 'reject') {
       userUpdate.kyc_status = 'rejected';
       userUpdate.verification_complete = false;
+      userUpdate.kyc_attempts = (targetUser.kyc_attempts || 0) + 1;
     } else if (decision === 'review') {
       userUpdate.kyc_status = 'pending';
       userUpdate.verification_complete = false;
+      userUpdate.account_state = 'KYC_REVIEW';
+      userUpdate.account_state_updated_at = new Date().toISOString();
     }
 
-    await base44.asServiceRole.entities.User.update(userId, userUpdate);
+    await sr.entities.User.update(userId, userUpdate);
   } catch (e) {
     console.warn('[replayDocupassWebhook] Failed to hydrate user:', e.message);
   }
 
-  // --- Wallet tier upgrade ---
-  if (decision === 'accept') {
-    try {
-      const wallets = await base44.asServiceRole.entities.Wallet.filter({
-        user_id: userId, entity_type: 'personal',
-      });
-      if (wallets.length > 0) {
-        await base44.asServiceRole.entities.Wallet.update(wallets[0].id, {
-          tier: 2, status: 'active',
-        });
-      }
-    } catch (e) {
-      console.warn('[replayDocupassWebhook] Wallet upgrade failed:', e.message);
-    }
-  }
-
   // --- AuditLog ---
   try {
-    await base44.asServiceRole.entities.AuditLog.create({
+    await sr.entities.AuditLog.create({
       user_id: userId,
       action: 'idanalyzer_docupass_replayed',
       entity_type: 'KycDocument',
-      description: `DocuPass transaction ${transactionId} manually replayed by admin ${adminUserId}. Decision: ${decision}. Face: ${faceConfidence}, Auth: ${authScore}.`,
+      description: `DocuPass ${transactionId} replayed by admin ${adminUserId}. Decision: ${decision}. Face: ${faceConfidence}, Auth: ${authScore}.`,
       new_values: { decision, transactionId, faceConfidence, authScore, auditReportUrl },
     });
   } catch (e) {
     console.warn('[replayDocupassWebhook] AuditLog failed:', e.message);
   }
 
-  // --- SasaPay KYC push (fire-and-forget) ---
-  if (decision === 'accept' && frontUrl && backUrl && faceUrl) {
-    pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }).catch(e =>
-      console.warn('[replayDocupassWebhook] SasaPay push failed:', e.message)
+  // --- SMS notification (reject only) ---
+  if (decision === 'reject') {
+    sendKycSms(base44, userId, decision).catch(e =>
+      console.warn('[replayDocupassWebhook] SMS failed:', e.message)
     );
   }
-
-  // --- SMS notification (fire-and-forget) ---
-  sendKycSms(base44, userId, decision).catch(e =>
-    console.warn('[replayDocupassWebhook] SMS failed:', e.message)
-  );
 
   return {
     success: true,
@@ -295,11 +272,14 @@ async function processTransaction(base44, payload, userId, adminUserId) {
     auditReportUrl,
     warnings: warnings.map(w => w.code),
     processedAt: new Date().toISOString(),
+    note: decision === 'accept'
+      ? 'User set to pending_confirmation — they must confirm details in the app to complete verification.'
+      : undefined,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Helpers (same as idAnalyzerCallback)
+// Helpers
 // ---------------------------------------------------------------------------
 
 function extractField(field) {
@@ -310,14 +290,10 @@ function extractField(field) {
   if (Array.isArray(field)) {
     if (field.length === 0) return null;
     const first = field[0];
-    if (typeof first === 'object') {
-      return { value: first.value ?? null, confidence: first.confidence ?? null };
-    }
+    if (typeof first === 'object') return { value: first.value ?? null, confidence: first.confidence ?? null };
     return { value: first, confidence: null };
   }
-  if (typeof field === 'object') {
-    return { value: field.value ?? null, confidence: field.confidence ?? null };
-  }
+  if (typeof field === 'object') return { value: field.value ?? null, confidence: field.confidence ?? null };
   return null;
 }
 
@@ -326,133 +302,27 @@ function normalizeDate(dateStr) {
   const cleaned = String(dateStr).replace(/\//g, '-');
   if (/^\d{4}-\d{2}-\d{2}/.test(cleaned)) return cleaned.substring(0, 10);
   const parts = cleaned.split('-');
-  if (parts.length === 3 && parts[2].length === 4) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
+  if (parts.length === 3 && parts[2].length === 4) return `${parts[2]}-${parts[1]}-${parts[0]}`;
   return cleaned.substring(0, 10);
 }
-
-// ---------------------------------------------------------------------------
-// SasaPay KYC push (same as idAnalyzerCallback)
-// ---------------------------------------------------------------------------
-
-async function pushToSasapay(base44, userId, { frontUrl, backUrl, faceUrl }) {
-  try {
-    const wallets = await base44.asServiceRole.entities.Wallet.filter({
-      user_id: userId, entity_type: 'personal',
-    });
-    if (wallets.length === 0) return;
-    const wallet = wallets[0];
-    if (!wallet.sasapay_account_number) return;
-
-    const user = await base44.asServiceRole.entities.User.get(userId);
-    if (!user?.phone) return;
-    const merchantCode = Deno.env.get('SASAPAY_MERCHANT_CODE');
-    if (!merchantCode) return;
-
-    const [token, faceFile, frontFile, backFile] = await Promise.all([
-      getSasapayToken(), downloadFile(faceUrl), downloadFile(frontUrl), downloadFile(backUrl),
-    ]);
-
-    const formData = new FormData();
-    formData.append('merchantCode', merchantCode);
-    formData.append('customerMobileNumber', user.phone);
-    formData.append('passportSizePhoto', faceFile, 'selfie.jpg');
-    formData.append('documentImageFront', frontFile, 'id_front.jpg');
-    formData.append('documentImageBack', backFile, 'id_back.jpg');
-
-    const response = await fetch(`${getSasapayApiUrl()}/waas/personal-onboarding/kyc/`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    });
-
-    const respText = await response.text();
-    let data;
-    try { data = JSON.parse(respText); } catch {
-      throw new Error(`SasaPay KYC returned non-JSON (HTTP ${response.status})`);
-    }
-
-    if (data.responseCode !== '0') {
-      throw new Error(`SasaPay KYC failed: ${data.message || data.responseCode}`);
-    }
-
-    await base44.asServiceRole.entities.Wallet.update(wallet.id, {
-      sasapay_account_status: data.data?.accountStatus || 'AWAITING_KYC_UPLOAD',
-      sasapay_kyc_uploaded_at: new Date().toISOString(),
-    });
-
-    await base44.asServiceRole.entities.AuditLog.create({
-      user_id: userId,
-      action: 'sasapay_kyc_uploaded',
-      entity_type: 'Wallet',
-      entity_id: wallet.id,
-      description: `SasaPay KYC uploaded from replay. Status: ${data.data?.accountStatus}`,
-    });
-  } catch (error) {
-    console.error(`[replayDocupassWebhook] SasaPay KYC push failed: ${error.message}`);
-  }
-}
-
-async function getSasapayToken() {
-  const clientId = Deno.env.get('SASAPAY_CLIENT_ID');
-  const clientSecret = Deno.env.get('SASAPAY_CLIENT_SECRET');
-  const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
-  const authUrl = `https://${env}.sasapay.app/api/v1/auth/token/?grant_type=client_credentials`;
-  const credentials = btoa(`${clientId}:${clientSecret}`);
-  const response = await fetch(authUrl, {
-    method: 'GET',
-    headers: { 'Authorization': `Basic ${credentials}` },
-  });
-  const text = await response.text();
-  let data;
-  try { data = JSON.parse(text); } catch {
-    throw new Error(`SasaPay auth returned non-JSON (HTTP ${response.status})`);
-  }
-  if (!data.access_token) {
-    throw new Error(`SasaPay auth failed: ${data.detail || data.error}`);
-  }
-  return data.access_token;
-}
-
-function getSasapayApiUrl() {
-  const env = Deno.env.get('SASAPAY_ENVIRONMENT') || 'sandbox';
-  return `https://${env}.sasapay.app/api/v2`;
-}
-
-async function downloadFile(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to download file: ${url}`);
-  return new File([await response.arrayBuffer()], 'file', {
-    type: response.headers.get('content-type') || 'image/jpeg',
-  });
-}
-
-// ---------------------------------------------------------------------------
-// SMS notification (same as idAnalyzerCallback)
-// ---------------------------------------------------------------------------
 
 async function sendKycSms(base44, userId, decision) {
   try {
     const user = await base44.asServiceRole.entities.User.get(userId);
     if (!user?.phone) return;
-
-    const templateKey = decision === 'accept' ? 'kyc_approved' : decision === 'reject' ? 'kyc_rejected' : null;
+    const templateKey = decision === 'reject' ? 'kyc_rejected' : null;
     if (!templateKey) return;
-
     const templates = await base44.asServiceRole.entities.SmsTemplate.filter({
       template_key: templateKey, is_active: true,
     });
     if (templates.length === 0) return;
-
     let body = templates[0].body;
     body = body.replace('{name}', user.id_extracted_name || user.full_name || 'Rider');
-
     await base44.functions.invoke('sendSms', {
       phone: user.phone, message: body, templateKey,
       eventType: templateKey, metadata: { decision, userId, replay: true },
     });
   } catch (error) {
-    console.error(`[replayDocupassWebhook] SMS send failed: ${error.message}`);
+    console.error('[replayDocupassWebhook] SMS failed: ' + error.message);
   }
 }

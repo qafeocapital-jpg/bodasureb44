@@ -99,13 +99,20 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
     };
   }, [polling, onDataChange]);
 
-  // Stop polling early if decision is available
+  // Stop polling early if decision is available OR pending_confirmation detected
   useEffect(() => {
-    if (polling && (user?.docupass_decision || allApproved)) {
+    if (polling && (user?.docupass_decision || allApproved || user?.kyc_status === 'pending_confirmation')) {
       setPolling(false);
       setShowOutcome(true);
     }
-  }, [user?.docupass_decision, allApproved, polling]);
+  }, [user?.docupass_decision, allApproved, user?.kyc_status, polling]);
+
+  // On mount: if user is already in pending_confirmation, show the confirm screen
+  useEffect(() => {
+    if (!showOutcome && user?.kyc_status === 'pending_confirmation' && user?.docupass_decision === 'accept') {
+      setShowOutcome(true);
+    }
+  }, [user?.kyc_status, user?.docupass_decision, showOutcome]);
 
   async function handleReturn() {
     await onDataChange();
@@ -148,10 +155,15 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
   }
 
   // === OUTCOME STATE (via DocupassResultScreen) ===
-  if (showOutcome && user?.docupass_decision) {
+  // Map kyc_status='pending_confirmation' to a 'pending_confirmation' decision for the result screen
+  const outcomeDecision = user?.kyc_status === 'pending_confirmation'
+    ? 'pending_confirmation'
+    : user?.docupass_decision;
+
+  if (showOutcome && outcomeDecision) {
     return (
       <DocupassResultScreen
-        decision={user.docupass_decision}
+        decision={outcomeDecision}
         user={user}
         kycDocs={kycDocs}
         attemptCount={user.docupass_attempt_count || 0}

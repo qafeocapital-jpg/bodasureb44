@@ -22,6 +22,7 @@
       "enum": [
         "unverified",
         "pending",
+        "pending_confirmation",
         "verified",
         "rejected"
       ],
@@ -292,6 +293,9 @@
       "default": false
     },
     "kyc_mismatch_reason": {
+      "type": "string"
+    },
+    "docupass_session_reference": {
       "type": "string"
     }
   }

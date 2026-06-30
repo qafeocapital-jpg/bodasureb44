@@ -8,13 +8,21 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    let targetUserId = user?.id;
+
+    // Allow passing userId explicitly (for admin/function-invoked calls)
+    try {
+      const body = await req.json();
+      if (body?.userId) targetUserId = body.userId;
+    } catch { /* no body — use authenticated user */ }
+
+    if (!targetUserId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const sr = base44.asServiceRole;
 
     // Find user's provisional permits
     const permits = await sr.entities.Permit.filter({ 
-      rider_id: user.id, 
+      rider_id: targetUserId, 
       permit_type: 'provisional', 
       status: 'active' 
     });
@@ -47,7 +55,7 @@ Deno.serve(async (req) => {
 
       // Audit log
       await sr.entities.AuditLog.create({
-        user_id: user.id,
+        user_id: targetUserId,
         action: 'permit_converted_to_full',
         entity_type: 'Permit',
         entity_id: permit.id,
