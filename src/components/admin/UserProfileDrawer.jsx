@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/AuthContext';
 import SubmissionsTab from '@/components/admin/drawer-tabs/SubmissionsTab';
 import RolesTab from '@/components/admin/drawer-tabs/RolesTab';
 import SendSmsModal from '@/components/admin/comms/SendSmsModal';
+import ResetKycCard from '@/components/admin/ResetKycCard';
 
 const DOC_TYPE_LABELS = {
   id_front: 'ID (Front)',
@@ -292,6 +293,16 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
                 ))
               ) : (
                 <EmptyState icon={FileText} message="No KYC documents uploaded" />
+              )}
+
+              {isSuper && (
+                <ResetKycCard
+                  userId={user.id}
+                  onResetComplete={() => {
+                    setLoaded(prev => ({ ...prev, kyc: false }));
+                    setTabData(prev => ({ ...prev, docs: [] }));
+                  }}
+                />
               )}
             </TabsContent>
 
