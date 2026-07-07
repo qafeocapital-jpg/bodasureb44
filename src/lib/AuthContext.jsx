@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
@@ -12,6 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const lastInvalidatedAt = useRef(null);
   const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
 
   useEffect(() => {
@@ -104,6 +105,7 @@ export const AuthProvider = ({ children }) => {
         throw { status: 401, message: 'No valid user session' };
       }
       setUser(currentUser);
+      lastInvalidatedAt.current = currentUser?.session_invalidated_at || null;
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
       setAuthChecked(true);
@@ -126,8 +128,22 @@ export const AuthProvider = ({ children }) => {
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
+      lastInvalidatedAt.current = currentUser?.session_invalidated_at || null;
     } catch (error) {
       console.error('Failed to refresh user:', error);
+    }
+  };
+
+  const checkSessionInvalidation = async () => {
+    try {
+      const freshUser = await base44.auth.me();
+      const freshTimestamp = freshUser?.session_invalidated_at;
+      if (freshTimestamp && freshTimestamp !== lastInvalidatedAt.current) {
+        lastInvalidatedAt.current = freshTimestamp;
+        setUser(freshUser);
+      }
+    } catch (e) {
+      // Silent — don't disrupt navigation
     }
   };
 
@@ -171,6 +187,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       navigateToLogin,
       refreshUser,
+      checkSessionInvalidation,
       checkUserAuth,
       checkAppState
     }}>

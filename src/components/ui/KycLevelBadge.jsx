@@ -8,8 +8,8 @@ import { Shield, Clock, ShieldCheck } from 'lucide-react';
  */
 export function getKycLevel(user, wallet) {
   if (!user) return 0;
-  if (user.kyc_status === 'verified' || user.wallet_tier >= 2) return 2;
-  if (user.kyc_status === 'pending' || user.wallet_tier === 1) return 1;
+  if (user.kyc_status === 'verified' || user.verification_complete) return 2;
+  if (user.kyc_status === 'pending' || user.kyc_status === 'pending_confirmation') return 1;
   return 0;
 }
 

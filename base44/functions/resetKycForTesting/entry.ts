@@ -73,6 +73,8 @@ Deno.serve(async (req) => {
       kyc_mismatch_reason: null,
       verification_complete: false,
       kyc_attempts: 0,
+      wallet_tier: 1,
+      session_invalidated_at: new Date().toISOString(),
     });
 
     // 5. Patch Wallet — tier=1, needs_review=false, PRESERVE SasaPay fields

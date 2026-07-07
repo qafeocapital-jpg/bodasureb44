@@ -14,7 +14,7 @@ export function checkServiceAccess(service, { user, wallet, bikes, countyLive })
   const profileComplete = user?.profile_complete === true;
   const hasBike = bikes && bikes.length > 0;
   const kycApproved = user?.kyc_status === 'verified';
-  const tier2 = (wallet?.tier || 0) >= 2 || (user?.wallet_tier || 0) >= 2;
+  const tier2 = kycApproved || (wallet?.tier || 0) >= 2;
 
   const services = {
     lipisha: {

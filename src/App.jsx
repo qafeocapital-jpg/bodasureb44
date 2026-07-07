@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
@@ -104,13 +104,20 @@ import Aml from './pages/marketing/Aml';
 import AcceptableUse from './pages/marketing/AcceptableUse';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user, checkSessionInvalidation } = useAuth();
+  const location = useLocation();
   const [minLoadDone, setMinLoadDone] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setMinLoadDone(true), 1000);
     return () => clearTimeout(timer);
   }, []);
+
+  // Detect session invalidation (e.g. after admin KYC reset) on navigation
+  useEffect(() => {
+    if (user) checkSessionInvalidation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   // Show branded loader while checking app public settings, auth, or minimum brand display window
   if (isLoadingPublicSettings || isLoadingAuth || !minLoadDone) {

@@ -93,6 +93,10 @@
       "type": "string",
       "format": "date-time"
     },
+    "session_invalidated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "kyc_attempts": {
       "type": "integer",
       "default": 0
