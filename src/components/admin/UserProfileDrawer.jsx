@@ -301,6 +301,7 @@ export default function UserProfileDrawer({ open, onOpenChange, user, wallet, sn
                   onResetComplete={() => {
                     setLoaded(prev => ({ ...prev, kyc: false }));
                     setTabData(prev => ({ ...prev, docs: [] }));
+                    if (onLinked) onLinked();
                   }}
                 />
               )}
