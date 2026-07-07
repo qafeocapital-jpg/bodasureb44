@@ -9,6 +9,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import BodaSureLoader from './components/BodaSureLoader';
 import ReamazeSSOProvider from './components/ReamazeSSOProvider';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
 import RiderLayout from './components/rider/RiderLayout';
 import StaffLayout from './components/staff/StaffLayout';
 import { saccoNav, merchantNav, agentNav, adminNav, commsNav } from './lib/staffNav';
@@ -268,6 +269,7 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
+          <PwaInstallPrompt />
           <Routes>
             {/* Auth routes — explicit so they render instead of falling through to AuthenticatedApp */}
             <Route path="/login" element={<Login />} />
