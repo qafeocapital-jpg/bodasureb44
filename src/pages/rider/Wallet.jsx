@@ -201,7 +201,7 @@ export default function Wallet() {
     { id: 'history', label: 'History', icon: History },
   ];
 
-  const needsTier2 = (activeTab === 'send' || activeTab === 'withdraw') && (wallet.tier || 0) < 2 && (user?.wallet_tier || 0) < 2;
+  const needsTier2 = (activeTab === 'send' || activeTab === 'withdraw') && (wallet.tier || 0) < 2 && user?.kyc_status !== 'verified';
 
   return (
     <div className="p-5 animate-fade-in">

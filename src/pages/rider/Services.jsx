@@ -85,7 +85,7 @@ export default function Services() {
 
   if (!wallet) return <PageSkeleton variant="hero-rows" />;
 
-  const isTier2 = (wallet?.tier || 0) >= 2 || (user?.wallet_tier || 0) >= 2;
+  const isTier2 = user?.kyc_status === 'verified' || (wallet?.tier || 0) >= 2;
 
   return (
     <div className="p-5 animate-fade-in">
