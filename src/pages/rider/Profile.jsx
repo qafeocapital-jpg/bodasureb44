@@ -37,6 +37,11 @@ export default function Profile() {
   const [docupassOutcome, setDocupassOutcome] = useState(null);
   const [group, setGroup] = useState(null);
 
+  // Re-fetch all data when admin resets KYC (session_invalidated_at changes)
+  useEffect(() => {
+    if (user?.session_invalidated_at) setHasInitialized(false);
+  }, [user?.session_invalidated_at]);
+
   useEffect(() => {
     async function load() {
       if (!user?.id || hasInitialized) return;

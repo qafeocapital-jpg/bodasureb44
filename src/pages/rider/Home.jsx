@@ -126,7 +126,7 @@ export default function Home() {
     }
     loadData();
     return () => { unsub?.(); clearTimeout(timeoutId); };
-  }, [user]);
+  }, [user, user?.session_invalidated_at]);
 
   if (loading) return <PageSkeleton variant="hero-grid" />;
 
