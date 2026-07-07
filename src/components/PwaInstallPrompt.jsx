@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useToast } from '@/components/ui/use-toast';
 import { Bike, Download, X, Share, SquarePlus, Check, Smartphone } from 'lucide-react';
 
 const DISMISS_KEY = 'bodasure_pwa_dismiss_count';
@@ -70,6 +71,7 @@ function recordDismiss() {
 
 export default function PwaInstallPrompt() {
   const location = useLocation();
+  const { toast } = useToast();
   const [visible, setVisible] = useState(false);
   const [showIOSPanel, setShowIOSPanel] = useState(false);
   const [iosDetected, setIosDetected] = useState(false);
@@ -92,6 +94,10 @@ export default function PwaInstallPrompt() {
       localStorage.setItem(INSTALLED_KEY, 'true');
       setVisible(false);
       setShowIOSPanel(false);
+      toast({
+        title: 'BodaSure added to your home screen 🎉',
+        description: 'Launch it anytime from your home screen.',
+      });
     }
     window.addEventListener('appinstalled', onInstalled);
     return () => window.removeEventListener('appinstalled', onInstalled);
