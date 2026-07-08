@@ -1,0 +1,63 @@
+---
+description: Base44 to Render+Supabase migration phase discipline — read MIGRATION_STATE.md first
+alwaysApply: false
+globs:
+  - "docs/MIGRATION_*"
+  - "supabase/**"
+  - "render.yaml"
+  - "api/**"
+  - "src/api/dataClient.js"
+  - "src/api/supabaseClient.js"
+---
+
+# BodaSure Cloud Migration Rules
+
+## Before any migration work
+
+1. Read `docs/MIGRATION_STATE.md` — note `CURRENT_PHASE` and `NEXT_PHASE`.
+2. Execute **only** the approved phase scope. Do not skip ahead.
+3. Read `docs/MIGRATION_ARCHITECTURE.md` for stack paths, env var names, and entity maps — **do not guess**.
+4. Wait for PM to say **"go to next phase"** before incrementing the phase number.
+
+## Phase gate (required at end of every phase)
+
+1. Complete the gate checklist in `docs/MIGRATION_PHASES.md` for that phase.
+2. Verify via MCP when the phase requires Render or Supabase checks.
+3. Run `npm run build` if any `src/` or build config changed.
+4. Append completion record to `docs/MIGRATION_STATE.md`.
+5. Give PM a plain-English summary + dashboard settings to confirm.
+
+## Live Base44 protection
+
+- **Do not** change production Base44 webhook URLs until Phase 26.
+- **Do not** remove `src/api/base44Client.js` until Phase 24+ is complete and PM approves.
+- **Do not** switch `VITE_STACK=supabase` on the live Base44 deployment.
+
+## Supabase rules
+
+- Enable RLS on every table in `public` schema.
+- Store roles in `app_metadata`, never authorize from `user_metadata`.
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` to frontend or commits.
+- Storage buckets for KYC/vehicle photos must be **private** with RLS.
+- Create migrations with `supabase migration new <name>` — never invent filenames.
+
+## Render rules
+
+- Bind HTTP servers to `0.0.0.0:$PORT`.
+- Secrets live in Render env vars or Supabase dashboard — never in git.
+- Webhook routes: `/webhooks/sasapay`, `/webhooks/idanalyzer`, `/webhooks/sms-delivery`.
+- Use Render MCP (`list_logs`, `list_deploys`, `get_service`) to verify deploys.
+
+## Fintech invariants (unchanged during migration)
+
+- SasaPay webhooks: HMAC-SHA512 constant-time verify; find by `checkout_request_id`.
+- Money movement: `Transaction` + `TransactionLeg` only — no direct wallet balance edits.
+- Identity lock-in: `full_name` / `middle_name` frozen after Phase 0 OTP confirm.
+- Read `src/FEATURE_CONTRACTS.md` and `.cursor/rules/bodasure-fintech-critical.mdc` for payment/KYC changes.
+
+## When to escalate to PM
+
+- Skip or combine migration phases.
+- Switch SasaPay or SMS to production environment.
+- Copy live Base44 rider data to staging before Phase 26 plan.
+- Change onboarding phase gates or KYC document types during rewire.
