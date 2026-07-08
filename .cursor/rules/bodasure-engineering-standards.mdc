@@ -1,0 +1,49 @@
+---
+description: Code quality, scale, and regression prevention for frontend and backend source edits
+alwaysApply: false
+globs:
+  - "src/**/*"
+  - "base44/**/*"
+---
+
+# BodaSure Engineering Standards
+
+## Repository Path Truth (Do Not Guess)
+
+- Entity schemas: `base44/entities/*.jsonc` (31 schemas)
+- Backend functions: `base44/functions/*/entry.ts` (40 handlers)
+- Frontend SDK: `src/api/base44Client.js` only — never instantiate a second client
+- No `src/entities/` or `src/functions/` — backend lives only under `base44/`
+
+## Scale Rules (1M+ Users)
+
+- No query loops inside React components (N+1 ban).
+- Lists and dashboards: one batch fetch or join — not staggered per-row requests.
+- Filter and paginate at database level; minimize payload size.
+- ComplianceDashboard pattern: collect IDs first, then `Promise.all` batch fetch.
+
+## Frontend Invariants (Prevent Silent Breaks)
+
+- Call `refreshUser()` after every `base44.auth.updateMe()` in the rider app.
+- Onboarding phases: do not change `getOnboardingPhase()` order without a migration plan.
+- Verification tasks: 0=identity, 1=bike, 2=owner — do not reorder indices.
+- Rider UI copy: say "BodaSure Wallet" — not "SasaPay".
+- Completed onboarding phases: read-only mode with `ReadOnlyBanner`.
+
+## Backend Invariants
+
+- Functions: `createClientFromRequest` → auth check → validate input → `asServiceRole` for admin/webhooks.
+- Normalize phone to E.164 `254XXXXXXXXX` before SasaPay and Africa's Talking API calls.
+- Coerce SasaPay `accountNumber` to string before Wallet entity write.
+
+## File Hygiene
+
+- Target ~200 lines per file; split orchestrators from presentational components.
+- Business logic belongs in `src/lib/` — not duplicated across pages.
+
+## When to Escalate to PM (Stop and Ask)
+
+- Remove duplicate phone/ID blocks or weaken webhook verification.
+- Change onboarding phase gates or KYC document types.
+- Switch SMS or SasaPay to production environment.
+- Schema changes without updating `src/ARCHITECTURE.md` and `src/FEATURE_CONTRACTS.md`.
