@@ -4,7 +4,7 @@ export function ReadOnlyBanner() {
   return (
     <div className="bg-muted border border-border rounded-xl p-3 flex items-center gap-2">
       <Lock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-      <p className="text-xs text-muted-foreground">This step is complete. Contact support to make changes.</p>
+      <p className="text-xs text-muted-foreground">This step is complete. You cannot make any more changes.</p>
     </div>
   );
 }

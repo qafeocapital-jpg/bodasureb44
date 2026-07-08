@@ -25,7 +25,7 @@ function mapTaskStatus(status) {
     case 'in_progress': return 'active';
     case 'submitted': return 'pending_review';
     case 'rejected': return 'rejected';
-    default: return 'locked';
+    default: return 'active';
   }
 }
 
@@ -141,8 +141,18 @@ export default function AccountVerificationSection({ user, bikes, kycDocs, group
                   </span>
                 )}
               </div>
-              <span className={`text-[10px] text-center font-medium leading-tight ${isGrey ? 'text-slate-400' : labelColorClass(step.state)}`}>
-                {step.label}
+              <span className={`text-[10px] text-center font-medium leading-tight ${
+                isGrey
+                  ? 'text-slate-400'
+                  : step.state === 'complete'
+                    ? 'text-green-600 font-semibold'
+                    : 'text-red-500 font-semibold'
+              }`}>
+                {isGrey
+                  ? step.label
+                  : step.state === 'complete'
+                    ? 'Done'
+                    : 'Not Done'}
               </span>
             </button>
           );
