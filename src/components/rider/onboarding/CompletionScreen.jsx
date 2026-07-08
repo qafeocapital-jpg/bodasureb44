@@ -24,6 +24,39 @@ export default function CompletionScreen({ onDone, verificationComplete, user })
   const isVerified = accountState === 'VERIFIED' || verificationComplete;
   const daysUntilExpiry = permitExpiry ? Math.ceil((permitExpiry - new Date()) / (1000 * 60 * 60 * 24)) : null;
 
+  if (isVerified) {
+    return (
+      <div className="text-center py-6 animate-fade-in">
+        <div className="w-24 h-24 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-5">
+          <Check className="w-12 h-12 text-success" strokeWidth={3} />
+        </div>
+        <h2 className="font-heading font-bold text-xl mb-2">You're All Set! 🎉</h2>
+        <p className="text-sm text-muted-foreground mb-6">Your account is fully verified and ready to go.</p>
+
+        <div className="space-y-2 mb-8 text-left">
+          {ONBOARDING_PHASES.map(phase => (
+            <div key={phase.id} className="flex items-center gap-3 bg-card border border-success/20 rounded-xl px-4 py-2.5">
+              <div className="w-7 h-7 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
+                <Check className="w-4 h-4 text-success" strokeWidth={3} />
+              </div>
+              <div>
+                <p className="text-sm font-medium">{phase.name}</p>
+                <p className="text-[10px] text-success">Complete</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={onDone}
+          className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm"
+        >
+          Go to Dashboard <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
   if (isBasicActive) {
     return (
       <div className="text-center py-6 animate-fade-in">
@@ -55,29 +88,16 @@ export default function CompletionScreen({ onDone, verificationComplete, user })
     );
   }
 
-  // VERIFIED state - original celebration
+  // Onboarding complete but not yet verified or basic_active
   return (
     <div className="text-center py-6 animate-fade-in">
-      <div className="w-24 h-24 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-5">
-        <Check className="w-12 h-12 text-success" strokeWidth={3} />
+      <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5">
+        <Check className="w-12 h-12 text-primary" strokeWidth={3} />
       </div>
-      <h2 className="font-heading font-bold text-xl mb-2">You're All Set! 🎉</h2>
-      <p className="text-sm text-muted-foreground mb-6">Your account is fully verified and ready to go.</p>
-
-      <div className="space-y-2 mb-8 text-left">
-        {ONBOARDING_PHASES.map(phase => (
-          <div key={phase.id} className="flex items-center gap-3 bg-card border border-success/20 rounded-xl px-4 py-2.5">
-            <div className="w-7 h-7 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
-              <Check className="w-4 h-4 text-success" strokeWidth={3} />
-            </div>
-            <div>
-              <p className="text-sm font-medium">{phase.name}</p>
-              <p className="text-[10px] text-success">Complete</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
+      <h2 className="font-heading font-bold text-xl mb-2">Setup Complete!</h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        You've completed all setup steps. Complete identity verification from your dashboard to unlock all features.
+      </p>
       <button
         onClick={onDone}
         className="w-full flex items-center justify-center gap-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm"

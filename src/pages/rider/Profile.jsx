@@ -48,7 +48,11 @@ export default function Profile() {
   // Handle direct verification task navigation from Home grid
   useEffect(() => {
     const task = location.state?.targetVerificationTask;
-    if (task) setVerificationTask(task);
+    if (task) {
+      setVerificationTask(task);
+    } else {
+      setVerificationTask(null);
+    }
   }, [location.state?.targetVerificationTask]);
 
   useEffect(() => {
