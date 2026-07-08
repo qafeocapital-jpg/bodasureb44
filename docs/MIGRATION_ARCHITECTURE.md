@@ -41,11 +41,11 @@ flowchart LR
   ApiProd --> SupaProd
 ```
 
-| Environment | Git branch | Render | Supabase project |
-|-------------|------------|--------|------------------|
-| Staging | `staging` | Staging static + API | `bodasure-staging` |
-| Production | `main` | Production static + API | `bodasure-production` |
-| Live (until cutover) | N/A | Base44 | Base44 |
+| Environment | Git repo / branch | Render | Supabase project |
+|-------------|-------------------|--------|------------------|
+| Staging | `BodaSureNewest` / `staging` | Staging static + API | `bodasure-staging` |
+| Production | `BodaSureNewest` / `main` | Production static + API | `bodasure-production` |
+| Live (until cutover) | `bodasureb44` / `main` | Base44 | Base44 |
 
 ---
 

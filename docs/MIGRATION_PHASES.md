@@ -29,7 +29,7 @@ Do not start the next phase until I say "go to next phase".
 | Phase | Title | Status | Gate |
 |-------|-------|--------|------|
 | **0** | Migration governance | COMPLETED | Docs + cursor rule + AGENTS.md exist |
-| **1** | New GitHub repo (BodaSureNewest) | PENDING | Repo exists; `staging` + `main` branches pushed |
+| **1** | New GitHub repo (BodaSureNewest) | IN PROGRESS | Repo exists; `staging` + `main` pushed — see `PHASE1_NEW_REPO_SETUP.md` |
 | **2** | MCP verification (Render + Supabase) | PENDING | Both MCPs authenticated; project IDs documented |
 | **3** | Supabase staging bootstrap | PENDING | `supabase/` scaffold; MCP `list_tables` OK |
 | **4** | Supabase Storage buckets | PENDING | Buckets + RLS policies confirmed |
