@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Bike, ChevronLeft, Check, AlertTriangle, Loader2, Camera, Clock, ShieldCheck } from 'lucide-react';
 import CameraCapture from '@/components/rider/onboarding/CameraCapture';
@@ -11,6 +12,7 @@ const BIKE_ANGLES = [
 ];
 
 export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange, onBack }) {
+  const navigate = useNavigate();
   const [plateNumber, setPlateNumber] = useState(vehicle?.plate_number || '');
   const [savingPlate, setSavingPlate] = useState(false);
   const [error, setError] = useState('');
@@ -109,8 +111,8 @@ export default function SubTaskBikePhotos({ user, vehicle, kycDocs, onDataChange
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
-        <ChevronLeft className="w-4 h-4" /> Back to tasks
+      <button onClick={() => navigate('/app')} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
+        <ChevronLeft className="w-4 h-4" /> Back to Dashboard
       </button>
 
       <div className="flex items-center gap-2">

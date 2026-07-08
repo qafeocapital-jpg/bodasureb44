@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { UserCheck, ChevronLeft, Check, AlertTriangle, Loader2, Send, ShieldCheck } from 'lucide-react';
 import { normalizePhone, formatPhoneDisplay } from '@/lib/phone';
 
 export default function SubTaskOwner({ user, vehicle, onDataChange, onBack }) {
+  const navigate = useNavigate();
   const [ownerPhone, setOwnerPhone] = useState(vehicle?.owner_phone || '');
   const [ownerName, setOwnerName] = useState(vehicle?.owner_name || '');
   const [sending, setSending] = useState(false);
@@ -85,8 +87,8 @@ export default function SubTaskOwner({ user, vehicle, onDataChange, onBack }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
-        <ChevronLeft className="w-4 h-4" /> Back to tasks
+      <button onClick={() => navigate('/app')} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
+        <ChevronLeft className="w-4 h-4" /> Back to Dashboard
       </button>
 
       <div className="flex items-center gap-2">

@@ -11,7 +11,9 @@ import PhasePersonal from '@/components/rider/onboarding/PhasePersonal';
 import PhaseBike from '@/components/rider/onboarding/PhaseBike';
 import PhaseMapBike from '@/components/rider/onboarding/PhaseMapBike';
 import PhaseSacco from '@/components/rider/onboarding/PhaseSacco';
-import PhaseVerification from '@/components/rider/onboarding/PhaseVerification';
+import SubTaskIdentity from '@/components/rider/onboarding/verification/SubTaskIdentity';
+import SubTaskBikePhotos from '@/components/rider/onboarding/verification/SubTaskBikePhotos';
+import SubTaskOwner from '@/components/rider/onboarding/verification/SubTaskOwner';
 import CompletionScreen from '@/components/rider/onboarding/CompletionScreen';
 import { getOrCreateWallet } from '@/lib/payments';
 import KycTierStatus from '@/components/rider/KycTierStatus';
@@ -35,12 +37,19 @@ export default function Profile() {
   const [wallet, setWallet] = useState(null);
   const [showDocupassResult, setShowDocupassResult] = useState(false);
   const [docupassOutcome, setDocupassOutcome] = useState(null);
+  const [verificationTask, setVerificationTask] = useState(null);
   const [group, setGroup] = useState(null);
 
   // Re-fetch all data when admin resets KYC (session_invalidated_at changes)
   useEffect(() => {
     if (user?.session_invalidated_at) setHasInitialized(false);
   }, [user?.session_invalidated_at]);
+
+  // Handle direct verification task navigation from Home grid
+  useEffect(() => {
+    const task = location.state?.targetVerificationTask;
+    if (task) setVerificationTask(task);
+  }, [location.state?.targetVerificationTask]);
 
   useEffect(() => {
     async function load() {
@@ -102,15 +111,18 @@ export default function Profile() {
         setCompletedPhase(phase);
         const targetPhase = location.state?.targetPhase;
         const viewStep = location.state?.viewStep;
+        const targetVerificationTask = location.state?.targetVerificationTask;
 
-        if (targetPhase !== undefined && targetPhase !== null) {
+        if (targetVerificationTask) {
+          setVerificationTask(targetVerificationTask);
+        } else if (targetPhase !== undefined && targetPhase !== null) {
           setCurrentPhase(targetPhase);
           setReadOnly(false);
         } else if (viewStep !== undefined && viewStep !== null && user?.onboarding_complete) {
           setCurrentPhase(viewStep);
           setReadOnly(true);
         } else {
-          setCurrentPhase(Math.min(phase, 5));
+          setCurrentPhase(Math.min(phase, 4));
           setReadOnly(false);
         }
       } catch (e) {}
@@ -136,8 +148,8 @@ export default function Profile() {
 
   async function handlePhaseComplete() {
     await refreshData();
-    setCurrentPhase(p => Math.min(p + 1, 5));
-    setCompletedPhase(p => Math.min(p + 1, 5));
+    setCurrentPhase(p => Math.min(p + 1, 4));
+    setCompletedPhase(p => Math.min(p + 1, 4));
   }
 
   const phaseInitialValues = (phase) => {
@@ -179,11 +191,29 @@ export default function Profile() {
     setReadOnly(false);
     const phase = getOnboardingPhase(user, vehicles, groupMembers, wallet);
     setCompletedPhase(phase);
-    setCurrentPhase(Math.min(phase, 5));
+    setCurrentPhase(Math.min(phase, 4));
     navigate('/app/profile', { replace: true, state: {} });
   };
 
   if (loading || !user) return <PageSkeleton variant="default" />;
+
+  // Direct verification sub-task rendering (from Home grid tile tap)
+  if (verificationTask) {
+    const vehicle = vehicles[0];
+    return (
+      <div className="p-5 animate-fade-in">
+        {verificationTask === 'identity' && (
+          <SubTaskIdentity user={user} kycDocs={kycDocs} onDataChange={refreshData} onBack={() => navigate('/app')} />
+        )}
+        {verificationTask === 'bike' && (
+          <SubTaskBikePhotos user={user} vehicle={vehicle} kycDocs={kycDocs} onDataChange={refreshData} onBack={() => navigate('/app')} />
+        )}
+        {verificationTask === 'owner' && (
+          <SubTaskOwner user={user} vehicle={vehicle} onDataChange={refreshData} onBack={() => navigate('/app')} />
+        )}
+      </div>
+    );
+  }
 
   // Issue 1: DocuPass result screen
   if (showDocupassResult) {
@@ -293,18 +323,7 @@ export default function Profile() {
             onExitReadOnly={handleExitReadOnly}
           />
         )}
-        {currentPhase === 4 && (
-          <PhaseVerification
-            user={user}
-            vehicle={vehicles[0]}
-            wallet={wallet}
-            onCompleted={() => setCurrentPhase(5)}
-            onBack={() => setCurrentPhase(3)}
-            readOnly={readOnly}
-            onExitReadOnly={handleExitReadOnly}
-          />
-        )}
-        {currentPhase >= 5 && (
+        {currentPhase >= 4 && (
           <CompletionScreen onDone={() => navigate('/app')} verificationComplete={user?.verification_complete} user={user} />
         )}
       </div>

@@ -112,7 +112,7 @@ export default function Home() {
         // Compute phase from local variables (not stale state) to avoid race condition
         const _phase = getOnboardingPhase(user, merged, gms, wallets[0] ?? null);
         setPhase(_phase);
-        if (_phase < 5) {
+        if (_phase < 4) {
           const seenKey = `bodasure_wizard_seen_${user.id}`;
           if (!localStorage.getItem(seenKey)) {
             setWizardStartScreen(0);
@@ -152,7 +152,7 @@ export default function Home() {
         servicesExpanded={servicesExpanded}
         setServicesExpanded={setServicesExpanded}
       />
-      {phase !== null && phase < 5 && (
+      {phase !== null && phase < 4 && (
         <OnboardingWizardModal
           open={wizardOpen}
           onClose={() => setWizardOpen(false)}
@@ -163,7 +163,7 @@ export default function Home() {
           startScreen={wizardStartScreen}
         />
       )}
-      {phase !== null && phase < 5 && (
+      {phase !== null && phase < 4 && (
         <OnboardingFAB
           phase={phase}
           userId={user?.id}

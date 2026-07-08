@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { User, Bike, MapPin, Users, ShieldCheck } from 'lucide-react';
+import { User, Bike, MapPin, Users } from 'lucide-react';
 import WizardStepCard from './WizardStepCard';
 
 const STEPS = [
@@ -7,12 +7,11 @@ const STEPS = [
   { name: 'Register Your Bike', icon: Bike, color: 'bg-blue-50 text-blue-600', route: '/app/bikes/register', state: null },
   { name: 'Map to County & Stage', icon: MapPin, color: 'bg-violet-50 text-violet-600', route: '/app/profile', state: { targetPhase: 2 } },
   { name: 'Join Your SACCO', icon: Users, color: 'bg-blue-50 text-blue-600', route: '/app/groups/register-sacco', state: null },
-  { name: 'Identity Verification', icon: ShieldCheck, color: 'bg-emerald-50 text-emerald-600', route: '/app/profile', state: { targetPhase: 4 } },
 ];
 
 export default function WizardStepOverview({ phase, onNavigate, onClose }) {
   const completedCount = phase;
-  const fillPct = (phase / 5) * 100;
+  const fillPct = (phase / 4) * 100;
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
@@ -25,7 +24,7 @@ export default function WizardStepOverview({ phase, onNavigate, onClose }) {
 
       <div className="px-5 py-6">
         <h2 className="font-heading font-extrabold text-xl text-foreground mb-1">Complete Your Setup</h2>
-        <p className="text-sm text-muted-foreground mb-4">{completedCount} of 5 steps complete</p>
+        <p className="text-sm text-muted-foreground mb-4">{completedCount} of 4 steps complete</p>
 
         <div className="w-full h-2 bg-muted rounded-full overflow-hidden mb-6">
           <div className="h-full bg-primary rounded-full transition-all duration-700" style={{ width: `${fillPct}%` }} />

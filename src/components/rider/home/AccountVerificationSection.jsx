@@ -62,7 +62,7 @@ export default function AccountVerificationSection({ user, bikes, kycDocs, group
   const tasks = getTaskStatuses(kycDocs, user, bikes?.[0]);
 
   // Hidden entirely once fully verified
-  if (phase >= 5 && user?.verification_complete) return null;
+  if (phase >= 4 && user?.verification_complete) return null;
 
   let completedCount = 0;
   const rows = STEPS.map((step) => {
@@ -98,7 +98,7 @@ export default function AccountVerificationSection({ user, bikes, kycDocs, group
         navigate('/app/profile', { state: { targetPhase: step.phase } });
       }
     } else if (step.type === 'verification') {
-      navigate('/app/profile', { state: { targetPhase: 4 } });
+      navigate('/app/profile', { state: { targetVerificationTask: step.taskId } });
     }
   };
 
@@ -141,19 +141,18 @@ export default function AccountVerificationSection({ user, bikes, kycDocs, group
                   </span>
                 )}
               </div>
-              <span className={`text-[10px] text-center font-medium leading-tight ${
-                isGrey
-                  ? 'text-slate-400'
-                  : step.state === 'complete'
-                    ? 'text-green-600 font-semibold'
-                    : 'text-red-500 font-semibold'
-              }`}>
-                {isGrey
-                  ? step.label
-                  : step.state === 'complete'
-                    ? 'Done'
-                    : 'Not Done'}
-              </span>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] text-center font-medium leading-tight text-slate-500">
+                  {step.label}
+                </span>
+                {!isGrey && (
+                  <span className={`text-[10px] text-center font-semibold leading-tight ${
+                    step.state === 'complete' ? 'text-green-600' : 'text-red-500'
+                  }`}>
+                    {step.state === 'complete' ? 'Done' : 'Not Done'}
+                  </span>
+                )}
+              </div>
             </button>
           );
         })}

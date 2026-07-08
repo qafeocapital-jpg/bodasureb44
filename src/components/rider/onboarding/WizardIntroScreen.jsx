@@ -12,8 +12,8 @@ const BENEFITS = [
 export default function WizardIntroScreen({ phase, firstName, onBegin, onClose }) {
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
-  const fillPct = (phase / 5) * 100;
-  const dashOffset = circumference * (1 - phase / 5);
+  const fillPct = (phase / 4) * 100;
+  const dashOffset = circumference * (1 - phase / 4);
 
   return (
     <div className="flex-1 overflow-y-auto bg-gradient-to-br from-orange-600 via-orange-600 to-orange-700">

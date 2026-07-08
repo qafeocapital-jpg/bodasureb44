@@ -6,7 +6,7 @@ export default function OnboardingFAB({ phase, userId, onOpen }) {
 
   useEffect(() => {
     if (!userId) return;
-    if (phase >= 5) {
+    if (phase >= 4) {
       const key = `bodasure_wizard_complete_${userId}`;
       const ts = localStorage.getItem(key);
       if (!ts) {
@@ -20,7 +20,7 @@ export default function OnboardingFAB({ phase, userId, onOpen }) {
 
   if (hidden) return null;
 
-  if (phase >= 5) {
+  if (phase >= 4) {
     return (
       <div className="fixed right-4 z-40" style={{ bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))' }}>
         <div className="bg-success text-success-foreground rounded-full px-4 py-2.5 shadow-lg flex items-center gap-2 text-sm font-semibold">
@@ -30,7 +30,7 @@ export default function OnboardingFAB({ phase, userId, onOpen }) {
     );
   }
 
-  const remaining = 5 - phase;
+  const remaining = 4 - phase;
   return (
     <button onClick={onOpen} className="fixed right-4 z-40 animate-pulse-glow" style={{ bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))' }}>
       <div className="bg-primary text-primary-foreground rounded-full px-4 py-2.5 shadow-lg shadow-primary/30 flex items-center gap-2 text-sm font-semibold">

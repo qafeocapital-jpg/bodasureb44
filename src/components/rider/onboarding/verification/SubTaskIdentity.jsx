@@ -182,8 +182,8 @@ export default function SubTaskIdentity({ user, kycDocs, onDataChange, onBack })
         <DocupassOverlay url={docupassUrl} onClose={handleCloseOverlay} />
       )}
 
-      <button onClick={onBack} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
-        <ChevronLeft className="w-4 h-4" /> Back to tasks
+      <button onClick={() => navigate('/app')} className="bg-muted text-foreground rounded-xl py-2.5 px-4 text-sm font-semibold flex items-center gap-1.5 w-full justify-center">
+        <ChevronLeft className="w-4 h-4" /> Back to Dashboard
       </button>
 
       <div className="flex items-center gap-2">
