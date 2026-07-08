@@ -5,7 +5,7 @@ export default function Footer() {
   return (
     <footer className="bg-foreground text-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-8">
           {/* Logo + tagline */}
           <div className="col-span-2 lg:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-3">
@@ -55,6 +55,16 @@ export default function Footer() {
               <li><Link to="/cookies" className="text-sm text-background/70 hover:text-primary transition-colors">Cookie Policy</Link></li>
               <li><Link to="/aml" className="text-sm text-background/70 hover:text-primary transition-colors">AML / KYC</Link></li>
               <li><Link to="/acceptable-use" className="text-sm text-background/70 hover:text-primary transition-colors">Acceptable Use</Link></li>
+            </ul>
+          </div>
+
+          {/* Our Policies */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-background/50 mb-3">Our Policies</h4>
+            <ul className="space-y-2.5">
+              <li><Link to="/consumer-protection" className="text-sm text-background/70 hover:text-primary transition-colors">Consumer Protection</Link></li>
+              <li><Link to="/refund-policy" className="text-sm text-background/70 hover:text-primary transition-colors">Refund Policy</Link></li>
+              <li><Link to="/complaints-redress" className="text-sm text-background/70 hover:text-primary transition-colors">Complaints Redress</Link></li>
             </ul>
           </div>
         </div>
