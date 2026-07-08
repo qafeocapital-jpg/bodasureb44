@@ -62,7 +62,7 @@ const STEPS = [
   {
     num: '1',
     title: 'Register & Get Your Wallet',
-    description: 'Sign up free, verify your ID, and activate your digital wallet in minutes. No county approval needed to start.',
+    description: 'Sign up free, verify your ID, and activate your digital wallet in minutes.',
   },
   {
     num: '2',
@@ -77,10 +77,10 @@ const STEPS = [
 ];
 
 const DARK_STATS = [
-  { value: '2,500+', label: 'riders joined this week' },
-  { value: 'KES 12M+', label: 'collected digitally' },
-  { value: '47', label: 'counties supported' },
-  { value: '100%', label: 'free to join' },
+  { value: '2.5M+', label: 'riders in Kenya\'s boda boda sector' },
+  { value: 'KES 660B', label: 'annual sector value' },
+  { value: '4.4%', label: 'share of national GDP' },
+  { value: '47', label: 'counties mandated to digitise under ICRMS 2025' },
 ];
 
 const Eyebrow = ({ children }) => (
@@ -163,7 +163,7 @@ export default function MarketingHome() {
               Get started in three simple steps
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              No county approval needed to register. Get your wallet today and ride with confidence.
+              Set up your wallet and start riding with confidence in just a few minutes.
             </p>
           </div>
           <div className="grid sm:grid-cols-3 gap-8">
@@ -273,7 +273,7 @@ export default function MarketingHome() {
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-success/10 border border-success/20 rounded-full px-3 py-1.5 mb-6">
               <CheckCircle2 className="w-4 h-4 text-success" />
-              <span className="text-xs font-semibold text-success tracking-wide">FREE TO JOIN · NO COUNTY APPROVAL NEEDED</span>
+              <span className="text-xs font-semibold text-success tracking-wide">FREE TO JOIN</span>
             </div>
             <h2 className="font-heading font-extrabold text-3xl sm:text-4xl lg:text-5xl tracking-tight">
               Get your digital wallet today
@@ -303,9 +303,9 @@ export default function MarketingHome() {
             <div className="text-center mb-8">
               <Eyebrow>FOR COUNTIES & SACCOs</Eyebrow>
               <h3 className="font-heading font-extrabold text-2xl sm:text-3xl tracking-tight mt-3">
-                Want to bring BodaSure to your county or SACCO?
+                Request a Callback
               </h3>
-              <p className="mt-3 text-muted-foreground">Request a demo and our team will reach out within 48 hours.</p>
+              <p className="mt-3 text-muted-foreground">Leave your details and our team will call you back within 48 hours.</p>
             </div>
             <DemoRequestForm />
           </div>

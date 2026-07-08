@@ -5,8 +5,6 @@ const PHONE_SCREENSHOT = 'https://media.base44.com/images/public/6a383cbbcd6dd93
 
 const TRUST_POINTS = [
   'Free to join',
-  'Works in all 47 counties',
-  'No county approval needed to register',
 ];
 
 export default function WalletHero() {
@@ -87,15 +85,6 @@ export default function WalletHero() {
           </div>
         </div>
 
-        {/* Social proof count strip */}
-        <div className="mt-12 lg:mt-16 flex justify-center lg:justify-start">
-          <div className="inline-flex items-center gap-3 bg-background/10 border border-background/20 rounded-full px-5 py-2.5">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-sm font-semibold text-background/80">
-              2,500+ riders joined this week · KES 12M+ collected digitally
-            </span>
-          </div>
-        </div>
       </div>
     </section>
   );

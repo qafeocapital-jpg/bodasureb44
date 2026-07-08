@@ -23,9 +23,9 @@ Deno.serve(async (req) => {
     try {
       await base44.asServiceRole.integrations.Core.SendEmail({
         to: 'hello@bodasure.co.ke',
-        subject: `New Demo Request: ${name} (${county})`,
+        subject: `New Callback Request: ${name} (${county})`,
         body: [
-          'New demo request received:',
+          'New callback request received:',
           '',
           `Name: ${name}`,
           `County: ${county}`,
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
           `Phone: ${phone}`,
           `Email: ${email}`,
           '',
-          'Please reach out within 48 hours to schedule the demo.',
+          'Please call them back within 48 hours.',
         ].join('\n'),
       });
     } catch (emailErr) {

@@ -30,7 +30,7 @@ export default function DemoRequestForm() {
         <CheckCircle2 className="w-12 h-12 text-success mx-auto mb-3" />
         <h3 className="font-heading font-bold text-lg mb-1">Request Received!</h3>
         <p className="text-sm text-muted-foreground">
-          Thank you, {form.name || 'there'}. Our team will reach out within 48 hours to schedule your demo.
+          Thank you, {form.name || 'there'}. Our team will call you back within 48 hours.
         </p>
       </div>
     );
@@ -81,7 +81,7 @@ export default function DemoRequestForm() {
         type="submit" disabled={submitting}
         className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm disabled:opacity-60 hover:opacity-90 transition-opacity"
       >
-        {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : 'Request Demo'}
+        {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : 'Request Callback'}
       </button>
       {error && (
         <div className="flex items-start gap-2 text-destructive text-sm bg-destructive/5 border border-destructive/20 rounded-xl p-3">
