@@ -80,7 +80,7 @@ export default function SaccoSplitPanel() {
             <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
               BodaSure gives boda boda SACCOs and chamas the tools to manage riders,
               collect stage fees and contributions digitally, and unlock new income
-              streams \u2014 all while giving your members the digital wallet and
+              streams, all while giving your members the digital wallet and
               compliance tools they need to ride without interruption.
             </p>
             <div className="mt-8 space-y-5">
