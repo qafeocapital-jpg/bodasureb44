@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Check, Wallet, PlayCircle } from 'lucide-react';
+import { ArrowRight, Check, PlayCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 const RIDER_PHOTO = 'https://media.base44.com/images/public/6a383cbbcd6dd93f84de66de/cfcd034cf_generated_image.png';
 
@@ -64,14 +64,25 @@ export default function WalletHero() {
                 />
               </div>
 
-              {/* Floating Active Wallets badge */}
-              <div className="absolute bottom-4 left-4 bg-card border border-border rounded-2xl px-4 py-3 shadow-xl flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Wallet className="w-5 h-5 text-primary" />
+              {/* Floating notification badges */}
+              <div className="absolute bottom-4 left-4 right-4 sm:right-auto flex flex-col gap-2.5">
+                <div className="bg-card border border-border rounded-2xl px-4 py-3 shadow-xl flex items-center gap-3 self-start">
+                  <div className="w-9 h-9 rounded-xl bg-success/10 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="w-5 h-5 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground leading-tight">Payment Received</p>
+                    <p className="font-bold text-sm text-foreground leading-tight">KES 150 from passenger</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground leading-tight">Active Wallets</p>
-                  <p className="font-heading font-extrabold text-lg text-foreground leading-tight">10,000+</p>
+                <div className="bg-card border border-border rounded-2xl px-4 py-3 shadow-xl flex items-center gap-3 self-start">
+                  <div className="w-9 h-9 rounded-xl bg-success/10 flex items-center justify-center flex-shrink-0">
+                    <ShieldCheck className="w-5 h-5 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground leading-tight">County Permit Active</p>
+                    <p className="font-bold text-sm text-foreground leading-tight">Valid until 31 Dec 2026</p>
+                  </div>
                 </div>
               </div>
             </div>
