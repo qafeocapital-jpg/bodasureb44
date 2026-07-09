@@ -103,6 +103,7 @@ import Terms from './pages/marketing/Terms';
 import Cookies from './pages/marketing/Cookies';
 import Aml from './pages/marketing/Aml';
 import AcceptableUse from './pages/marketing/AcceptableUse';
+import DataProtection from './pages/marketing/DataProtection';
 import ConsumerProtection from './pages/marketing/ConsumerProtection';
 import RefundPolicy from './pages/marketing/RefundPolicy';
 import ComplaintsRedress from './pages/marketing/ComplaintsRedress';
@@ -298,6 +299,7 @@ function App() {
               <Route path="/cookies" element={<Cookies />} />
               <Route path="/aml" element={<Aml />} />
               <Route path="/acceptable-use" element={<AcceptableUse />} />
+              <Route path="/data-protection" element={<DataProtection />} />
               <Route path="/consumer-protection" element={<ConsumerProtection />} />
               <Route path="/refund-policy" element={<RefundPolicy />} />
               <Route path="/complaints-redress" element={<ComplaintsRedress />} />

@@ -55,6 +55,7 @@ export default function Footer() {
               <li><Link to="/cookies" className="text-sm text-background/70 hover:text-primary transition-colors">Cookie Policy</Link></li>
               <li><Link to="/aml" className="text-sm text-background/70 hover:text-primary transition-colors">AML / KYC</Link></li>
               <li><Link to="/acceptable-use" className="text-sm text-background/70 hover:text-primary transition-colors">Acceptable Use</Link></li>
+              <li><Link to="/data-protection" className="text-sm text-background/70 hover:text-primary transition-colors">Data Protection Policy</Link></li>
             </ul>
           </div>
 
