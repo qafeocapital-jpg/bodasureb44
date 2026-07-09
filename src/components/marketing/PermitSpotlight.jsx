@@ -49,32 +49,56 @@ export default function PermitSpotlight() {
           {/* Right \u2014 permit card mockup */}
           <div className="flex justify-center lg:justify-end">
             <div className="relative w-full max-w-sm">
-              <div className="bg-card text-foreground rounded-3xl p-8 shadow-2xl">
-                <div className="flex items-center justify-between mb-6">
+              <div className="bg-card text-foreground rounded-3xl p-6 sm:p-8 shadow-2xl">
+                <div className="flex items-center justify-between mb-5">
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">BodaSure Permit</p>
-                    <p className="font-heading font-bold text-lg mt-1">Digital Licence</p>
+                    <p className="font-heading font-bold text-lg mt-0.5">Digital Licence</p>
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
-                    <ShieldCheck className="w-5 h-5 text-success" />
+                  <div className="inline-flex items-center gap-1.5 bg-success/10 text-success rounded-full px-2.5 py-1">
+                    <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                    <span className="text-xs font-bold">Active</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-center py-6 bg-accent rounded-2xl mb-6">
-                  <QrCode className="w-32 h-32 text-foreground" />
+
+                <div className="flex items-center justify-center py-5 bg-accent rounded-2xl mb-5">
+                  <QrCode className="w-28 h-28 text-foreground" />
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status</span>
-                    <span className="font-semibold text-success">Active</span>
+
+                <div className="space-y-2.5 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Rider Name</span>
+                    <span className="font-semibold">John Mwangi</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Plate</span>
-                    <span className="font-semibold">KMEA 221X</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">National ID</span>
+                    <span className="font-semibold font-mono">••••••782</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Valid until</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">County</span>
+                    <span className="font-semibold">Nairobi</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Sub-County</span>
+                    <span className="font-semibold">Westlands</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Bike Plate</span>
+                    <span className="font-semibold font-mono">KMEA 221X</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Permit Type</span>
+                    <span className="font-semibold">Monthly</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Valid Until</span>
                     <span className="font-semibold">31 Dec 2026</span>
                   </div>
+                </div>
+
+                <div className="mt-5 pt-4 border-t border-border flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-success flex-shrink-0" />
+                  <span className="text-xs text-muted-foreground">Verified by BodaSure &amp; County Government</span>
                 </div>
               </div>
             </div>

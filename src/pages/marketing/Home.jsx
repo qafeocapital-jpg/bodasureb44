@@ -33,7 +33,7 @@ const WALLET_FEATURES = [
   },
   {
     icon: Shield,
-    title: 'Insurance & Credit',
+    title: 'Insurance & Loans',
     description: 'Affordable motorbike insurance, access to loans, and chama savings \u2014 financial services built for riders.',
   },
   {
@@ -105,7 +105,7 @@ export default function MarketingHome() {
           <div className="text-center max-w-2xl mx-auto mb-12">
             <Eyebrow>ONE APP, EVERYTHING YOU NEED</Eyebrow>
             <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight mt-3">
-              Your boda boda wallet does it all
+              Your BodaSure Wallet does it all
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
               From collecting fares to proving compliance — BodaSure is the only app a rider needs.
