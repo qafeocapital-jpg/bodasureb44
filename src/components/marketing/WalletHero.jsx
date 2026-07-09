@@ -47,7 +47,7 @@ export default function WalletHero() {
             {/* Micro-copy */}
             <div className="mt-4">
               <span className="flex items-center gap-1.5 text-sm text-success font-medium">
-                <Check className="w-4 h-4" /> Get started in 2 minutes — it's free
+                <Check className="w-4 h-4" /> Get started in 2 minutes
               </span>
             </div>
           </div>
