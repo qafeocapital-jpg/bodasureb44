@@ -113,7 +113,6 @@ export default function Riders() {
         badge="For riders & bike owners"
         title="Ride. Earn. Grow. All in one app."
         subtitle="BodaSure is your all-in-one app — collect fares, pay county fees, get a digital permit, access loans, insurance, and the financial tools to go from renting a bike to owning one."
-        primaryCta={{ text: 'Sign Up Free', to: '/register' }}
       />
 
       {/* Section 2 — Dark Promise Band */}
@@ -264,16 +263,7 @@ export default function Riders() {
       <CTASection
         title="Join thousands of riders going digital."
         subtitle="Sign up free and start today — or ask your SACCO to onboard you and your group."
-      >
-        <div className="mt-8">
-          <Link
-            to="/register"
-            className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
-          >
-            Sign Up Free <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </CTASection>
+      />
     </>
   );
 }

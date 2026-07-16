@@ -87,11 +87,7 @@ export default function Saccos() {
             <p className="mt-6 text-lg sm:text-xl text-background/70 leading-relaxed max-w-2xl">
               BodaSure gives boda boda SACCOs, welfare groups and self-help groups the digital tools to track members, collect contributions, and unlock new income — so your group runs clean, stays accountable, and grows strong.
             </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <Link to="/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
-                Register your group <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
+
           </div>
         </div>
       </section>
@@ -282,9 +278,6 @@ export default function Saccos() {
         subtitle="Register your SACCO or welfare group on BodaSure, or talk to us about how your group can start earning — not just collecting."
       >
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link to="/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
-            Register your group <ArrowRight className="w-4 h-4" />
-          </Link>
           <button onClick={() => window.reamaze && window.reamaze('contact')} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-background text-foreground rounded-xl font-semibold text-sm hover:bg-background/90 transition-colors shadow-lg">
             Talk to us
           </button>

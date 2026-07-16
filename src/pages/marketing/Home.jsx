@@ -122,15 +122,7 @@ export default function MarketingHome() {
               </div>
             ))}
           </div>
-          <div className="text-center mt-10">
-            <Link
-              to="/register"
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm"
-            >
-              Get Your Free Wallet <ArrowRight className="w-4 h-4" />
-            </Link>
-            <MicroCopy />
-          </div>
+
         </div>
       </section>
 
@@ -160,15 +152,7 @@ export default function MarketingHome() {
               </div>
             ))}
           </div>
-          <div className="text-center mt-10">
-            <Link
-              to="/register"
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm"
-            >
-              Get Your Free Wallet <ArrowRight className="w-4 h-4" />
-            </Link>
-            <MicroCopy />
-          </div>
+
         </div>
       </section>
 
@@ -188,14 +172,7 @@ export default function MarketingHome() {
               SACCO, and access financial services right now. When your county goes live,
               you&rsquo;ll be ready to pay your licence and get your permit instantly.
             </p>
-            <div className="mt-8">
-              <Link
-                to="/register"
-                className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-xl font-bold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
-              >
-                Register Now — It&rsquo;s Free <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
+
           </div>
         </div>
       </section>
@@ -262,21 +239,7 @@ export default function MarketingHome() {
               Join thousands of riders already using BodaSure. Register free and start
               collecting fares, paying licences, and riding without harassment.
             </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-              <Link
-                to="/register"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-xl font-bold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
-              >
-                Get Your Free Wallet <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 border border-border text-foreground rounded-xl font-semibold text-sm hover:bg-accent transition-colors"
-              >
-                I Already Have an Account
-              </Link>
-            </div>
-            <MicroCopy />
+
           </div>
 
           {/* County/SACCO callback request */}

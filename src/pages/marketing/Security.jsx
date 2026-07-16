@@ -20,7 +20,6 @@ export default function Security() {
       <Hero
         title="Enterprise-Grade Security for Kenya's Most Important Transport Sector"
         subtitle="BodaSure is built to banking-grade security standards. From data encryption to identity verification, every layer is designed to protect riders, SACCOs, and counties."
-        primaryCta={{ text: 'Get Started', to: '/register' }}
       />
 
       <section className="py-20 lg:py-28">

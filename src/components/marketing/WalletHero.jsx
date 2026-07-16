@@ -31,24 +31,11 @@ export default function WalletHero() {
             {/* CTAs */}
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Link
-                to="/register"
-                className="inline-flex items-center justify-center gap-2 px-7 py-4 bg-primary text-primary-foreground rounded-xl font-bold text-sm hover:opacity-90 transition-opacity shadow-lg shadow-primary/30"
-              >
-                Get Your Free Wallet <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
                 to="/how-it-works"
                 className="inline-flex items-center justify-center gap-2 px-7 py-4 border border-border text-foreground rounded-xl font-semibold text-sm hover:bg-accent transition-colors"
               >
                 <PlayCircle className="w-4 h-4" /> See How It Works
               </Link>
-            </div>
-
-            {/* Micro-copy */}
-            <div className="mt-4">
-              <span className="flex items-center gap-1.5 text-sm text-success font-medium">
-                <Check className="w-4 h-4" /> Get started in 2 minutes
-              </span>
             </div>
           </div>
 
